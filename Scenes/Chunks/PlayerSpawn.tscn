@@ -1,0 +1,39 @@
+[gd_scene load_steps=4 format=3 uid="uid://cbkn47re2fiqg"]
+
+[ext_resource type="Script" uid="uid://bmqyp63b54y4q" path="res://Scripts/Terrain Gen/Chunk.cs" id="1_pid7i"]
+[ext_resource type="Script" uid="uid://ojqwcp715d0s" path="res://Scripts/GridSystem/GridCellStateOverride.cs" id="2_k62n0"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pid7i"]
+size = Vector3(3.3886108, 2.0489502, 5.987549)
+
+[node name="Node3D" type="Node3D"]
+script = ExtResource("1_pid7i")
+metadata/_custom_type_script = "uid://bmqyp63b54y4q"
+
+[node name="CSGBox3D" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.5, 8)
+use_collision = true
+collision_layer = 2
+size = Vector3(16, 1, 16)
+
+[node name="CSGBox3D2" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.604497, 4.6527596, 3)
+use_collision = true
+collision_layer = 2
+size = Vector3(3.3842773, 1, 6)
+
+[node name="CSGBox3D3" type="CSGBox3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.8660254, -0.5, 0, 0.5, 0.8660254, 7.6103563, 2.7204447, 9.224303)
+use_collision = true
+collision_layer = 2
+size = Vector3(3.395996, 1, 8)
+
+[node name="Area3D" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 5.6527596, 2)
+script = ExtResource("2_k62n0")
+useunitTeamSpawnOverride = true
+metadata/_custom_type_script = "uid://ojqwcp715d0s"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6010437, 0.47950602, 0.9923096)
+shape = SubResource("BoxShape3D_pid7i")

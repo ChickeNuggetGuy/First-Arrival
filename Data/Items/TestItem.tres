@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=7 format=3 uid="uid://c5ykfuhyygnx5"]
+
+[ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="1_3n6qk"]
+[ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="1_8fx0k"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_50k2r"]
+[ext_resource type="Script" uid="uid://cqk2q16xxuf4n" path="res://Scripts/GridSystem/GridShape.cs" id="2_qct33"]
+
+[sub_resource type="Resource" id="Resource_14h5b"]
+script = ExtResource("1_3n6qk")
+metadata/_custom_type_script = "uid://60yksynr5w30"
+
+[sub_resource type="Resource" id="Resource_qct33"]
+script = ExtResource("2_qct33")
+GridWidth = 2
+GridHeight = 2
+ShapeGrid = Array[bool]([true, true, true, true])
+metadata/_custom_type_script = "uid://cqk2q16xxuf4n"
+
+[resource]
+script = ExtResource("1_50k2r")
+ItemIcon = ExtResource("1_8fx0k")
+ItemShape = SubResource("Resource_qct33")
+ActionDefinitions = Array[Object]([SubResource("Resource_14h5b")])
+metadata/_custom_type_script = "uid://da4j8smky5g6x"

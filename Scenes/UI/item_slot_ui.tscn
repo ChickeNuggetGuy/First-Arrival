@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://daeffx1rbwqt6"]
+
+[ext_resource type="Script" uid="uid://ceyb5m1r60hb8" path="res://Scripts/UI/ItemSlotUI.cs" id="1_j2x77"]
+
+[node name="ItemSlotUI" type="Button"]
+custom_minimum_size = Vector2(50, 50)
+anchors_preset = -1
+offset_right = 50.0
+offset_bottom = 50.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 0
+expand_icon = true
+script = ExtResource("1_j2x77")
+metadata/_custom_type_script = "uid://ceyb5m1r60hb8"

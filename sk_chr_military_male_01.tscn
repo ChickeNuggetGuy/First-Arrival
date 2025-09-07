@@ -1,0 +1,5 @@
+[gd_scene load_steps=2 format=3 uid="uid://b1eef6eg5yfhk"]
+
+[ext_resource type="PackedScene" uid="uid://cexwpivjlg3hk" path="res://Third-Party Assets/Characters/Unreal_Characters/SK_Chr_MilitaryMale_01.fbx" id="1_v7p7r"]
+
+[node name="SK_Chr_MilitaryMale_01" instance=ExtResource("1_v7p7r")]

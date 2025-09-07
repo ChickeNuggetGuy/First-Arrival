@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://b1snx3p0mm70d"]
+
+[node name="MainMenu" type="Node3D"]
+
+[node name="Main Menu UI" type="Control" parent="."]
+layout_mode = 3
+offset_right = 1920.0
+offset_bottom = 1080.0
+size_flags_horizontal = 3
+size_flags_vertical = 3

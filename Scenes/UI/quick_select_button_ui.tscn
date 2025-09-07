@@ -1,0 +1,62 @@
+[gd_scene load_steps=3 format=3 uid="uid://dsp47ijjmg8gf"]
+
+[ext_resource type="Script" uid="uid://f4fqoib1q63y" path="res://Scripts/UI/QuickSelectButtonUI.cs" id="1_1sb64"]
+[ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="2_0xqlj"]
+
+[node name="QuickSelectButtonUI" type="Control" node_paths=PackedStringArray("_button")]
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 3
+anchors_preset = 0
+size_flags_vertical = 6
+script = ExtResource("1_1sb64")
+_button = NodePath("Button")
+metadata/_custom_type_script = "uid://f4fqoib1q63y"
+
+[node name="Button" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Button"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="Button/VBoxContainer"]
+layout_mode = 2
+text = "Player Playerson "
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Button/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="Button/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+stretch_mode = 1
+
+[node name="TextureRect" type="TextureRect" parent="Button/VBoxContainer/HBoxContainer/AspectRatioContainer"]
+layout_mode = 2
+texture = ExtResource("2_0xqlj")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Button/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ProgressBar" type="ProgressBar" parent="Button/VBoxContainer/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ProgressBar2" type="ProgressBar" parent="Button/VBoxContainer/HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ProgressBar3" type="ProgressBar" parent="Button/VBoxContainer/HBoxContainer/VBoxContainer"]
+layout_mode = 2
