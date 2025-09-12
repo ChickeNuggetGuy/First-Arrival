@@ -1,15 +1,20 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.ActionSystem.ItemActions;
+using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Utility;
 
 namespace FirstArrival.Scripts.Managers;
+
 [GlobalClass]
 public partial class ActionManager : Manager<ActionManager>
 {
+	public bool IsBusy { get; private set; }
 	public ActionDefinition SelectedAction { get; private set; }
+
 	protected override async Task _Setup()
 	{
 		return;
@@ -22,110 +27,144 @@ public partial class ActionManager : Manager<ActionManager>
 
 	public override void _Input(InputEvent @event)
 	{
+		if (IsBusy) return;
 		base._UnhandledInput(@event);
 		if (InputManager.Instance.MouseOverUI) return;
-		
-		if (@event is InputEventMouseButton  mouseButton)
-		{
-			if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
-			{
-				GridObject selectedGridObject = GridObjectManager.Instance
-					.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
-				if (selectedGridObject == null)
-				{
-					GD.Print("_Input: SelectedGridObject == null");
-					return;
-				}
 
-				GridCell currentGridCell = InputManager.Instance.currentGridCell;
-				if (currentGridCell == null)
+		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
+		{
+			GridObject selectedGridObject = GridObjectManager.Instance
+				.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
+			if (selectedGridObject == null)
+			{
+				GD.Print("_Input: SelectedGridObject == null");
+				return;
+			}
+
+			GridCell currentGridCell = InputManager.Instance.currentGridCell;
+			if (currentGridCell == null)
+			{
+				GD.Print("_Input: CurrentGridCell == null");
+				return;
+			}
+
+			if (SelectedAction != null)
+			{
+				MouseButton actionInput = SelectedAction.GetActionInput();
+
+				if (mouseButton.ButtonIndex == actionInput)
 				{
-					GD.Print("_Input: CurrentGridCell == null");
-					return;
+					if (TryTakeAction(SelectedAction, selectedGridObject, selectedGridObject.GridPositionData.GridCell,
+						    currentGridCell).Result)
+					{
+						return;
+					}
 				}
-				
-				 _ = TryTakeAction(SelectedAction,selectedGridObject, selectedGridObject.GridPositionData.GridCell, currentGridCell);
+			}
+
+			ActionDefinition[] actions = selectedGridObject.ActionDefinitions
+				.Where(action => action.GetIsAlwaysActive()).ToArray();
+			foreach (var action in actions)
+			{
+				if (mouseButton.ButtonIndex == action.GetActionInput())
+				{
+					TryTakeAction(action, selectedGridObject, selectedGridObject.GridPositionData.GridCell,
+						currentGridCell);
+				}
 			}
 		}
 	}
-	
+
 	public void SetSelectedAction(ActionDefinition action, Dictionary<string, Variant> extraData = null)
 	{
-		//Clear prevous Selected Action if there is onw
-		if (SelectedAction != null)
-		{
-			SelectedAction.extraData.Clear();
-		}
-		
 		SelectedAction = action;
-		if (extraData != null)
+		if (action is IItemActionDefinition itemActionDefinition)
 		{
-			SelectedAction.extraData = extraData;
+			if (extraData != null && extraData.ContainsKey("item"))
+			{
+				itemActionDefinition.Item = extraData["item"].As<Item>();
+			}
 		}
+
 		GD.Print($"set selected action {SelectedAction.GetActionName()}");
 	}
 
-	public async Task TryTakeAction(ActionDefinition action, GridObject gridObject, GridCell startingGridCell,
+	public async Task<bool> TryTakeAction(ActionDefinition action, GridObject gridObject, GridCell startingGridCell,
 		GridCell targetGridCell, Dictionary<string, Variant> extraData = null)
 	{
 		if (action == null)
 		{
 			GD.Print("TryTakeAction: action is null");
-			return ;
+			return false;
 		}
-		
+
 		if (gridObject == null)
 		{
 			GD.Print("TryTakeAction: gridObject is null");
-			return ;
+			return false;
 		}
-		
+
 		if (targetGridCell == null)
 		{
 			GD.Print("TryTakeAction: targetGridCell is null");
-			return ;
+			return false;
 		}
 
-		if (action.extraData != null && action.extraData.Count > 0)
-		{	if (extraData == null)
-			{
-				extraData = action.extraData;
-			}
-			else
-			{
-				foreach (var kvp in action.extraData)
-				{
-					extraData.Add(kvp.Key, kvp.Value);
-				}
-			}
-		}
-		if (SelectedAction is ItemActionDefinition itemActionDefinition)
+		if (action is IItemActionDefinition itemActionDefinition && itemActionDefinition.Item == null)
 		{
-			if (extraData == null)
-			{
-				GD.Print("tryTakeAction: extraData is null");
-				return ;
-			}
-			if(!extraData.ContainsKey("item"))
-			{
-				GD.Print("tryTakeAction: item is null");
-				return ;
-			}
+			GD.Print("tryTakeAction: Item is null");
+			return false;
 		}
 
-		var result = SelectedAction.CanTakeAction(gridObject, startingGridCell, targetGridCell, extraData,
-			out var data);
+		var result = action.CanTakeAction(gridObject, startingGridCell, targetGridCell, out var costs,
+			out string reason);
 
 		if (result == true)
 		{
-			GD.Print($"Time units {data.costs[Enums.Stat.TimeUnits]} , Stamina {data.costs[Enums.Stat.Stamina]}");
-			await SelectedAction.InstantiateActionCall(gridObject, startingGridCell, targetGridCell, (data.costs, data.extraData));
-			return;
+			GD.Print($"action: {action.GetActionName()} can be taken, starting execution");
+			SetIsBusy(true);
+			await action.InstantiateActionCall(gridObject, startingGridCell, targetGridCell, costs);
+			return true;
 		}
 		else
 		{
-			GD.Print(data.reason);
-			return ;
+			GD.Print(reason);
+			return false;
 		}
+	}
+
+	public void ActionCompleteCall(ActionDefinition action)
+	{
+		GD.Print("action complete");
+
+		switch (action)
+		{
+			case null:
+				GD.Print("Action is null");
+				return;
+			case IItemActionDefinition itemActionDefinition:
+				itemActionDefinition.Item = null;
+				break;
+			case MoveActionDefinition moveActionDefinition:
+				moveActionDefinition.path = null;
+				break;
+		}
+
+		if (action.GetIsAlwaysActive())
+			SetIsBusy(false);
+
+		if (action != SelectedAction) return;
+
+
+		if (!action.remainSelected)
+		{
+			SetSelectedAction(GridObjectManager.Instance.CurrentPlayerGridObject.ActionDefinitions.First());
+		}
+	}
+
+	public void SetIsBusy(bool isBusy)
+	{
+		IsBusy = isBusy;
+		GD.Print($"ActionManager: SetIsBusy: {isBusy} ");
 	}
 }

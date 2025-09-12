@@ -81,7 +81,19 @@ public class Enums
 	public enum InventorySettings
 	{
 		None = 0,
-		isEquipmentinventory,
-		UseItemSizes
+		IsEquipmentinventory = 1,
+		UseItemSizes = 2,
+		CanExecuteActions = 4 
 	}
+
+
+	#region UI Enums
+
+	public enum UIAnimationType
+	{
+		Translate,
+		Scale,
+		Rotate,
+	}
+	#endregion
 }

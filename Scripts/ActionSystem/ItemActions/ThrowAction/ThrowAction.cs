@@ -9,7 +9,8 @@ using Godot.Collections;
 
 namespace FirstArrival.Scripts.ActionSystem.ItemActions.ThrowAction;
 
-public class ThrowAction : ItemAction, ICompositeAction
+
+public class ThrowAction : Action, ICompositeAction, IItemAction
 {
 	public Action ParentAction
 	{
@@ -17,42 +18,32 @@ public class ThrowAction : ItemAction, ICompositeAction
 	public List<Action> SubActions { get; set; }
 	public Item Item { get; set; }
 
-	protected List<GridCell> path =  new List<GridCell>();
-	protected Array<Vector3> vectorPath =  new Array<Vector3>();
+	protected GridCell[] path;
+	protected Vector3[] vectorPath ;
 	public ThrowAction()
 	{
 		
 	}
-	public ThrowAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
-		(System.Collections.Generic.Dictionary<Enums.Stat, int> costs, System.Collections.Generic.Dictionary<string, Variant> extraData) data) : base(parentGridObject, startingGridCell, targetGridCell, data)
+	public ThrowAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, ActionDefinition parentAction,
+		Vector3[] vPath, System.Collections.Generic.Dictionary<Enums.Stat, int> costs) :
+		base(parentGridObject, startingGridCell, targetGridCell, parentAction, costs)
 	{
 		GridSystem gridSystem = GridSystem.Instance;
-
-		if (data.extraData.TryGetValue("path", out Variant pathVariant))
+		if (parentAction is ThrowActionDefinition throwActionDefinition)
 		{
-			Array<Vector3I> p = pathVariant.As<Array<Vector3I>>();
-			foreach (var gridCoords in p)
-			{
-				GridCell cell = gridSystem.GetGridCell(gridCoords);
-				if (cell != null)
-					path.Add(cell);
-			}
+			
 		}
-		else
+		if (vPath == null  || vPath.Length == 0)
 		{
 			GD.Print("Path not found!");
 		}
-
-		if (data.extraData.TryGetValue("vectorPath", out Variant vectorPathVariant))
-		{
-			vectorPath = vectorPathVariant.As<Array<Vector3>>();
-		}
+		vectorPath = vPath;
 	}
 
 	protected override Task Setup()
 	{
 		ParentAction = this;
-		if (path == null || path.Count == 0)
+		if (path == null || path.Length == 0)
 		{
 			GD.Print("Setup Path not found!");
 			
@@ -74,7 +65,7 @@ public class ThrowAction : ItemAction, ICompositeAction
 			if (rotateActionDefinition == null) return Task.CompletedTask;
 
 			RotateAction rotateAction = (RotateAction)rotateActionDefinition.InstantiateAction(parentGridObject, 
-				startingGridCell, targetGridCell,(costs,null));
+				startingGridCell, targetGridCell,costs);
 			
 			SubActions.Add(rotateAction);
 		}
@@ -86,7 +77,7 @@ public class ThrowAction : ItemAction, ICompositeAction
 		GD.Print("ThrowAction");
 		GridSystem gridSystem = GridSystem.Instance;
 		CsgSphere3D visual = new CsgSphere3D();
-		visual.Radius = 2;
+		visual.Radius = 0.5f;
 		parentGridObject.GetTree().Root.AddChild(visual);
 		visual.GlobalPosition = vectorPath[0];
 		
@@ -99,10 +90,30 @@ public class ThrowAction : ItemAction, ICompositeAction
 			await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
 		}
 
+
+
+		if (Item == null)
+		{
+			GD.Print("item is null");
+		}
+		if (Item.currentGrid == null)
+		{
+			GD.Print("Item inventory not found");
+		}
+		else
+		{
+			GD.Print("Item inventory found!");
+		}
+		if (!InventoryGrid.TryTransferItem(Item.currentGrid, targetGridCell.InventoryGrid, Item))
+		{
+			GD.Print("Failed to transfer item");
+		}
+		else
+		{
+			GD.Print($"Successfully transfed item to {targetGridCell.gridCoordinates} inventory {targetGridCell.InventoryGrid.ItemCount}");
+		}
 		GD.Print("Execute Throw Action");
 		visual.QueueFree();
-	
-		targetGridCell.InventoryGrid.TryAddItem(Item);
 		return;
 	}
 

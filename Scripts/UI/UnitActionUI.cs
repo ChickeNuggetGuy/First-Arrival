@@ -15,17 +15,26 @@ public partial class UnitActionUI : UIWindow
 	List<ActionButtonUI>  _actionButtons = new List<ActionButtonUI>();
 	
 	[Export] private VBoxContainer _statBarContainer;
+	private List<GridStatBarUI> _statBars = new List<GridStatBarUI>();
 
 
 	protected override async Task _Setup()
 	{
 		await base._Setup();
+		GridObject selectedGridObject = GridObjectManager.Instance.CurrentPlayerGridObject;
+		
 		foreach (UIElement uiElement in uiElements)
 		{
 			if (uiElement is ActionButtonUI actionButtonUI)
 			{
 				_actionButtons.Add(actionButtonUI);
 			}
+			
+			if (uiElement is GridStatBarUI statBarUI)
+				{
+				_statBars.Add(statBarUI);
+				statBarUI.SetupStatBar(selectedGridObject);
+				}
 		}
 		GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).SelectedGridObjectChanged += OnSelectedGridObjectChanged;
 	}
@@ -33,6 +42,7 @@ public partial class UnitActionUI : UIWindow
 	private void OnSelectedGridObjectChanged(GridObject gridObject)
 	{
 		UpdateActionButtons(gridObject);
+		UpdateStatBars(gridObject);
 	}
 
 	private void UpdateActionButtons(GridObject gridObject)
@@ -53,6 +63,15 @@ public partial class UnitActionUI : UIWindow
 		}
 	}
 
+	private void UpdateStatBars(GridObject gridObject)
+	{
+		if (gridObject == null) return;
+
+		foreach (GridStatBarUI statBarUI in _statBars)
+		{
+			statBarUI.SetupStatBar(gridObject);
+		}
+	}
 
 	private async Task CreateActionButton(ActionDefinition actionDefinition)
 	{

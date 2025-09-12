@@ -13,4 +13,5 @@ metadata/_custom_type_script = "uid://cqk2q16xxuf4n"
 script = ExtResource("1_a6hed")
 InventoryType = 1
 GridShape = SubResource("Resource_jmo66")
+InventorySettings = 2
 metadata/_custom_type_script = "uid://bhryrg4yb7i00"

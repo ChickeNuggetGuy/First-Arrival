@@ -8,26 +8,15 @@ using Godot;
 public partial class MoveStepActionDefinition : ActionDefinition
 {
 	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
-		(Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData) data)
+		Dictionary<Enums.Stat, int> costs)
 	{
-		return new MoveStepAction(parent, startGridCell, targetGridCell, data);
+		return new MoveStepAction(parent, startGridCell, targetGridCell,this, costs);
 	}
 
-	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell,  Dictionary<string, Variant> extraData,
-		out(Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData, string reason) outdata)
+	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell,  out Dictionary<Enums.Stat, int> costs,
+		out string reason)
 	{
-		outdata = new();
-		if (extraData != null && extraData.Count > 0)
-		{
-			outdata.extraData = extraData;
-		}
-		else
-		{
-			outdata =new (new Dictionary<Enums.Stat, int>(),
-			new Dictionary<string, Variant>(), "");
-		}
-		
-		outdata.costs = new Dictionary<Enums.Stat, int>()
+		costs = new Dictionary<Enums.Stat, int>()
 		{
 			{ Enums.Stat.TimeUnits, 0 },
 			{ Enums.Stat.Stamina, 0 },
@@ -37,13 +26,13 @@ public partial class MoveStepActionDefinition : ActionDefinition
 			{ Enums.Stat.TimeUnits, -1 },
 			{ Enums.Stat.Stamina, -1 },
 		};
-		outdata.reason = "";
+		reason = "";
 
 
 		if (!GetValidGridCells(parentGridObject,startingGridCell).Contains(targetGridCell))
 		{
-			outdata.reason = "Target grid cell is not valid";
-			outdata.costs = failedCosts;
+			reason = "Target grid cell is not valid";
+			costs = failedCosts;
 			return false;
 		}
 		
@@ -51,8 +40,8 @@ public partial class MoveStepActionDefinition : ActionDefinition
 		if(neighbors.Count == 0) return false;
 		if (!neighbors.Contains(startingGridCell))
 		{
-			outdata.reason = "Starting grid cell not neighbor of target grid cell";
-			outdata.costs = failedCosts;
+			reason = "Starting grid cell not neighbor of target grid cell";
+			costs = failedCosts;
 			return false;
 		}
 		
@@ -64,41 +53,43 @@ public partial class MoveStepActionDefinition : ActionDefinition
 				parentGridObject.ActionDefinitions.FirstOrDefault(a => a is RotateActionDefinition) as RotateActionDefinition;
 			if (rotateActionDefinition == null)
 			{
-				outdata.reason = "No rotate action definition on grid object";
-				outdata.costs = failedCosts;
+				reason = "No rotate action definition on grid object";
+				costs = failedCosts;
 				return false;
 			}
 
-			if (!rotateActionDefinition.CanTakeAction(parentGridObject, startingGridCell, targetGridCell,null,
-				    out var rotateData
-			    ))
+			if (!rotateActionDefinition.CanTakeAction(parentGridObject, startingGridCell, targetGridCell,
+				    out var rotateCosts, out string rotateReason))
 			{
-				outdata.reason = ($"Rotate couldn't execute for reason: {rotateData.reason} ");
-				outdata.costs = failedCosts;
-				return false;	
+				if(rotateReason!= "Already facing in that direction")
+				{
+					reason= ($"Rotate couldn't execute for reason: {rotateReason} ");
+					costs= failedCosts;
+					return false;
+				}
 			}
 			
-			outdata.costs[Enums.Stat.TimeUnits] += rotateData.costs[Enums.Stat.TimeUnits];
-			outdata.costs[Enums.Stat.Stamina] += rotateData.costs[Enums.Stat.Stamina];
+			costs[Enums.Stat.TimeUnits] += rotateCosts[Enums.Stat.TimeUnits];
+			costs[Enums.Stat.Stamina] += rotateCosts[Enums.Stat.Stamina];
 		}
 
 		if (startingGridCell.gridCoordinates.X - targetGridCell.gridCoordinates.X == 1 &&
 		    startingGridCell.gridCoordinates.Z - targetGridCell.gridCoordinates.Z == 1)
 		{
 			//Cells Are diagonal to each other
-			outdata.costs[Enums.Stat.TimeUnits] += 6;
-			outdata.costs[Enums.Stat.Stamina] += 2;
+			costs[Enums.Stat.TimeUnits] += 6;
+			costs[Enums.Stat.Stamina] += 2;
 		}
 		else
 		{
-			outdata.costs[Enums.Stat.TimeUnits] += 4;
-			outdata.costs[Enums.Stat.Stamina] += 2;
+			costs[Enums.Stat.TimeUnits] += 4;
+			costs[Enums.Stat.Stamina] += 2;
 		}
 
-		bool canAfford = parentGridObject.CanAffordStatCost(outdata.costs);
+		bool canAfford = parentGridObject.CanAffordStatCost(costs);
 		if (!canAfford)
 		{
-			outdata.reason = "Can't afford stat costs"; ;
+			reason = "Can't afford stat costs"; ;
 			return false;
 		}
 
@@ -113,4 +104,7 @@ public partial class MoveStepActionDefinition : ActionDefinition
 	}
 	public override string GetActionName() => "Move Step";
 	public override bool GetIsUIAction() => false;
+	public override MouseButton GetActionInput() => MouseButton.None;
+	
+	public override bool GetIsAlwaysActive() => false;
 }

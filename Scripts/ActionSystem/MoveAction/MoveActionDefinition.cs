@@ -9,51 +9,39 @@ using Array = Godot.Collections.Array;
 [GlobalClass]
 public partial class MoveActionDefinition : ActionDefinition
 {
-
+	public List<GridCell> path = new List<GridCell>();
 	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
-		(Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData) data)
+		Dictionary<Enums.Stat, int> costs)
 	{
-		return new MoveAction(parent, startGridCell, targetGridCell, data);
+		return new MoveAction(parent, startGridCell, targetGridCell,this,  costs);
 	}
 
-	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell, Dictionary<string, Variant> extraData,
-		out(Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData, string reason) outdata)
+	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell, out Dictionary<Enums.Stat, int> costs,
+		out string reason)
 	{
-		outdata = new();
-		if (extraData != null && extraData.Count > 0)
-		{
-			outdata.extraData = extraData;
-		}
-		else
-		{
-			outdata =new (new Dictionary<Enums.Stat, int>(),
-				new Dictionary<string, Variant>(), "");
-		}
-		
 		var failedCosts = new Dictionary<Enums.Stat, int>()
 		{
 			{ Enums.Stat.TimeUnits, -1 },
 			{ Enums.Stat.Stamina, -1 },
 		};
-		outdata.costs = new Dictionary<Enums.Stat, int>()
+		costs = new Dictionary<Enums.Stat, int>()
 		{
 			{ Enums.Stat.TimeUnits, 0 },
 			{ Enums.Stat.Stamina, 0 }
 		};
-		outdata.extraData = new Dictionary<string, Variant>();
 		
 		if (!targetGridCell.state.HasFlag(Enums.GridCellState.Walkable))
 		{
-			outdata.reason = "Target grid cell is not walkable";
-			outdata.costs = failedCosts;
+			reason = "Target grid cell is not walkable";
+			costs = failedCosts;
 			return false;
 		}
 		
-		List<GridCell> path  = Pathfinder.Instance.FindPath(startingGridCell, targetGridCell);
-		if (path == null || path.Count == 0)
+		List<GridCell> tempPath  = Pathfinder.Instance.FindPath(startingGridCell, targetGridCell);
+		if (tempPath == null || tempPath.Count == 0)
 		{
-			outdata.reason = "No path found";
-			outdata.costs = failedCosts;
+			reason = "No path found";
+			costs = failedCosts;
 			return false;
 		}
 
@@ -63,43 +51,42 @@ public partial class MoveActionDefinition : ActionDefinition
 		
 		if (moveStepAction == null)
 		{
-			outdata.reason = "No move step action found";
-			outdata.costs = failedCosts;
+			reason = "No move step action found";
+			costs = failedCosts;
 			return false;
 		}
 		
 		GridCell currentGridCell = gridObject.GridPositionData.GridCell;
-		for (int i = 0; i < path.Count; i++)
+		for (int i = 0; i < tempPath.Count; i++)
 		{
-			if (i +1 >= path.Count) continue;
-			GridCell nextGridCell = path[i +1];
+			if (i +1 >= tempPath.Count) continue;
+			GridCell nextGridCell = tempPath[i +1];
 
-			if (!moveStepAction.CanTakeAction(gridObject, currentGridCell, nextGridCell, null,
-				    out var moveStepData))
+			if (!moveStepAction.CanTakeAction(gridObject, currentGridCell, nextGridCell,
+				    out var moveStepCosts, out string moveStepReason))
 			{
-				outdata.reason =$" Move step action failed because: {moveStepData.reason}";
-				outdata.costs = failedCosts;
+				reason =$" Move step action failed because: {moveStepReason}";
+				costs = failedCosts;
 				return false;
 			}
 			currentGridCell = nextGridCell;
-			outdata.costs[Enums.Stat.TimeUnits] = moveStepData.costs[Enums.Stat.TimeUnits];
-			outdata.costs[Enums.Stat.Stamina] = moveStepData.costs[Enums.Stat.Stamina];
+			costs[Enums.Stat.TimeUnits] = moveStepCosts[Enums.Stat.TimeUnits];
+			costs[Enums.Stat.Stamina] = moveStepCosts[Enums.Stat.Stamina];
 		}
 
-		if (!gridObject.CanAffordStatCost(outdata. costs))
+		if (!gridObject.CanAffordStatCost(costs))
 		{
-			outdata.reason = "Can't afford stat costs";
-			outdata.costs =outdata.costs;
+			reason = "Can't afford stat costs"; ;
 			return false;
 		}
 
 		Godot.Collections.Array<Vector3I> vectorPath = new Godot.Collections.Array<Vector3I>();
-		for (int i = 0; i < path.Count; i++)
+		for (int i = 0; i < tempPath.Count; i++)
 		{
-			vectorPath.Add(path[i].gridCoordinates);
+			vectorPath.Add(tempPath[i].gridCoordinates);
 		}
-		outdata.reason = "Success!";
-		outdata.extraData["path"] = vectorPath;
+		reason = "Success!";
+		path = tempPath;
 		return true;
 	}
 
@@ -111,5 +98,9 @@ public partial class MoveActionDefinition : ActionDefinition
 	public override bool GetIsUIAction() => true;
 	
 	public override string GetActionName() => "Move";
+	
+	public override MouseButton GetActionInput() => MouseButton.Left;
+	
+	public override bool GetIsAlwaysActive() => true;
 }
 

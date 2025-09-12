@@ -1,18 +1,30 @@
 using Godot;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.UI.UIAnimations;
 
 [GlobalClass]
 public partial class UIWindow : UIElement
 {
 	[Export] protected Control Visual;
+	[Export] Button toggleButton;
 	[Export] public string uiName { get; private set; }
 	[Export] protected Key toggleKey { get; private set; }
 	[Export] bool startHidden = false;
 	protected List<UIElement> uiElements = new List<UIElement>();
 	
 	public bool IsShown {get; private set;}
-
+	
+	
+	#region Animation
+	bool isBusy = false;
+	[ExportGroup("Animations")]
+	[Export(PropertyHint.ResourceType, "UIAnimation")]
+	private UIAnimation showAnimation;
+	[Export(PropertyHint.ResourceType, "UIAnimation")]
+	private UIAnimation hideAnimation;
+	
+	#endregion
 	protected override async Task _Setup()
 	{
 		// Find all UIElements that belong to this window
@@ -25,15 +37,32 @@ public partial class UIWindow : UIElement
 		}
 
 		if (startHidden)
+		{ 
+			await HideCall(false);
+		}
+		else
 		{
-			HideCall();
+			IsShown = true;
+		}
+		
+		
+		
+		if (toggleButton != null)
+		{
+			toggleButton.Pressed += ToggleButtonOnPressed;
 		}
 		
 		return;
 	}
 
+	private void ToggleButtonOnPressed()
+	{
+		Toggle();
+	}
+
 	public override void _Input(InputEvent @event)
 	{
+		if(isBusy)return;
 		base._Input(@event);
 		if (@event is InputEventKey inputEventKey && inputEventKey.Keycode == toggleKey && @event.IsPressed())
 		{
@@ -41,22 +70,36 @@ public partial class UIWindow : UIElement
 		}
 	}
 
-	public void Toggle()
+	public async Task Toggle()
 	{
 		if (IsShown)
 		{
-			HideCall();
+			await HideCall();
 		}
 		else
 		{
-			ShowCall();
+			await ShowCall();
 		}
 	}
 
-	public void ShowCall()
+	public async Task ShowCall(bool playAnimation = true)
 	{
 		_Show();
 		Visual.Show();
+		foreach (var uiElement in uiElements)
+		{
+			if (uiElement is UIWindow uiWindow)
+			{
+				await uiWindow.ShowCall();
+			}
+		}
+
+		if (playAnimation && showAnimation != null)
+		{
+			await StartShowAnimation();
+			isBusy = false;
+		}
+
 		IsShown = true;
 	}
 
@@ -65,8 +108,14 @@ public partial class UIWindow : UIElement
 		
 	}
 
-	public void HideCall()
+	public async Task HideCall(bool playAnimation = true)
 	{
+		if (playAnimation && hideAnimation != null)
+		{
+			await StartHideAnimation();
+			isBusy = false;
+		}
+
 		_Hide();
 		Visual.Hide();
 		IsShown = false;
@@ -77,6 +126,22 @@ public partial class UIWindow : UIElement
 		
 	}
 	
+	#region Animation Functions
+
+	protected async Task StartShowAnimation()
+	{
+		isBusy = true;
+		Tween animationTween = showAnimation.createAnimationTween(this);
+		await ToSignal(animationTween, Tween.SignalName.Finished);
+	}
+	protected  async Task  StartHideAnimation()
+	{
+		isBusy = true;
+		Tween animationTween = hideAnimation.createAnimationTween(this);
+		await ToSignal(animationTween, Tween.SignalName.Finished);
+	}
+	
+	#endregion
 	/// <summary>
 	/// Finds all UIElements that belong to this window, excluding those that belong to child UIWindows
 	/// </summary>
@@ -114,4 +179,6 @@ public partial class UIWindow : UIElement
 			SearchUIElementsRecursively(child, result);
 		}
 	}
+	
+	public Control GetVisual() => Visual;
 }

@@ -21,8 +21,8 @@ public partial class ItemData : Resource
 	
 	[Export]public PackedScene ItemScene { get; protected set; }
 
-	[Export(PropertyHint.ResourceType, "ItemActionDefinition")]
-	public ItemActionDefinition[] ActionDefinitions;
+	[Export(PropertyHint.ResourceType, "ActionDefinition")]
+	public ActionDefinition[] ActionDefinitions;
 
 	[Export] public int weight { get; protected set; } = 2; 
 

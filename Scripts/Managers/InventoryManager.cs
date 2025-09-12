@@ -36,7 +36,6 @@ public partial class InventoryManager : Manager<InventoryManager>
 				runtimeInventoryGridUI.Value.SetupInventoryUI(inventoryGrid);
 		}
 		
-		
 		//Refresh Ground inventory at gridObjects Position
 		if (!runtimeInventoryGridUIs.ContainsKey(Enums.InventoryType.Ground))
 		{

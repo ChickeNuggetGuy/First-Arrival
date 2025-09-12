@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
@@ -13,6 +14,7 @@ public partial class QuickSelectUI : UIWindow
 	[Export] private Control quickSelectHolder;
 	[Export] private PackedScene quickSelectButtonScene;
 	private Array quickSelectButtons=new Array();
+	
 	protected override Task _Setup()
 	{
 		base._Setup();

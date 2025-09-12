@@ -28,7 +28,7 @@ GridHeight = 1
 ShapeGrid = Array[bool]([])
 metadata/_custom_type_script = "uid://cqk2q16xxuf4n"
 
-[node name="Node3D" type="Node3D" node_paths=PackedStringArray("GridPositionData", "GridObjectNodeHolder", "statHolder") groups=["GridObjects"]]
+[node name="Unit" type="Node3D" node_paths=PackedStringArray("GridPositionData", "GridObjectNodeHolder", "statHolder") groups=["GridObjects"]]
 script = ExtResource("1_qk68r")
 GridPositionData = NodePath("GridPositionData")
 GridObjectNodeHolder = NodePath("GridObjectComponents")
@@ -60,11 +60,11 @@ metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"
 [node name="TimeUnits" type="Node" parent="GridObjectComponents/GridObjectStats"]
 script = ExtResource("6_ppost")
 Stat = 4
-maxValue = 64
+maxValue = 120
 metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"
 
 [node name="Stamia" type="Node" parent="GridObjectComponents/GridObjectStats"]
 script = ExtResource("6_ppost")
 Stat = 2
-maxValue = 40
+maxValue = 400
 metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"

@@ -28,6 +28,7 @@ public partial class GridPositionData : Node
     public Enums.Direction Direction {get; private set;}
     [Signal]
     public delegate void  GridPositionDataUpdatedEventHandler(GridPositionData gridPositionData);
+    [Signal]public delegate void GridCellPositionUpdatedEventHandler(Vector3I newGridCoordinates);
     
     #region Functions
 
@@ -85,7 +86,7 @@ public partial class GridPositionData : Node
                 }
             }
         }
-
+		EmitSignal(SignalName.GridCellPositionUpdated, gridCell.gridCoordinates);
 }
 
     public void SetDirection(Enums.Direction direction)

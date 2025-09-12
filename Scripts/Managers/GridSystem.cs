@@ -478,7 +478,7 @@ public partial class GridSystem : Manager<GridSystem>
   }
 
 
-  public bool TryGetCellsInRange(GridCell startingGridCell, Vector2I range, out List<GridCell> neighbors, Enums.GridCellState stateFilter = Enums.GridCellState.None)
+  public bool TryGetGridCellsInRange(GridCell startingGridCell, Vector2I range, out List<GridCell> neighbors, Enums.GridCellState stateFilter = Enums.GridCellState.None)
   {
 	  neighbors = new List<GridCell>();
 	  if (startingGridCell == null)
@@ -593,7 +593,9 @@ public partial class GridSystem : Manager<GridSystem>
 
     return gridCells.Count > 0;
   }
-
+  
+  
+  
   // Builds a world-space AABB that contains all CollisionShape3D children of the Area3D.
   private static bool TryGetAreaWorldAabb(Area3D area, out Aabb aabb)
   {

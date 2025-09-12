@@ -13,7 +13,9 @@ public partial class InputManager : Manager<InputManager>
 	}
 	
 	[Export] private Node3D mouseMarker;
-	public bool MouseOverUI;
+	public bool MouseOverUI
+	{
+		get => IsMouseOverUI(); private set{}}
 	protected override Task _Setup()
 	{
 		return Task.CompletedTask;
@@ -41,7 +43,7 @@ public partial class InputManager : Manager<InputManager>
 
 	private void WorldMouseMarker()
 	{
-		if (IsMouseOverUI()) return;
+		if (MouseOverUI) return;
 		Node node =	GetObjectAtMousePosition(out Vector3 hitPosition) as Node;
 		
 		if (node == null) return;
@@ -81,6 +83,7 @@ public partial class InputManager : Manager<InputManager>
 			if (mouseMarker != null)
 				mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
 		}
+		// GD.Print($"currentGridCell: {currentGridCell.gridCoordinates}");
 	}
 	
 	public GodotObject GetObjectAtMousePosition(out Vector3 worldPosition)

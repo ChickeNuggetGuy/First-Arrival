@@ -9,7 +9,9 @@ public class MoveStepAction : Action, ICompositeAction
 {
 	public Action ParentAction { get; set; }
 	public List<Action> SubActions { get; set; }
-	public MoveStepAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, (Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData) data) : base(parentGridObject, startingGridCell, targetGridCell, data)
+	public MoveStepAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, ActionDefinition parent,
+		Dictionary<Enums.Stat, int> costs) 
+		: base(parentGridObject, startingGridCell, targetGridCell,parent, costs)
 	{
 	}
 
@@ -28,8 +30,7 @@ public class MoveStepAction : Action, ICompositeAction
 			if (rotateActionDefinition == null) return;
 
 			RotateAction rotateAction =
-				(RotateAction)rotateActionDefinition.InstantiateAction(parentGridObject, startingGridCell,
-					targetGridCell,(costs,null));
+				(RotateAction)rotateActionDefinition.InstantiateAction(parentGridObject, startingGridCell, targetGridCell,costs);
 			SubActions.Add(rotateAction);
 						 
 			
@@ -54,8 +55,9 @@ public class MoveStepAction : Action, ICompositeAction
 		await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
 	}
 
-	protected override async Task ActionComplete()
+	protected override  Task ActionComplete()
 	{
 		parentGridObject.GridPositionData.SetGridCell(targetGridCell);
+		return Task.CompletedTask;
 	}
 }

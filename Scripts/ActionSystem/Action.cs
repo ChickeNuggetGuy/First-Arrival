@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
 public abstract partial class Action
@@ -9,6 +10,7 @@ public abstract partial class Action
 	protected GridObject parentGridObject;
 	protected GridCell startingGridCell;
 	protected GridCell targetGridCell;
+	protected ActionDefinition parentActionDefinition;
 	
 	protected Dictionary<Enums.Stat, int> costs = new Dictionary<Enums.Stat, int>();
 
@@ -17,12 +19,13 @@ public abstract partial class Action
 		
 	}
 	public Action(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
-		(Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData) data)
+		ActionDefinition parent, Dictionary<Enums.Stat, int> costs)
 	{
+		this.parentActionDefinition = parent;
 		this.parentGridObject = parentGridObject;
 		this.startingGridCell = startingGridCell;
 		this.targetGridCell = targetGridCell;
-			costs = data.costs;
+			costs = costs;
 	}
 
 
@@ -75,6 +78,7 @@ public abstract partial class Action
 			}
 			stat.RemoveValue((int)costs[pair.Key]);
 		}
+		ActionManager.Instance.ActionCompleteCall(parentActionDefinition);
 	}
 	protected abstract Task ActionComplete();
 }

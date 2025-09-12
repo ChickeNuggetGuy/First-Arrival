@@ -62,6 +62,11 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 
 		foreach (var actionDefinition in ActionDefinitions)
 		{
+			if (actionDefinition == null)
+			{
+				GD.Print("actionDefinition is null");
+				continue;
+			}
 			actionDefinition.parentGridObject = this;
 		}
 	}
@@ -167,7 +172,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		foreach (var inventoryPair in inventoryGrids)
 		{
 			if (inventoryPair.Value == null) continue;
-			if(!inventoryPair.Value.inventorySettings.HasFlag(Enums.InventorySettings.isEquipmentinventory)) continue;
+			if(!inventoryPair.Value.InventorySettings.HasFlag(Enums.InventorySettings.IsEquipmentinventory)) continue;
 			
 			if(inventoryPair.Value.ItemCount < 1) continue;
 			

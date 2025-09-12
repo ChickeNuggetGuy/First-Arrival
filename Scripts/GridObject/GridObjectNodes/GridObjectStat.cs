@@ -43,6 +43,8 @@ public partial class GridObjectStat : GridObjectNode
 		{
 			EmitSignal(SignalName.CurrentValueMax, CurrentValue);
 		}
+
+		EmitSignal(SignalName.CurrentValueChanged, CurrentValue);
 	}
 
 	public void RemoveValue(int value)
@@ -54,6 +56,6 @@ public partial class GridObjectStat : GridObjectNode
 			EmitSignal(SignalName.CurrentValueMin, minValue);
 		}
 
-		// GD.Print(CurrentValue);
+		EmitSignal(SignalName.CurrentValueChanged, CurrentValue);
 	}
 }

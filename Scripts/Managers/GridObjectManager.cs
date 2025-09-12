@@ -13,7 +13,16 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	
 	[Export] PackedScene gridObjectScene;
 
-
+	public GridObject CurrentPlayerGridObject
+	{
+		get
+		{
+			GridObjectTeamHolder holder = GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+			if (holder == null) return null;
+			
+			return holder.CurrentGridObject;
+		}
+	}
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (@event is InputEventKey eventKey && eventKey.Keycode == Key.C && eventKey.Pressed)
@@ -51,7 +60,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		
 		GridObjectTeamHolder teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 		if (teamHolder == null) return;
-		
+		teamHolder.GetNextGridObject();
 		teamHolder.SelectedGridObjectChanged += InventoryManager.Instance.TeamHolderOnSelectedGridObjectChanged;
 	}
 

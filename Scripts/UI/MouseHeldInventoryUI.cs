@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
@@ -14,9 +15,9 @@ public partial class MouseHeldInventoryUI : InventoryGridUI
 
 	protected override Task _Setup()
 	{
-		inventoryGrid = InventoryManager.Instance.GetInventoryGrid(Enums.InventoryType.MouseHeld);
-		inventoryGrid.ItemAdded += InventoryGridOnItemAdded;
-		inventoryGrid.ItemRemoved += InventoryGridOnItemRemoved;
+		InventoryGrid = InventoryManager.Instance.GetInventoryGrid(Enums.InventoryType.MouseHeld);
+		InventoryGrid.ItemAdded += InventoryGridOnItemAdded;
+		InventoryGrid.ItemRemoved += InventoryGridOnItemRemoved;
 		base._Setup();
 		return Task.CompletedTask;
 	}

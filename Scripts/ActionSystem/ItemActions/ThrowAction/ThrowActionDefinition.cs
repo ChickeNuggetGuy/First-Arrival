@@ -11,49 +11,39 @@ using Godot.Collections;
 using Array = Godot.Collections.Array;
 
 [GlobalClass]
-public partial class ThrowActionDefinition : ItemActionDefinition
+public partial class ThrowActionDefinition : ActionDefinition, IItemActionDefinition
 {
+	public Item Item { get; set; }
+	public List<GridCell> path = new List<GridCell>();
+	public Vector3[] vectorPath;
 	public ThrowActionDefinition()
 	{
 		
 	}
-	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
-		(System.Collections.Generic.Dictionary<Enums.Stat, int> costs, System.Collections.Generic.Dictionary<string, Variant> extraData) data)
+	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell, System.Collections.Generic.Dictionary<Enums.Stat, int> costs)
 	{
-		return new ThrowAction(parent, startGridCell, targetGridCell, data);
+		return new ThrowAction(parent, startGridCell, targetGridCell,this,vectorPath, costs);
 	}
 
-	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell, System.Collections.Generic.Dictionary<string, Variant> extraData,
-		out (System.Collections.Generic.Dictionary<Enums.Stat, int> costs, System.Collections.Generic.Dictionary<string, Variant> extraData, string reason) outdata)
+	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell, out System.Collections.Generic.Dictionary<Enums.Stat, int> costs,
+		out string reason)
 	{
-
-		
-		outdata = new();
-		if (extraData != null && extraData.Count > 0)
-		{
-			outdata.extraData = extraData;
-		}
-		else
-		{
-			outdata =new (new System.Collections.Generic.Dictionary<Enums.Stat, int>(),
-				new System.Collections.Generic.Dictionary<string, Variant>(), "");
-		}
-		
 		var failedCosts = new System.Collections.Generic.Dictionary<Enums.Stat, int>()
 		{
 			{ Enums.Stat.TimeUnits, -1 },
 			{ Enums.Stat.Stamina, -1 },
 		};
-		outdata.costs = new System.Collections.Generic.Dictionary<Enums.Stat, int>()
+		
+		costs = new System.Collections.Generic.Dictionary<Enums.Stat, int>()
 		{
 			{ Enums.Stat.TimeUnits, 0 },
 			{ Enums.Stat.Stamina, 0 }
 		};
-		Item item = extraData["item"].As<Item>();
-		if (item == null)
+		
+		if (Item == null)
 		{
-			outdata.reason = "Item not found";
-			outdata.costs = failedCosts;
+			reason = "Item not found";
+			costs = failedCosts;
 			return false;
 		}
 		
@@ -64,8 +54,8 @@ public partial class ThrowActionDefinition : ItemActionDefinition
 		
 		if (path == null || path.Count == 0)
 		{
-			outdata.reason = "No path found";
-			outdata.costs = failedCosts;
+			reason = "No path found";
+			costs = failedCosts;
 			return false;
 		}
 
@@ -75,8 +65,8 @@ public partial class ThrowActionDefinition : ItemActionDefinition
 		
 		if (rotateActionDefinition == null)
 		{
-			outdata.reason = "Rotate action found";
-			outdata.costs = failedCosts;
+			reason = "Rotate action found";
+			costs = failedCosts;
 			return false;
 		}
 		
@@ -86,45 +76,42 @@ public partial class ThrowActionDefinition : ItemActionDefinition
 		if (gridObject.GridPositionData.Direction != targetDirection)
 		{
 			//Rotation Action needed!
-			if (!rotateActionDefinition.CanTakeAction(gridObject, startingGridCell, targetGridCell, extraData,
-				    out var rotateData))
+			if (!rotateActionDefinition.CanTakeAction(gridObject, startingGridCell, targetGridCell,
+				    out var rotateCosts,out string rotateReason))
 			{
-				outdata.reason =$" RotateAction failed because: {rotateData.reason}";
-				outdata.costs = failedCosts;
+				reason =$" RotateAction failed because: {rotateReason}";
+				costs = failedCosts;
 				return false;
 			}
 			
-			outdata.costs[Enums.Stat.TimeUnits] += rotateData.costs[Enums.Stat.TimeUnits];
-			outdata.costs[Enums.Stat.Stamina] += rotateData.costs[Enums.Stat.Stamina];
-			
+			costs[Enums.Stat.TimeUnits] += rotateCosts[Enums.Stat.TimeUnits];
+			costs[Enums.Stat.Stamina] += rotateCosts[Enums.Stat.Stamina];
 		}
 
-		outdata.costs[Enums.Stat.TimeUnits] += 2 * item.ItemData.weight;
-		outdata.costs[Enums.Stat.Stamina] += 4 * 2 * item.ItemData.weight;
+		costs[Enums.Stat.TimeUnits] += 2 * Item.ItemData.weight;
+		costs[Enums.Stat.Stamina] += 4 * 2 * Item.ItemData.weight;
 		
-		if (!gridObject.CanAffordStatCost(outdata. costs))
+		if (!gridObject.CanAffordStatCost(costs))
 		{
-			outdata.reason = "Can't afford stat costs";
-			outdata.costs =outdata.costs;
+			reason = "Can't afford stat costs";
 			return false;
 		}
 
-		Godot.Collections.Array<Vector3I> coordinatePath = new Godot.Collections.Array<Vector3I>();
+		List<Vector3> tempPath  = new List<Vector3>();
 		for (int i = 0; i < path.Count; i++)
 		{
-			coordinatePath.Add(path[i].gridCoordinates);
+			tempPath.Add(path[i].gridCoordinates);
 		}
+		vectorPath = tempPath.ToArray();
 
 		GD.Print(path.Count);
-		outdata.reason = "Success!";
-		outdata.extraData["path"] = coordinatePath;
-		outdata.extraData["vectorPath"] = results.Vector3Path;
+		reason = "Success!";
 		return true;
 	}
 
 	protected override List<GridCell> GetValidGridCells(GridObject gridObject, GridCell startingGridCell)
 	{
-		if (!GridSystem.Instance.TryGetCellsInRange(startingGridCell,new Vector2I(5,3), out List<GridCell> gridCells))
+		if (!GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(5,3), out List<GridCell> gridCells))
 		{
 			return null;
 		}
@@ -136,4 +123,9 @@ public partial class ThrowActionDefinition : ItemActionDefinition
 
 	public override bool GetIsUIAction() => true;
 	public override string GetActionName() => "Throw";
+	
+	public override MouseButton GetActionInput() => MouseButton.Left;
+	
+	public override bool GetIsAlwaysActive() => false;
+
 }

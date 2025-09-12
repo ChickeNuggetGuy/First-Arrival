@@ -26,7 +26,9 @@ public partial class RotateAction : Action
   private const bool UseTween = true;
 
 
-  public RotateAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, (Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData) data, Enums.Direction targetDirection) : base(parentGridObject, startingGridCell, targetGridCell, data)
+  public RotateAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
+	  ActionDefinition parentAction, Dictionary<Enums.Stat, int> costs, Enums.Direction targetDirection) 
+	  : base(parentGridObject, startingGridCell, targetGridCell,parentAction, costs)
   {
 	  _targetDirection = targetDirection;
   }

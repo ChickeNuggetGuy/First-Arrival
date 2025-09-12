@@ -10,9 +10,8 @@ public partial class InventoryGrid : Resource
 	[Export] public Enums.InventoryType InventoryType { get; protected set; }
 
 	[Export] public GridShape GridShape { get; protected set; }
-	[Export] public bool UseItemSize { get; protected set; } = true;
-	[Export] public Enums.InventorySettings inventorySettings { get; protected set; }
-	public Item[,] Itemstems{get; private set;}
+	[Export(PropertyHint.Enum)] public Enums.InventorySettings InventorySettings { get; protected set; }
+	public Item[,] Items{get; private set;}
 
 	/// <summary>
 	/// Gets the nummber of unique Items in the grid
@@ -21,16 +20,16 @@ public partial class InventoryGrid : Resource
 	{
 		get
 		{
-			if (Itemstems == null) return -1;
+			if (Items == null) return -1;
 			List<Item> uniqueItems = new  List<Item>();
 
-			for (int x = 0; x < Itemstems.GetLength(0); x++)
+			for (int x = 0; x < Items.GetLength(0); x++)
 			{
-				for (int y = 0; y < Itemstems.GetLength(1); y++)
+				for (int y = 0; y < Items.GetLength(1); y++)
 				{
-					if  (Itemstems[x, y] == null) continue;
-					if (uniqueItems.Contains(Itemstems[x, y])) continue;
-					uniqueItems.Add(Itemstems[x, y]);
+					if  (Items[x, y] == null) continue;
+					if (uniqueItems.Contains(Items[x, y])) continue;
+					uniqueItems.Add(Items[x, y]);
 				}
 			}
 			return uniqueItems.Count;
@@ -43,13 +42,13 @@ public partial class InventoryGrid : Resource
 		{
 			List<Item> uniqueItems = new  List<Item>();
 
-			for (int x = 0; x < Itemstems.GetLength(0); x++)
+			for (int x = 0; x < Items.GetLength(0); x++)
 			{
-				for (int y = 0; y < Itemstems.GetLength(1); y++)
+				for (int y = 0; y < Items.GetLength(1); y++)
 				{
-					if  (Itemstems[x, y] == null) continue;
-					if (uniqueItems.Contains(Itemstems[x, y])) continue;
-					uniqueItems.Add(Itemstems[x, y]);
+					if  (Items[x, y] == null) continue;
+					if (uniqueItems.Contains(Items[x, y])) continue;
+					uniqueItems.Add(Items[x, y]);
 				}
 			}
 			return uniqueItems;
@@ -72,7 +71,7 @@ public partial class InventoryGrid : Resource
 
 	public void Initialize()
 	{
-		Itemstems = new Item[GridShape.GridWidth, GridShape.GridHeight];
+		Items = new Item[GridShape.GridWidth, GridShape.GridHeight];
 	}
 
 	private void AddItem(Item item)
@@ -88,22 +87,18 @@ public partial class InventoryGrid : Resource
 	private void AddItemAt(int x, int y, Item item)
 	{
 		// --- Corrected Logic ---
-		if (UseItemSize)
+		if (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes))
 		{
 			// An item can occupy multiple cells based on its ItemShape.
 			GridShape itemShape = item?.ItemData?.ItemShape;
-
-			// Safety check in case item or its data/shape is null/missing
-			// If no shape is defined, perhaps default to placing it in the single cell (x,y).
-			// This depends on your game's rules. For now, we'll assume a shape is needed if UseItemSize=true,
-			// and CanAddItemAt should have validated this. If not, we place it in (x,y) if valid.
+			
 			if (itemShape == null)
 			{
 				// Fallback or error handling. Placing in single cell as a default.
 				GD.PushWarning($"AddItemAt: Item '{item?.ItemData?.ItemName ?? "Unknown"}' has no ItemShape but UseItemSize is true. Placing in single cell ({x},{y}).");
 				if (x >= 0 && x < GridShape.GridWidth && y >= 0 && y < GridShape.GridHeight && GridShape.GetGridShapeCell(x, y))
 				{
-					Itemstems[x, y] = item;
+					Items[x, y] = item;
 				}
 			}
 			else
@@ -126,7 +121,7 @@ public partial class InventoryGrid : Resource
 						// Also check if the calculated grid cell is part of the inventory's shape.
 						if (gridX >= 0 && gridX < GridShape.GridWidth && gridY >= 0 && gridY < GridShape.GridHeight && GridShape.GetGridShapeCell(gridX, gridY))
 						{
-							Itemstems[gridX, gridY] = item;
+							Items[gridX, gridY] = item;
 						}
 						// Optionally, else log error if CanAddItemAt was supposed to prevent this.
 						// else { GD.PrintErr($"AddItemAt: Calculated position ({gridX},{gridY}) is out of bounds or invalid for inventory shape."); }
@@ -142,13 +137,13 @@ public partial class InventoryGrid : Resource
 			// Bounds and shape check (should be ensured by CanAddItemAt, but safe here as a safeguard)
 			if (x >= 0 && x < GridShape.GridWidth && y >= 0 && y < GridShape.GridHeight && GridShape.GetGridShapeCell(x, y))
 			{
-				Itemstems[x, y] = item;
+				Items[x, y] = item;
 			}
 			// Optionally, else log error if CanAddItemAt was supposed to prevent this.
 			// else { GD.PrintErr($"AddItemAt: Position ({x},{y}) is out of bounds or invalid for inventory shape (UseItemSize=false)."); }
 		}
 		// --- End of Correction ---
-
+		item.currentGrid = this;
 		EmitSignal(SignalName.ItemAdded, item);
 		EmitSignal(SignalName.InventoryChanged);
 	}
@@ -184,9 +179,9 @@ public partial class InventoryGrid : Resource
 		List<Vector2I> positions = GetItemPositions(item);
 		foreach (Vector2I pos in positions)
 		{
-			Itemstems[pos.X, pos.Y] = null;
+			Items[pos.X, pos.Y] = null;
 		}
-
+		item.currentGrid = null;
 		EmitSignal(SignalName.ItemRemoved, item);
 		EmitSignal(SignalName.InventoryChanged);
 	}
@@ -207,9 +202,9 @@ public partial class InventoryGrid : Resource
 		GridShape itemShape = item.ItemData?.ItemShape;
 
 		// Iterate through potential top-left corners in the inventory grid
-		for (int x = 0; x <= GridShape.GridWidth - (UseItemSize && itemShape != null ? itemShape.GridWidth : 1); x++)
+		for (int x = 0; x <= GridShape.GridWidth - (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null ? itemShape.GridWidth : 1); x++)
 		{
-			for (int y = 0; y <= GridShape.GridHeight - (UseItemSize && itemShape != null ? itemShape.GridHeight : 1); y++)
+			for (int y = 0; y <= GridShape.GridHeight - (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null ? itemShape.GridHeight : 1); y++)
 			{
 				// The logic for checking if an item fits is now consolidated in CanAddItemAt.
 				if (CanAddItemAt(x, y, item)) 
@@ -227,26 +222,21 @@ public partial class InventoryGrid : Resource
 	{
 		if (item == null) return false;
 		// TODO: Check stacking logic
-
-		// --- Corrected/Clarified Logic ---
-		if (UseItemSize)
+		
+		if (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes))
 		{
-			// An item can occupy multiple cells based on its ItemShape.
 			GridShape itemShape = item?.ItemData?.ItemShape;
-
-			// Safety check: If UseItemSize is true but item has no shape, it cannot be placed this way.
+			
 			if (itemShape == null)
 			{
 				GD.PushWarning($"CanAddItemAt: Item '{item?.ItemData?.ItemName ?? "Unknown"}' has no ItemShape but UseItemSize is true. Cannot place.");
 				return false;
 			}
-
-			// Check each cell that the item would occupy
+			
 			for (int relX = 0; relX < itemShape.GridWidth; relX++)
 			{
 				for (int relY = 0; relY < itemShape.GridHeight; relY++)
 				{
-					// Check if this part of the item's shape is actually used/occupied.
 					if (!itemShape.GetGridShapeCell(relX, relY))
 					{
 						continue; // This part of the item's bounding box is empty, skip it.
@@ -254,74 +244,59 @@ public partial class InventoryGrid : Resource
 
 					int gridX = x + relX;
 					int gridY = y + relY;
-
-					// 1. Check if the calculated position is within the inventory grid bounds
+					
 					if (gridX < 0 || gridX >= GridShape.GridWidth || gridY < 0 || gridY >= GridShape.GridHeight)
 					{
 						return false; // Part of the item would be placed outside the inventory grid.
 					}
-
-					// 2. Check if the calculated cell is valid according to the inventory's own GridShape
-					//    (Important if the inventory grid itself is not a perfect rectangle)
+					
 					if (!GridShape.GetGridShapeCell(gridX, gridY))
 					{
 						return false; // This cell in the inventory is not part of the usable space.
 					}
-
-					// 3. Check if the cell in the inventory grid is already occupied
-					//    Use direct check for null. Consistent with HasItemAt's final check.
-					if (Itemstems[gridX, gridY] != null)
+					
+					if (Items[gridX, gridY] != null)
 					{
 						return false; // Cell is already occupied by another item.
 					}
-					// Note on Inventory Shape Check: The check `GridShape.GetGridShapeCell(gridX, gridY)`
-					// above ensures we are only trying to place items in valid inventory cells.
-					// The original `HasItemAt` also did this check, so this is the correct place for it.
+
 				}
 			}
 		}
 		else
 		{
-			// --- Corrected Logic for UseItemSize = false ---
-			// An item occupies only the single cell (x, y).
-
-			// 1. Check if the position (x, y) is within the inventory grid bounds
 			if (x < 0 || x >= GridShape.GridWidth || y < 0 || y >= GridShape.GridHeight)
 			{
 				return false; // Position is outside the grid dimensions.
 			}
-
-			// 2. Check if the cell (x, y) is valid according to the inventory's own GridShape
-			//    (Important if the inventory grid itself is not a perfect rectangle)
+			
 			if (!GridShape.GetGridShapeCell(x, y))
 			{
 				return false; // This cell is not part of the usable inventory space.
 			}
 
-			// 3. Check if the cell (x, y) in the inventory grid is already occupied
-			//    Use direct check for null, consistent with HasItemAt's final check.
-			if (Itemstems[x, y] != null)
+
+			if (Items[x, y] != null)
 			{
 				return false; // Cell is already occupied.
 			}
 		}
-		// --- End of Correction ---
 
-		return true; // All necessary checks for placement passed.
+
+		return true;
 	}
-
-    // ... (rest of the class remains the same) ...
+	
 
 	public bool HasItem(Item item)
 	{
 		if (item == null) return false;
-		if (Itemstems == null) return false;
+		if (Items == null) return false;
 
 		for (int x = 0; x < GridShape.GridWidth; x++)
 		{
 			for (int y = 0; y < GridShape.GridHeight; y++)
 			{
-				if (Itemstems[x, y] == item) return true;
+				if (Items[x, y] == item) return true;
 			}
 		}
 
@@ -330,18 +305,18 @@ public partial class InventoryGrid : Resource
 
 	public bool HasItemAt(int x, int y)
 	{
-		if (Itemstems == null) return false;
+		if (Items == null) return false;
 		if (x < 0 || x >= GridShape.GridWidth || y < 0 || y >= GridShape.GridHeight) return false;
 		if (!GridShape.GetGridShapeCell(x, y)) return false; // Check inventory shape validity
 
-		return Itemstems[x, y] != null; // Check if cell is occupied
+		return Items[x, y] != null; // Check if cell is occupied
 	}
 
 	public bool HasItemAt(int x, int y, Item item)
 	{
 		if (!HasItemAt(x, y)) return false;
 
-		if (Itemstems[x, y] == item) return true;
+		if (Items[x, y] == item) return true;
 		else return false;
 	}
 
@@ -349,7 +324,7 @@ public partial class InventoryGrid : Resource
 	{
 		if (HasItemAt(x, y))
 		{
-			return Itemstems[x, y];
+			return Items[x, y];
 		}
 
 		return null;
@@ -366,13 +341,13 @@ public partial class InventoryGrid : Resource
 	public List<Vector2I> GetItemPositions(Item item)
 	{
 		List<Vector2I> result = new List<Vector2I>();
-		if (item == null || Itemstems == null) return result;
+		if (item == null || Items == null) return result;
 
 		for (int x = 0; x < GridShape.GridWidth; x++)
 		{
 			for (int y = 0; y < GridShape.GridHeight; y++)
 			{
-				if (Itemstems[x, y] == item)
+				if (Items[x, y] == item)
 				{
 					Vector2I pos = new Vector2I(x, y);
 					if (!result.Contains(pos))

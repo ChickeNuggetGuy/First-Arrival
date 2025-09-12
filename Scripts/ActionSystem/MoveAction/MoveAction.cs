@@ -13,18 +13,15 @@ public partial class MoveAction : Action, ICompositeAction
 	public List<Action> SubActions { get; set; }
 	
 	List<GridCell> path = new List<GridCell>();
-	public MoveAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
-		(Dictionary<Enums.Stat, int> costs, Dictionary<string, Variant> extraData) data) : base(parentGridObject, startingGridCell, targetGridCell, data)
+	public MoveAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,ActionDefinition parent,
+		Dictionary<Enums.Stat, int> costs) : base(parentGridObject, startingGridCell,
+		targetGridCell,parent, costs)
 	{
-		if (data.extraData.ContainsKey("path"))
+		if (parent is MoveActionDefinition moveActionDefinition)
 		{
-			GridSystem gridSystem = GridSystem.Instance;
-			foreach (Vector3I gridCoords in (Godot.Collections.Array)data.extraData["path"])
-			{
-				path.Add(gridSystem.GetGridCell(gridCoords));
-			}
+			path = moveActionDefinition.path;
 		}
-		else
+		if(path.Count == 0)
 		{
 			GD.Print("Path not found!");
 		}
@@ -46,16 +43,13 @@ public partial class MoveAction : Action, ICompositeAction
 			GridCell nextGridCell = path[index + 1];
 
 			MoveStepAction moveStepAction = moveStepActionDefinition.InstantiateAction(parentGridObject,
-				startingGridCell,
-				nextGridCell,
-				(costs, null)) as MoveStepAction;
+				startingGridCell, nextGridCell, costs) as MoveStepAction;
 			SubActions.Add(moveStepAction);
 		}
 	}
 
 	protected override async Task Execute()
 	{
-		GD.Print("MoveAction");
 		return;
 	}
 

@@ -11,7 +11,8 @@ public partial class Item : Node3D, IContextUser<Item>
 		get => this; set{} }
 	public ItemData ItemData { get; protected set; }
 	[Export]public Node3D Visual { get;protected set; }
-
+	
+	public InventoryGrid currentGrid{get;set;}
 	public void Init(ItemData itemData)
 	{
 		ItemData = itemData;
@@ -30,4 +31,5 @@ public partial class Item : Node3D, IContextUser<Item>
 		}
 		return actions;
 	}
+	
 }

@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3 uid="uid://ci5t5ugjnmjr"]
+[gd_scene load_steps=36 format=3 uid="uid://ci5t5ugjnmjr"]
 
 [ext_resource type="Script" uid="uid://dr5vsk7v685hc" path="res://Scripts/Managers/GameManager.cs" id="1_hpc76"]
 [ext_resource type="Script" uid="uid://cmh00onxfeox7" path="res://Scripts/Terrain Gen/ChunkData.cs" id="3_c1ier"]
@@ -22,8 +22,10 @@
 [ext_resource type="Script" uid="uid://cl2f3rnpmng0i" path="res://Scripts/Managers/ActionManager.cs" id="13_enc0b"]
 [ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="13_hx8n4"]
 [ext_resource type="PackedScene" uid="uid://dsh6gqixhv5ls" path="res://Scenes/UI/action_button_ui.tscn" id="14_i0j58"]
+[ext_resource type="Script" uid="uid://byqfcs7esjitb" path="res://Scripts/UI/UIAnimations/TranslateUIAnimation.cs" id="16_u5v48"]
 [ext_resource type="Script" uid="uid://bc6x81kp7kdgk" path="res://Scripts/UI/UIWindow.cs" id="17_bpy1e"]
 [ext_resource type="Script" uid="uid://ckjuiwq2v6s4o" path="res://Scripts/UI/InventoryGridUI.cs" id="18_p5ymy"]
+[ext_resource type="Script" uid="uid://342n07onmffs" path="res://Scripts/UI/GridStatBarUI.cs" id="19_c3pre"]
 [ext_resource type="PackedScene" uid="uid://bowk2i3ys78tu" path="res://Scenes/UI/blank_slot_ui.tscn" id="20_wmecs"]
 [ext_resource type="Script" uid="uid://yaqinydnxa3a" path="res://Scripts/UI/MouseHeldInventoryUI.cs" id="21_mymud"]
 [ext_resource type="Script" uid="uid://bv7f34s83qmss" path="res://Scripts/UI/ContextMenu/ContextMenuUI.cs" id="22_4sso6"]
@@ -35,13 +37,24 @@ chunkType = 1
 chunkGOIndex = "PlayerSpawn"
 metadata/_custom_type_script = "uid://cmh00onxfeox7"
 
+[sub_resource type="Resource" id="Resource_u5v48"]
+script = ExtResource("16_u5v48")
+duration = 0.2
+metadata/_custom_type_script = "uid://byqfcs7esjitb"
+
+[sub_resource type="Resource" id="Resource_s1acj"]
+script = ExtResource("16_u5v48")
+position = Vector2(-200, 0)
+duration = 0.2
+metadata/_custom_type_script = "uid://byqfcs7esjitb"
+
 [sub_resource type="LabelSettings" id="LabelSettings_c1ier"]
 font_size = 20
 
 [sub_resource type="Resource" id="Resource_q68mp"]
 script = ExtResource("6_y4jh7")
 
-[node name="Node3D" type="Node3D"]
+[node name="BattleScene" type="Node3D"]
 
 [node name="GameManager" type="Node" parent="." node_paths=PackedStringArray("managers")]
 script = ExtResource("1_hpc76")
@@ -119,8 +132,8 @@ mouse_filter = 2
 theme_override_constants/margin_top = 50
 theme_override_constants/margin_bottom = 25
 
-[node name="QuickSelectPanel" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("quickSelectHolder", "Visual")]
-custom_minimum_size = Vector2(175, 300)
+[node name="QuickSelectPanel" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("quickSelectHolder", "Visual", "toggleButton")]
+custom_minimum_size = Vector2(200, 300)
 layout_mode = 2
 size_flags_horizontal = 0
 size_flags_vertical = 0
@@ -128,7 +141,11 @@ script = ExtResource("10_6rnll")
 quickSelectHolder = NodePath("Panel/ScrollContainer/VBoxContainer")
 quickSelectButtonScene = ExtResource("11_enc0b")
 Visual = NodePath("Panel")
+toggleButton = NodePath("Panel/Button")
 uiName = "Player Quick Select"
+toggleKey = 84
+showAnimation = SubResource("Resource_u5v48")
+hideAnimation = SubResource("Resource_s1acj")
 metadata/_custom_type_script = "uid://lh8kdv34nvel"
 
 [node name="Panel" type="Panel" parent="GameManager/UIManager/Control/QuickSelectPanel"]
@@ -141,16 +158,29 @@ grow_vertical = 2
 
 [node name="ScrollContainer" type="ScrollContainer" parent="GameManager/UIManager/Control/QuickSelectPanel/Panel"]
 layout_mode = 0
-offset_right = 175.0
+offset_right = 200.0
 offset_bottom = 350.0
-grow_horizontal = 2
-grow_vertical = 2
 size_flags_horizontal = 3
 
 [node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/Control/QuickSelectPanel/Panel/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+
+[node name="Button" type="Button" parent="GameManager/UIManager/Control/QuickSelectPanel/Panel"]
+custom_minimum_size = Vector2(25, 40)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.528
+offset_top = -15.800003
+offset_right = 25.0
+offset_bottom = 15.800003
+grow_horizontal = 0
+grow_vertical = 2
+text = ">"
 
 [node name="Unit Action Panel" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("_actionButtonContainer", "_statBarContainer", "Visual")]
 custom_minimum_size = Vector2(375, 200)
@@ -229,9 +259,14 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 5
 
-[node name="StatBar" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer"]
+[node name="StatBar" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
+script = ExtResource("19_c3pre")
+statBar = NodePath("ProgressBar")
+stat = 1
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
 
 [node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar"]
 layout_mode = 1
@@ -241,9 +276,14 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="StatBar5" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer"]
+[node name="StatBar5" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
+script = ExtResource("19_c3pre")
+statBar = NodePath("ProgressBar")
+stat = 4
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
 
 [node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar5"]
 layout_mode = 1
@@ -253,9 +293,14 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="StatBar2" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer"]
+[node name="StatBar2" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
+script = ExtResource("19_c3pre")
+statBar = NodePath("ProgressBar")
+stat = 2
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
 
 [node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar2"]
 layout_mode = 1
@@ -265,9 +310,14 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="StatBar4" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer"]
+[node name="StatBar4" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
+script = ExtResource("19_c3pre")
+statBar = NodePath("ProgressBar")
+stat = 3
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
 
 [node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar4"]
 layout_mode = 1
@@ -277,10 +327,36 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="UIWindow" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("Visual")]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/Unit Action Panel/Panel"]
+custom_minimum_size = Vector2(200, 100)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -100.0
+offset_right = 200.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer"]
 layout_mode = 2
-size_flags_horizontal = 4
-size_flags_vertical = 4
+size_flags_horizontal = 3
+script = ExtResource("18_p5ymy")
+metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="InventoryWindow" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("Visual")]
+custom_minimum_size = Vector2(550, 400)
+layout_mode = 2
 mouse_filter = 2
 script = ExtResource("17_bpy1e")
 Visual = NodePath("MarginContainer")
@@ -289,7 +365,7 @@ toggleKey = 73
 startHidden = true
 metadata/_custom_type_script = "uid://bc6x81kp7kdgk"
 
-[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/Control/UIWindow"]
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/Control/InventoryWindow"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -297,16 +373,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-theme_override_constants/margin_left = 175
+theme_override_constants/margin_left = 350
 theme_override_constants/margin_bottom = 100
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/UIWindow/MarginContainer"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer"]
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 
-[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel"]
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel"]
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 1.0
@@ -318,16 +394,17 @@ mouse_filter = 2
 theme_override_constants/margin_top = 15
 theme_override_constants/margin_right = 15
 
-[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel/MarginContainer" node_paths=PackedStringArray("slotHolder")]
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel/MarginContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
 custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("18_p5ymy")
 inventoryType = 2
 slotHolder = NodePath("Panel/GridContainer")
+Visual = NodePath("Panel")
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -336,7 +413,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI/Panel"]
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI/Panel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -345,7 +422,7 @@ grow_horizontal = 2
 grow_vertical = 2
 columns = 3
 
-[node name="GroundInventoryContainer" type="MarginContainer" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel"]
+[node name="GroundInventoryContainer" type="MarginContainer" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel"]
 layout_mode = 1
 anchors_preset = -1
 anchor_top = 1.0
@@ -360,16 +437,17 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 15
 
-[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel/GroundInventoryContainer" node_paths=PackedStringArray("slotHolder")]
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
 custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
 mouse_filter = 2
 script = ExtResource("18_p5ymy")
 inventoryType = 1
 slotHolder = NodePath("Panel/GridContainer")
+Visual = NodePath("Panel")
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -378,7 +456,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/Control/UIWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI/Panel"]
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI/Panel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -452,7 +530,7 @@ script = ExtResource("4_qxria")
 transform = Transform3D(0.9291326, -0.36974674, 0, 0.34046704, 0.85555595, 0.39000806, -0.14420421, -0.3623692, 0.9208115, 0, 0, 0)
 
 [node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
-transform = Transform3D(-0.7048061, 0, 0, 0, 0.89442694, 0.4463899, 0, 0.44721353, -0.8927796, 0, 5.44639, -10.892779)
+transform = Transform3D(-0.6537938, 0, 0, 0, 0.89442694, 0.4463899, 0, 0.44721353, -0.8927796, 0, 5.44639, -10.892779)
 top_level = true
 script = ExtResource("5_y4jh7")
 follow_mode = 5
@@ -461,6 +539,8 @@ look_at_mode = 2
 look_at_target = NodePath("../Transposer")
 tween_resource = SubResource("Resource_q68mp")
 follow_offset = Vector3(0, 5, -10)
+follow_damping = true
+follow_damping_value = Vector3(0.15, 0.15, 0.15)
 
 [node name="Transposer" type="Node3D" parent="." node_paths=PackedStringArray("MainCamera")]
 script = ExtResource("7_q68mp")
