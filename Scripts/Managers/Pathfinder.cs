@@ -563,8 +563,7 @@ public ArcPathResult TryCalculateArcPath(GridCell startCell, GridCell endCell, i
         // Calculate arc height with variation for each attempt
         float heightFactor = 0.3f + (attempt * 0.2f); // Start lower, go higher
         float arcHeight = distance * heightFactor;
-
-        GD.Print($"Attempt {attempt + 1} with arc height: {arcHeight}");
+        
 
         // Adaptive number of points based on distance and cell size
         int numPoints = Mathf.Max(10, (int)(distance / Mathf.Min(cellSize.X, cellSize.X) * 2));
@@ -627,7 +626,6 @@ public ArcPathResult TryCalculateArcPath(GridCell startCell, GridCell endCell, i
         {
             attemptResult.Success = true;
             attemptResult.Vector3Path = smoothPath;
-            GD.Print($"Arc path found with {attemptResult.GridCellPath.Count} cells");
             return attemptResult;
         }
     }

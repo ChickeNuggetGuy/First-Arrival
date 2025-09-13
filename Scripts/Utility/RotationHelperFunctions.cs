@@ -1,32 +1,32 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace FirstArrival.Scripts.Utility;
 
 public static class RotationHelperFunctions
 {
-  // CONFIG
-  // Set true if your grid's "North" is +Z. Set false to use Godot's default (-Z).
-  public const bool NorthIsPlusZ = true;
-
-  // If your mesh faces +Z when rotation.y == 0, set 180.
-  // If it faces -Z (Godot default), leave 0.
+  // If your mesh faces -Z (Godot default) when rotation.y == 0, set 180.
+  // If it faces +Z (Unity default), leave 0.
   public const float ModelForwardYawOffsetDeg = 0f;
 
-  // Clockwise starting at North
+  // Counter-clockwise starting at North
   private static readonly Enums.Direction[] Ordered8 =
   {
     Enums.Direction.North, Enums.Direction.NorthEast, Enums.Direction.East,
     Enums.Direction.SouthEast, Enums.Direction.South, Enums.Direction.SouthWest,
     Enums.Direction.West, Enums.Direction.NorthWest
   };
+  
+  private static readonly IReadOnlyDictionary<Enums.Direction, int> DirectionIndices =
+    Ordered8.Select((dir, index) => new { dir, index })
+      .ToDictionary(x => x.dir, x => x.index);
 
   // Yaw in degrees you can set directly on Node3D.Rotation.Y to face each direction.
   public static readonly IReadOnlyDictionary<Enums.Direction, float>
     DirectionAngles = BuildDirectionAngles();
 
-  private static IReadOnlyDictionary<Enums.Direction, float>
-    BuildDirectionAngles()
+  private static IReadOnlyDictionary<Enums.Direction, float> BuildDirectionAngles()
   {
     var dict = new Dictionary<Enums.Direction, float>(8);
     foreach (var d in Ordered8)
@@ -43,13 +43,13 @@ public static class RotationHelperFunctions
 
   private static int Mod8(int x) => ((x % 8) + 8) % 8;
 
-  // Convert a world-space forward vector to Godot yaw degrees (0° faces -Z)
+  // Convert a world-space forward vector to yaw degrees (0° faces +Z)
   private static float VectorToYawWorldDeg(Vector3 v)
   {
-    // Yaw mapping for Godot: yaw = atan2(x, -z)
-    return NormalizeDeg(Mathf.RadToDeg(Mathf.Atan2(v.X, -v.Z)));
+    // Yaw mapping: yaw = atan2(x, z)
+    return NormalizeDeg(Mathf.RadToDeg(Mathf.Atan2(v.X, v.Z)));
   }
-
+  
   // Node yaw (deg) you can assign to Rotation.Y to face the direction
   private static float GetNodeYawDegForDirection(Enums.Direction dir)
   {
@@ -75,56 +75,43 @@ public static class RotationHelperFunctions
       Mathf.RadToDeg(rotationY) - ModelForwardYawOffsetDeg
     );
 
-    // Define where "North" sits in world yaw
-    float northWorldDeg = NorthIsPlusZ ? 180f : 0f;
-
-    // Round to nearest 45° sector starting at North
-    int idx = Mod8(Mathf.RoundToInt((yawWorldDeg - northWorldDeg) / 45f));
-    return Ordered8[idx];
+    int sector = Mathf.RoundToInt(yawWorldDeg / 45f);
+    // Yaw is CCW and Ordered8 is CCW, so the mapping is direct.
+    return Ordered8[Mod8(sector)];
   }
 
-  /// Sign-based 8-way direction between cells (no step count).
-  /// Uses +X = East, -X = West. Z mapping depends on NorthIsPlusZ.
-  public static Enums.Direction GetDirectionBetweenCells(
-    GridCell fromCell, GridCell toCell)
+  /// Calculates an 8-way direction from one grid cell to another based on their grid coordinates.
+  public static Enums.Direction GetDirectionBetweenCells(GridCell fromCell, GridCell toCell)
   {
-    if (fromCell == null || toCell == null) return Enums.Direction.None;
+    if (fromCell == null || toCell == null || fromCell.gridCoordinates == toCell.gridCoordinates)
+      return Enums.Direction.None;
+    
+    var d = toCell.gridCoordinates - fromCell.gridCoordinates;
+    var key = (System.Math.Sign(d.X), System.Math.Sign(d.Z));
 
-    int dx = toCell.gridCoordinates.X - fromCell.gridCoordinates.X;
-    int dz = toCell.gridCoordinates.Z - fromCell.gridCoordinates.Z;
-
-    if (NorthIsPlusZ)
+    // Grid's +Z is North, +X is East.
+    return key switch
     {
-      if (dx > 0 && dz == 0) return Enums.Direction.East;
-      if (dx < 0 && dz == 0) return Enums.Direction.West;
-      if (dx == 0 && dz > 0) return Enums.Direction.North;
-      if (dx == 0 && dz < 0) return Enums.Direction.South;
-      if (dx > 0 && dz > 0) return Enums.Direction.NorthEast;
-      if (dx < 0 && dz > 0) return Enums.Direction.NorthWest;
-      if (dx > 0 && dz < 0) return Enums.Direction.SouthEast;
-      if (dx < 0 && dz < 0) return Enums.Direction.SouthWest;
-    }
-    else
-    {
-      if (dx > 0 && dz == 0) return Enums.Direction.East;
-      if (dx < 0 && dz == 0) return Enums.Direction.West;
-      if (dx == 0 && dz > 0) return Enums.Direction.South;
-      if (dx == 0 && dz < 0) return Enums.Direction.North;
-      if (dx > 0 && dz > 0) return Enums.Direction.SouthEast;
-      if (dx < 0 && dz > 0) return Enums.Direction.SouthWest;
-      if (dx > 0 && dz < 0) return Enums.Direction.NorthEast;
-      if (dx < 0 && dz < 0) return Enums.Direction.NorthWest;
-    }
-
-    return Enums.Direction.None;
+        (0, 1) => Enums.Direction.North,
+        (1, 1) => Enums.Direction.NorthEast,   // +X (East), +Z (North)
+        (1, 0) => Enums.Direction.East,        // +X (East)
+        (1, -1) => Enums.Direction.SouthEast,   // +X (East), -Z (South)
+        (0, -1) => Enums.Direction.South,
+        (-1, -1) => Enums.Direction.SouthWest,  // -X (West), -Z (South)
+        (-1, 0) => Enums.Direction.West,        // -X (West)
+        (-1, 1) => Enums.Direction.NorthWest,  // -X (West), +Z (North)
+        _ => Enums.Direction.None
+    };
   }
 
   /// One-step clockwise or counter-clockwise in 45° increments.
   public static Enums.Direction GetNextDirection(
     Enums.Direction current, bool clockwise)
   {
-    int idx = System.Array.IndexOf(Ordered8, current);
-    if (idx < 0) return Enums.Direction.None;
+    if (!DirectionIndices.TryGetValue(current, out int idx))
+    {
+      return Enums.Direction.None;
+    }
     int next = Mod8(idx + (clockwise ? 1 : -1));
     return Ordered8[next];
   }
@@ -133,42 +120,28 @@ public static class RotationHelperFunctions
   public static Enums.Direction GetDirectionFromVector3(Vector3 direction)
   {
     if (direction.LengthSquared() < 0.001f) return Enums.Direction.None;
-    direction = direction.Normalized();
 
-    float yawWorldDeg = VectorToYawWorldDeg(direction);
-    float northWorldDeg = NorthIsPlusZ ? 180f : 0f;
-
-    int idx = Mod8(Mathf.RoundToInt((yawWorldDeg - northWorldDeg) / 45f));
-    return Ordered8[idx];
+    float yawWorldDeg = VectorToYawWorldDeg(direction.Normalized());
+    
+    int sector = Mathf.RoundToInt(yawWorldDeg / 45f);
+    // Yaw is CCW and Ordered8 is CCW, so the mapping is direct.
+    return Ordered8[Mod8(sector)];
   }
 
   /// Direction to normalized world-space Vector3.
   public static Vector3 GetWorldVector3FromDirection(Enums.Direction direction)
   {
-    bool plusZ = NorthIsPlusZ;
-
+    // North is world +Z, East is world +X.
     return direction switch
     {
-      Enums.Direction.North => plusZ
-        ? new Vector3(0, 0, 1)
-        : new Vector3(0, 0, -1),
-      Enums.Direction.South => plusZ
-        ? new Vector3(0, 0, -1)
-        : new Vector3(0, 0, 1),
+      Enums.Direction.North => new Vector3(0, 0, 1),
+      Enums.Direction.South => new Vector3(0, 0, -1),
       Enums.Direction.East => new Vector3(1, 0, 0),
       Enums.Direction.West => new Vector3(-1, 0, 0),
-      Enums.Direction.NorthEast => plusZ
-        ? new Vector3(1, 0, 1).Normalized()
-        : new Vector3(1, 0, -1).Normalized(),
-      Enums.Direction.NorthWest => plusZ
-        ? new Vector3(-1, 0, 1).Normalized()
-        : new Vector3(-1, 0, -1).Normalized(),
-      Enums.Direction.SouthEast => plusZ
-        ? new Vector3(1, 0, -1).Normalized()
-        : new Vector3(1, 0, 1).Normalized(),
-      Enums.Direction.SouthWest => plusZ
-        ? new Vector3(-1, 0, -1).Normalized()
-        : new Vector3(-1, 0, 1).Normalized(),
+      Enums.Direction.NorthEast => new Vector3(1, 0, 1).Normalized(),
+      Enums.Direction.NorthWest => new Vector3(-1, 0, 1).Normalized(),
+      Enums.Direction.SouthEast => new Vector3(1, 0, -1).Normalized(),
+      Enums.Direction.SouthWest => new Vector3(-1, 0, -1).Normalized(),
       _ => Vector3.Zero
     };
   }
@@ -181,30 +154,23 @@ public static class RotationHelperFunctions
   public static Enums.Direction GetOppositeDirection(
     Enums.Direction direction)
   {
-    return direction switch
+    if (!DirectionIndices.TryGetValue(direction, out int idx))
     {
-      Enums.Direction.North => Enums.Direction.South,
-      Enums.Direction.NorthEast => Enums.Direction.SouthWest,
-      Enums.Direction.East => Enums.Direction.West,
-      Enums.Direction.SouthEast => Enums.Direction.NorthWest,
-      Enums.Direction.South => Enums.Direction.North,
-      Enums.Direction.SouthWest => Enums.Direction.NorthEast,
-      Enums.Direction.West => Enums.Direction.East,
-      Enums.Direction.NorthWest => Enums.Direction.SouthEast,
-      _ => Enums.Direction.None
-    };
+      return Enums.Direction.None;
+    }
+    return Ordered8[Mod8(idx + 4)];
   }
 
   /// Shortest angular distance in 45° steps. Positive=CW, Negative=CCW.
   public static int GetRotationStepsBetweenDirections(
     Enums.Direction from, Enums.Direction to)
   {
-    int fromIndex = System.Array.IndexOf(Ordered8, from);
-    int toIndex = System.Array.IndexOf(Ordered8, to);
-    if (fromIndex < 0 || toIndex < 0) return 0;
+    if (!DirectionIndices.TryGetValue(from, out int fromIndex) || !DirectionIndices.TryGetValue(to, out int toIndex))
+    {
+      return 0;
+    }
 
-    int diffCW = Mod8(toIndex - fromIndex);
-    int diffCCW = Mod8(fromIndex - toIndex);
-    return diffCW <= diffCCW ? diffCW : -diffCCW;
+    int diff = Mod8(toIndex - fromIndex);
+    return diff > 4 ? diff - 8 : diff;
   }
 }

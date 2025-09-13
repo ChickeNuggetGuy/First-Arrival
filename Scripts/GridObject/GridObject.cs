@@ -14,7 +14,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public GridObject parent { get => this; set{ } }
 	
 	[Export]public GridPositionData GridPositionData;
-	public Enums.UnitTeam Team {get; private set;}
+	[Export]public Enums.UnitTeam Team {get; private set;}
 
 	[Export] protected Node GridObjectNodeHolder;
 
@@ -41,7 +41,8 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	private System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids =
 		new System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid>();
 
-	
+	public bool IsInitialized { get; protected set; }= false;
+	[Export] public bool IsActive { get; protected set; } = true;
 	
 
 	public virtual async Task Initialize(Enums.UnitTeam team, GridCell gridCell)
@@ -51,9 +52,10 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		
 		InitializeGridObjectNodes();
 		await Task.Yield();
-		InitializeRuntimeInventories();
+				InitializeRuntimeInventories();
 		InitializeActionDefinitions();
-		GridPositionData.SetDirection(RotationHelperFunctions.GetDirectionFromVector3(-Transform.Basis.Z));
+		GridPositionData.SetDirection(Enums.Direction.North);
+		IsInitialized = true;
 	}
 
 	private void InitializeActionDefinitions()
@@ -113,7 +115,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			if (inventory == null) continue;
 			inventoryGrids.Add(inventoryType, inventory);
 
-			if (inventoryType == Enums.InventoryType.Backpack)
+			if (inventoryType == Enums.InventoryType.LeftHand)
 			{
 				inventory.TryAddItem(InventoryManager.Instance.GetRandomItem());
 			}
@@ -123,6 +125,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public bool TryGetStat(Enums.Stat statToFind, out GridObjectStat stat)
 	{
 		stat = null;
+		if(!gridObjectNodesDictionary.ContainsKey("stats")) return false;
 		if (gridObjectNodesDictionary["stats"] == null) return false;
 
 		stat = (GridObjectStat)gridObjectNodesDictionary["stats"].FirstOrDefault(gridObjectNode =>
@@ -186,5 +189,10 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			}
 		}
 		return actions;
+	}
+
+	public void SetIsActive(bool isActive)
+	{
+		IsActive = isActive;
 	}
 }

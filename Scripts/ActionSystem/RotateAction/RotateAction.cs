@@ -7,77 +7,66 @@ public partial class RotateAction : Action
 {
   private Enums.Direction _targetDirection;
 
-  // 8-way yaw angles in degrees. Adjust these values if North/South are backwards.
-  // Default assumes: North=0°, East=90°, South=180°, West=270°
-  private static readonly Dictionary<Enums.Direction, float> DirectionYawDegrees = new()
-  {
-    { Enums.Direction.North, 0f },
-    { Enums.Direction.NorthEast, 45f },
-    { Enums.Direction.East, 90f },
-    { Enums.Direction.SouthEast, 135f },
-    { Enums.Direction.South, 180f },
-    { Enums.Direction.SouthWest, 225f },
-    { Enums.Direction.West, 270f },
-    { Enums.Direction.NorthWest, 315f }
-  };
-
   // Tween settings
   private const float TurnSpeedDegPerSec = 540f;
   private const bool UseTween = true;
 
-
-  public RotateAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
-	  ActionDefinition parentAction, Dictionary<Enums.Stat, int> costs, Enums.Direction targetDirection) 
-	  : base(parentGridObject, startingGridCell, targetGridCell,parentAction, costs)
+  public RotateAction(
+    GridObject parentGridObject,
+    GridCell startingGridCell,
+    GridCell targetGridCell,
+    ActionDefinition parentAction,
+    Dictionary<Enums.Stat, int> costs,
+    Enums.Direction targetDirection
+  )
+    : base(parentGridObject, startingGridCell, targetGridCell, parentAction, costs)
   {
-	  _targetDirection = targetDirection;
+    _targetDirection = targetDirection;
   }
 
   protected override async Task Setup()
   {
-    _targetDirection = RotationHelperFunctions.GetDirectionBetweenCells(
-      startingGridCell,
-      targetGridCell
-    );
+    if (_targetDirection == Enums.Direction.None && startingGridCell != null && targetGridCell != null)
+    {
+      _targetDirection = RotationHelperFunctions.GetDirectionBetweenCells(
+        startingGridCell,
+        targetGridCell
+      );
+    }
     await Task.CompletedTask;
   }
 
   protected override async Task Execute()
   {
+	  GD.Print($"RotateAction, starting direction: {parentGridObject.GridPositionData.Direction}. ");
     if (_targetDirection == Enums.Direction.None)
     {
       await Task.CompletedTask;
       return;
     }
 
-    // Get the target yaw angle for this direction
-    if (!DirectionYawDegrees.TryGetValue(_targetDirection, out float targetYawDeg))
-    {
-      await Task.CompletedTask;
-      return;
-    }
+    // Correct yaw for the target direction (respects NorthIsPlusZ and ModelForwardYawOffsetDeg).
+    float targetYawRad = RotationHelperFunctions.GetRotationRadians(_targetDirection);
 
-    float targetYawRad = Mathf.DegToRad(targetYawDeg);
+    // Rotate shortest path
+    float currentYaw = parentGridObject.Rotation.Y;
+    float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
+    float finalYaw = currentYaw + delta;
 
     if (!UseTween)
     {
       var r = parentGridObject.Rotation;
-      r.Y = targetYawRad;
+      r.Y = finalYaw;
       parentGridObject.Rotation = r;
       await Task.CompletedTask;
       return;
     }
 
-    // Tween to target using shortest path
-    float currentYaw = parentGridObject.Rotation.Y;
-    float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
-    float finalYaw = currentYaw + delta;
-
     float duration = Mathf.Abs(delta) / Mathf.DegToRad(TurnSpeedDegPerSec);
     if (duration < 0.0001f)
     {
       var r = parentGridObject.Rotation;
-      r.Y = targetYawRad;
+      r.Y = finalYaw;
       parentGridObject.Rotation = r;
       await Task.CompletedTask;
       return;
@@ -92,7 +81,9 @@ public partial class RotateAction : Action
 
   protected override async Task ActionComplete()
   {
-	  parentGridObject.GridPositionData.SetDirection(_targetDirection);
+    // Snap stored facing to actual transform to avoid drift/rounding issues
+    var facing = RotationHelperFunctions.GetDirectionFromRotation3D(parentGridObject.Rotation.Y);
+    parentGridObject.GridPositionData.SetDirection(facing);
     await Task.CompletedTask;
   }
 }

@@ -1,27 +1,37 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-
 public partial class MoveAction : Action, ICompositeAction
 {
 	public Action ParentAction { get; set; }
 	public List<Action> SubActions { get; set; }
-	
-	List<GridCell> path = new List<GridCell>();
-	public MoveAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,ActionDefinition parent,
-		Dictionary<Enums.Stat, int> costs) : base(parentGridObject, startingGridCell,
-		targetGridCell,parent, costs)
+
+	private List<GridCell> path = new List<GridCell>();
+
+	public MoveAction(
+		GridObject parentGridObject,
+		GridCell startingGridCell,
+		GridCell targetGridCell,
+		ActionDefinition parent,
+		Dictionary<Enums.Stat, int> costs
+	)
+		: base(
+			parentGridObject,
+			startingGridCell,
+			targetGridCell,
+			parent,
+			costs
+		)
 	{
 		if (parent is MoveActionDefinition moveActionDefinition)
 		{
 			path = moveActionDefinition.path;
 		}
-		if(path.Count == 0)
+		if (path.Count == 0)
 		{
 			GD.Print("Path not found!");
 		}
@@ -30,33 +40,45 @@ public partial class MoveAction : Action, ICompositeAction
 	protected override async Task Setup()
 	{
 		ParentAction = this;
-		if (path == null || path.Count == 0) return;
+		if (path == null || path.Count == 0)
+			return;
 
-		MoveStepActionDefinition moveStepActionDefinition =
-			parentGridObject.ActionDefinitions.FirstOrDefault(a => a is MoveStepActionDefinition) as MoveStepActionDefinition;
-		
-		if (moveStepActionDefinition == null) return;
-		for (var index = 0; index < path.Count; index++)
+		var moveStepActionDefinition =
+			parentGridObject.ActionDefinitions.FirstOrDefault(
+				a => a is MoveStepActionDefinition
+			) as MoveStepActionDefinition;
+
+		if (moveStepActionDefinition == null)
+			return;
+
+		// Build step actions using the correct cell for each step
+		for (int i = 0; i < path.Count - 1; i++)
 		{
-			var gridCell = path[index];
-			if (index +1 >= path.Count) continue;
-			GridCell nextGridCell = path[index + 1];
+			GridCell stepStart = path[i];
+			GridCell stepEnd = path[i + 1];
 
-			MoveStepAction moveStepAction = moveStepActionDefinition.InstantiateAction(parentGridObject,
-				startingGridCell, nextGridCell, costs) as MoveStepAction;
-			SubActions.Add(moveStepAction);
+			var moveStepAction =
+				moveStepActionDefinition.InstantiateAction(
+					parentGridObject,
+					stepStart,
+					stepEnd,
+					costs
+				) as MoveStepAction;
+
+			AddSubAction(moveStepAction);
 		}
+
+		await Task.CompletedTask;
 	}
 
 	protected override async Task Execute()
 	{
-		return;
+		await Task.CompletedTask;
 	}
 
 	protected override async Task ActionComplete()
 	{
-		return;
+		parentGridObject.GridPositionData.SetGridCell(targetGridCell);
+		await Task.CompletedTask;
 	}
-
-
 }

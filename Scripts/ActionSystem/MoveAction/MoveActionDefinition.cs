@@ -1,106 +1,132 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
-using Array = Godot.Collections.Array;
 
 [GlobalClass]
 public partial class MoveActionDefinition : ActionDefinition
 {
-	public List<GridCell> path = new List<GridCell>();
-	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs)
-	{
-		return new MoveAction(parent, startGridCell, targetGridCell,this,  costs);
-	}
+  public List<GridCell> path = new List<GridCell>();
 
-	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell, out Dictionary<Enums.Stat, int> costs,
-		out string reason)
-	{
-		var failedCosts = new Dictionary<Enums.Stat, int>()
-		{
-			{ Enums.Stat.TimeUnits, -1 },
-			{ Enums.Stat.Stamina, -1 },
-		};
-		costs = new Dictionary<Enums.Stat, int>()
-		{
-			{ Enums.Stat.TimeUnits, 0 },
-			{ Enums.Stat.Stamina, 0 }
-		};
-		
-		if (!targetGridCell.state.HasFlag(Enums.GridCellState.Walkable))
-		{
-			reason = "Target grid cell is not walkable";
-			costs = failedCosts;
-			return false;
-		}
-		
-		List<GridCell> tempPath  = Pathfinder.Instance.FindPath(startingGridCell, targetGridCell);
-		if (tempPath == null || tempPath.Count == 0)
-		{
-			reason = "No path found";
-			costs = failedCosts;
-			return false;
-		}
+  public override Action InstantiateAction(
+    GridObject parent,
+    GridCell startGridCell,
+    GridCell targetGridCell,
+    Dictionary<Enums.Stat, int> costs
+  )
+  {
+    return new MoveAction(parent, startGridCell, targetGridCell, this, costs);
+  }
 
-		MoveStepActionDefinition moveStepAction =
-			gridObject.ActionDefinitions
-				.FirstOrDefault(a => a is MoveStepActionDefinition) as MoveStepActionDefinition;
-		
-		if (moveStepAction == null)
-		{
-			reason = "No move step action found";
-			costs = failedCosts;
-			return false;
-		}
-		
-		GridCell currentGridCell = gridObject.GridPositionData.GridCell;
-		for (int i = 0; i < tempPath.Count; i++)
-		{
-			if (i +1 >= tempPath.Count) continue;
-			GridCell nextGridCell = tempPath[i +1];
+  protected override bool OnValidateAndBuildCosts(
+    GridObject gridObject,
+    GridCell startingGridCell,
+    GridCell targetGridCell,
+    Dictionary<Enums.Stat, int> costs,
+    out string reason
+  )
+  {
+    if (!targetGridCell.state.HasFlag(Enums.GridCellState.Walkable))
+    {
+      reason = "Target grid cell is not walkable";
+      return false;
+    }
 
-			if (!moveStepAction.CanTakeAction(gridObject, currentGridCell, nextGridCell,
-				    out var moveStepCosts, out string moveStepReason))
-			{
-				reason =$" Move step action failed because: {moveStepReason}";
-				costs = failedCosts;
-				return false;
-			}
-			currentGridCell = nextGridCell;
-			costs[Enums.Stat.TimeUnits] = moveStepCosts[Enums.Stat.TimeUnits];
-			costs[Enums.Stat.Stamina] = moveStepCosts[Enums.Stat.Stamina];
-		}
+    List<GridCell> tempPath =
+      Pathfinder.Instance.FindPath(startingGridCell, targetGridCell);
 
-		if (!gridObject.CanAffordStatCost(costs))
-		{
-			reason = "Can't afford stat costs"; ;
-			return false;
-		}
+    if (tempPath == null || tempPath.Count == 0)
+    {
+      reason = "No path found";
+      return false;
+    }
 
-		Godot.Collections.Array<Vector3I> vectorPath = new Godot.Collections.Array<Vector3I>();
-		for (int i = 0; i < tempPath.Count; i++)
-		{
-			vectorPath.Add(tempPath[i].gridCoordinates);
-		}
-		reason = "Success!";
-		path = tempPath;
-		return true;
-	}
+    // Simulate costs along the path with evolving facing, based on transform.
+    var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
+      gridObject.Rotation.Y
+    );
 
-	protected override List<GridCell> GetValidGridCells(GridObject gridObject, GridCell startingGridCell)
-	{
-		return new List<GridCell>() { GridCell.Null };
-	}
+    for (int i = 0; i < tempPath.Count - 1; i++)
+    {
+      GridCell current = tempPath[i];
+      GridCell next = tempPath[i + 1];
 
-	public override bool GetIsUIAction() => true;
-	
-	public override string GetActionName() => "Move";
-	
-	public override MouseButton GetActionInput() => MouseButton.Left;
-	
-	public override bool GetIsAlwaysActive() => true;
+      var stepDir = RotationHelperFunctions.GetDirectionBetweenCells(
+        current,
+        next
+      );
+
+      if (facing != stepDir)
+      {
+        int steps = RotationHelperFunctions.GetRotationStepsBetweenDirections(
+          facing,
+          stepDir
+        );
+        AddCost(costs, Enums.Stat.TimeUnits, Mathf.Abs(steps) * 1);
+        AddCost(costs, Enums.Stat.Stamina, Mathf.Abs(steps) * 1);
+        facing = stepDir;
+      }
+
+      bool diagonal =
+        Mathf.Abs(current.gridCoordinates.X - next.gridCoordinates.X) == 1
+        && Mathf.Abs(current.gridCoordinates.Z - next.gridCoordinates.Z) == 1;
+
+      if (diagonal)
+      {
+        AddCost(costs, Enums.Stat.TimeUnits, 6);
+        AddCost(costs, Enums.Stat.Stamina, 2);
+      }
+      else
+      {
+        AddCost(costs, Enums.Stat.TimeUnits, 4);
+        AddCost(costs, Enums.Stat.Stamina, 2);
+      }
+    }
+
+    path = tempPath;
+    reason = "Success!";
+    return true;
+  }
+
+  protected override List<GridCell> GetValidGridCells(
+    GridObject gridObject,
+    GridCell startingGridCell
+  )
+  {
+    GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(10,3), out List<GridCell> cellsInRange, Enums.GridCellState.Walkable);
+    return cellsInRange.Where( cell => Pathfinder.Instance.IsPathPossible(startingGridCell, cell)).ToList();
+  }
+
+  public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
+  {
+	  if (parentGridObject == null)
+	  {
+		  GD.Print("Parent grid object is null");
+		  return (null, 0);
+	  }
+
+	  GridCell startingCell = parentGridObject.GridPositionData.GridCell;
+	  if (startingCell == null)
+	  {
+		  GD.Print("Starting grid cell is null");
+		  return (null, 0);
+	  }
+
+	  float distance = startingCell.worldCenter.DistanceTo(targetGridCell.worldCenter);
+    
+	  // Normalize distance to a score. Let's say max distance we care about is 20 tiles.
+	  float maxDistance = 20.0f;
+	  float normalizedScore = (distance / maxDistance) * 70.0f;
+    
+	  int score = (int)Mathf.Clamp(normalizedScore, 0, 70);
+	  return (targetGridCell, score);
+  }
+
+  public override bool GetIsUIAction() => true;
+  public override string GetActionName() => "Move";
+  public override MouseButton GetActionInput() => MouseButton.Left;
+  public override bool GetIsAlwaysActive() => true;
+
+  public override bool GetRemainSelected() => true;
 }
-

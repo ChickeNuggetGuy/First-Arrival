@@ -5,57 +5,125 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class GridObjectStat : GridObjectNode
 {
-	[Export] public Enums.Stat Stat { get;private set; }
-	public int CurrentValue { get; protected set; }
-	
+	[Export] public Enums.Stat Stat { get; private set; }
+	[Export] public float CurrentValue { get; protected set; }
+
 	[Export] int minValue = 0;
 	[Export] int maxValue = 0;
-	public (int min, int max) MinMaxValue {
-		get
-		{
-			return (minValue, maxValue);
-		} protected set
+
+	public (int min, int max) MinMaxValue
+	{
+		get => (minValue, maxValue);
+		protected set
 		{
 			minValue = value.min;
 			maxValue = value.max;
 		}
 	}
-	
+
 	[Export] private bool signalOnMinValue = false;
 	[Export] private bool signalOnMaxValue = false;
-	[Signal]
-	public delegate void CurrentValueChangedEventHandler(int value);
-	[Signal]
-	public delegate void CurrentValueMinEventHandler(int value);
-	[Signal]
-	public delegate void CurrentValueMaxEventHandler(int value);
+
+	[Export] public Enums.StatTurnBehavior turnBehavior = Enums.StatTurnBehavior.None;
+	[Export] private float incrementValue = 0;
+	[Export] private float decrementValue = 0;
+	[Signal] public delegate void CurrentValueChangedEventHandler(int value, GridObject gridObject);
+	[Signal] public delegate void CurrentValueMinEventHandler(int value, GridObject gridObject);
+	[Signal] public delegate void CurrentValueMaxEventHandler(int value, GridObject gridObject);
+
 	protected override void Setup()
 	{
 		CurrentValue = MinMaxValue.max;
-		EmitSignal(SignalName.CurrentValueChanged, this, parentGridObject);
+		EmitSignal(SignalName.CurrentValueChanged, CurrentValue,parentGridObject);
 	}
 
-	public void AddValue(int value)
+	public void AddValue(float value)
 	{
-		CurrentValue = ((CurrentValue + value) >= MinMaxValue.max) ? MinMaxValue.max :CurrentValue +  value;
+		float old = CurrentValue;
+		CurrentValue = Mathf.Clamp(CurrentValue + value, minValue, maxValue);
 
-		if (CurrentValue == maxValue && signalOnMaxValue)
+		if (CurrentValue != old)
 		{
-			EmitSignal(SignalName.CurrentValueMax, CurrentValue);
-		}
+			EmitSignal(SignalName.CurrentValueChanged, CurrentValue);
 
-		EmitSignal(SignalName.CurrentValueChanged, CurrentValue);
+			if (CurrentValue >= maxValue && signalOnMaxValue)
+			{
+				EmitSignal(SignalName.CurrentValueMax, CurrentValue, parentGridObject);
+			}
+		}
 	}
 
-	public void RemoveValue(int value)
+	public void RemoveValue(float value)
 	{
-		CurrentValue = ((CurrentValue - value) <= minValue) ? MinMaxValue.min : CurrentValue -  value;
+		float old = CurrentValue;
+		CurrentValue = Mathf.Clamp(CurrentValue - value, minValue, maxValue);
 
-		if (CurrentValue == MinMaxValue.min && signalOnMinValue)
+		if (CurrentValue != old)
 		{
-			EmitSignal(SignalName.CurrentValueMin, minValue);
-		}
+			EmitSignal(SignalName.CurrentValueChanged, CurrentValue,parentGridObject);
 
-		EmitSignal(SignalName.CurrentValueChanged, CurrentValue);
+			if (CurrentValue <= minValue && signalOnMinValue)
+			{
+				EmitSignal(SignalName.CurrentValueMin, CurrentValue,parentGridObject);
+			}
+		}
+		
+	}
+
+	public void SetValue(float value)
+	{
+		float old = CurrentValue;
+		CurrentValue = Mathf.Clamp(CurrentValue + value, minValue, maxValue);
+		
+		if (CurrentValue <= minValue && signalOnMinValue)
+		{
+			EmitSignal(SignalName.CurrentValueMin, CurrentValue,parentGridObject);
+		}
+		
+		if (CurrentValue >= maxValue && signalOnMaxValue)
+		{
+			EmitSignal(SignalName.CurrentValueMax, CurrentValue, parentGridObject);
+		}
+	}
+	
+	
+	public void OnTurnEnded()
+	{
+		switch (turnBehavior)
+		{
+			case Enums.StatTurnBehavior.None:
+				break;
+			case Enums.StatTurnBehavior.ResetToMax:
+				SetValue(maxValue);
+				break;
+			case Enums.StatTurnBehavior.ResetToMin:
+				SetValue(minValue);
+				break;
+			case Enums.StatTurnBehavior.Increment:
+				if (incrementValue > 0 && incrementValue < 1)
+				{
+					//Percentage Increment
+					AddValue(CurrentValue * incrementValue);
+				}
+				else
+				{
+					AddValue(incrementValue);
+				}
+
+				break;
+			case Enums.StatTurnBehavior.Decrement:
+				if (decrementValue > 0 && decrementValue < 1)
+				{
+					//Percentage decrement
+					RemoveValue(CurrentValue * decrementValue);
+				}
+				else
+				{
+					RemoveValue(incrementValue);
+				}
+				break;
+			default:
+				throw new ArgumentOutOfRangeException();
+		}
 	}
 }

@@ -61,8 +61,17 @@ public class Enums
 		Bravery,
 		TimeUnits
 	}
+
+	public enum StatTurnBehavior
+	{
+		None = 0,
+		ResetToMax,
+		ResetToMin,
+		Increment,
+		Decrement
+	}
 	
-	
+	#region Inventory system
 	public enum InventoryType
 	{
 		None = 0,
@@ -86,6 +95,16 @@ public class Enums
 		CanExecuteActions = 4 
 	}
 
+	[Flags]
+	public enum ItemSettings
+	{
+		None = 0,
+		CanMelee = 1 << 0,
+		CanRanged = 1 << 1,
+		CanThrow = 1 << 2,
+		CanEquip = 1 << 3,
+	}
+	#endregion
 
 	#region UI Enums
 

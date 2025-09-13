@@ -491,7 +491,7 @@ public partial class GridSystem : Manager<GridSystem>
 		  {
 			  for (int z = Mathf.RoundToInt(-range.X / 2.0); z < Mathf.RoundToInt(range.X / 2.0); z++)
 			  {
-				  Vector3I gridCellCoords = new Vector3I(x, y, z);
+				  Vector3I gridCellCoords = startingGridCell.gridCoordinates + new Vector3I(x, y, z);
 				  GridCell gridCell = GetGridCell(gridCellCoords);
 				  if (gridCell == null) continue;
 				  

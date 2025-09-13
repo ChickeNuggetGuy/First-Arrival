@@ -57,8 +57,7 @@ public partial class GridPositionData : Node
             GD.Print("gridcell is null, returning");
             return;
         }
-
-        GD.Print(gridCell.gridCoordinates);
+        
         //Add the base cell
         gridCells.Add(gridCell);
         var newState = gridCell.state & ~Enums.GridCellState.Walkable;

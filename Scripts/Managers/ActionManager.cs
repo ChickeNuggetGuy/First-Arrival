@@ -12,27 +12,27 @@ namespace FirstArrival.Scripts.Managers;
 [GlobalClass]
 public partial class ActionManager : Manager<ActionManager>
 {
-	public bool IsBusy { get; private set; }
 	public ActionDefinition SelectedAction { get; private set; }
 
 	protected override async Task _Setup()
 	{
-		return;
+		await Task.CompletedTask;
 	}
 
 	protected override async Task _Execute()
 	{
-		return;
+		await Task.CompletedTask;
 	}
 
 	public override void _Input(InputEvent @event)
 	{
 		if (IsBusy) return;
-		base._UnhandledInput(@event);
+		if(TurnManager.Instance.CurrentTurn.team != Enums.UnitTeam.Player) return;
 		if (InputManager.Instance.MouseOverUI) return;
 
 		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
 		{
+			GD.Print("_Input event button pressed");
 			GridObject selectedGridObject = GridObjectManager.Instance
 				.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
 			if (selectedGridObject == null)
@@ -50,32 +50,64 @@ public partial class ActionManager : Manager<ActionManager>
 
 			if (SelectedAction != null)
 			{
+				GD.Print("_Input: SelectedAction != null");
 				MouseButton actionInput = SelectedAction.GetActionInput();
 
 				if (mouseButton.ButtonIndex == actionInput)
 				{
-					if (TryTakeAction(SelectedAction, selectedGridObject, selectedGridObject.GridPositionData.GridCell,
-						    currentGridCell).Result)
-					{
-						return;
-					}
+					_ = RunTryTakeActionAsync(
+						SelectedAction,
+						selectedGridObject,
+						selectedGridObject.GridPositionData.GridCell,
+						currentGridCell
+					);
+					return;
 				}
 			}
 
 			ActionDefinition[] actions = selectedGridObject.ActionDefinitions
-				.Where(action => action.GetIsAlwaysActive()).ToArray();
+				.Where(action => action.GetIsAlwaysActive())
+				.ToArray();
+
 			foreach (var action in actions)
 			{
 				if (mouseButton.ButtonIndex == action.GetActionInput())
 				{
-					TryTakeAction(action, selectedGridObject, selectedGridObject.GridPositionData.GridCell,
-						currentGridCell);
+					_ = RunTryTakeActionAsync(
+						action,
+						selectedGridObject,
+						selectedGridObject.GridPositionData.GridCell,
+						currentGridCell
+					);
+					return;
 				}
 			}
 		}
 	}
 
-	public void SetSelectedAction(ActionDefinition action, Dictionary<string, Variant> extraData = null)
+	private async Task RunTryTakeActionAsync(
+		ActionDefinition action,
+		GridObject gridObject,
+		GridCell start,
+		GridCell target,
+		Dictionary<string, Variant> extraData = null
+	)
+	{
+		try
+		{
+			await TryTakeAction(action, gridObject, start, target, extraData);
+		}
+		catch (Exception e)
+		{
+			GD.PushError($"TryTakeAction failed: {e}");
+			SetIsBusy(false);
+		}
+	}
+
+	public void SetSelectedAction(
+		ActionDefinition action,
+		Dictionary<string, Variant> extraData = null
+	)
 	{
 		SelectedAction = action;
 		if (action is IItemActionDefinition itemActionDefinition)
@@ -89,9 +121,15 @@ public partial class ActionManager : Manager<ActionManager>
 		GD.Print($"set selected action {SelectedAction.GetActionName()}");
 	}
 
-	public async Task<bool> TryTakeAction(ActionDefinition action, GridObject gridObject, GridCell startingGridCell,
-		GridCell targetGridCell, Dictionary<string, Variant> extraData = null)
+	public async Task<bool> TryTakeAction(
+		ActionDefinition action,
+		GridObject gridObject,
+		GridCell startingGridCell,
+		GridCell targetGridCell,
+		Dictionary<string, Variant> extraData = null
+	)
 	{
+		GD.Print("try taking action");
 		if (action == null)
 		{
 			GD.Print("TryTakeAction: action is null");
@@ -110,20 +148,45 @@ public partial class ActionManager : Manager<ActionManager>
 			return false;
 		}
 
-		if (action is IItemActionDefinition itemActionDefinition && itemActionDefinition.Item == null)
+		if (action is IItemActionDefinition itemActionDefinition &&
+		    itemActionDefinition.Item == null)
 		{
 			GD.Print("tryTakeAction: Item is null");
 			return false;
 		}
 
-		var result = action.CanTakeAction(gridObject, startingGridCell, targetGridCell, out var costs,
-			out string reason);
+		var result = action.CanTakeAction(
+			gridObject,
+			startingGridCell,
+			targetGridCell,
+			out var costs,
+			out string reason
+		);
 
-		if (result == true)
+		if (result)
 		{
-			GD.Print($"action: {action.GetActionName()} can be taken, starting execution");
+			GD.Print(
+				$"action: {action.GetActionName()} can be taken, starting execution"
+			);
 			SetIsBusy(true);
-			await action.InstantiateActionCall(gridObject, startingGridCell, targetGridCell, costs);
+			try
+			{
+				GD.Print($"{action} {gridObject} {startingGridCell} {costs}");
+				await action.InstantiateActionCall(
+					gridObject,
+					startingGridCell,
+					targetGridCell,
+					costs
+				);
+			}
+			catch (Exception e)
+			{
+				GD.PushError(
+					$"Exception during action '{action.GetActionName()}': {e}"
+				);
+				SetIsBusy(false);
+			}
+
 			return true;
 		}
 		else
@@ -133,38 +196,46 @@ public partial class ActionManager : Manager<ActionManager>
 		}
 	}
 
-	public void ActionCompleteCall(ActionDefinition action)
+	public void ActionCompleteCall(ActionDefinition actionDef)
+	{
+		ActionCompleteCall(actionDef, null);
+	}
+
+	// New API: only clear IsBusy if the completed action is the root (no parent)
+	public void ActionCompleteCall(ActionDefinition actionDef, global::Action actionInst)
 	{
 		GD.Print("action complete");
 
-		switch (action)
+		switch (actionDef)
 		{
 			case null:
 				GD.Print("Action is null");
 				return;
 			case IItemActionDefinition itemActionDefinition:
-				itemActionDefinition.Item = null;
+				if(!actionDef.GetRemainSelected())
+					itemActionDefinition.Item = null;
 				break;
 			case MoveActionDefinition moveActionDefinition:
-				moveActionDefinition.path = null;
+				if(!actionDef.GetRemainSelected())
+					moveActionDefinition.path = null;
 				break;
 		}
 
-		if (action.GetIsAlwaysActive())
+		bool isRoot = actionInst == null || actionInst.Parent == null;
+
+		if (isRoot)
+		{
 			SetIsBusy(false);
 
-		if (action != SelectedAction) return;
-
-
-		if (!action.remainSelected)
-		{
-			SetSelectedAction(GridObjectManager.Instance.CurrentPlayerGridObject.ActionDefinitions.First());
+			if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
+			{
+				SetSelectedAction(GridObjectManager.Instance
+					.CurrentPlayerGridObject
+					.ActionDefinitions
+					.First());
+			}
 		}
 	}
 
-	public void SetIsBusy(bool isBusy)
-	{
-		IsBusy = isBusy;
-		GD.Print($"ActionManager: SetIsBusy: {isBusy} ");
-	}
+
 }

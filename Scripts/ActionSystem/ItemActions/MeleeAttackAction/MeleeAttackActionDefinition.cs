@@ -1,5 +1,4 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using FirstArrival.Scripts.ActionSystem.ItemActions;
@@ -8,158 +7,187 @@ using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
 [GlobalClass]
-public partial class MeleeAttackActionDefinition : ActionDefinition, IItemActionDefinition
+public partial class MeleeAttackActionDefinition
+	: ActionDefinition,
+		IItemActionDefinition
 {
 	public Item Item { get; set; }
-	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs)
+
+	public override Action InstantiateAction(
+		GridObject parent,
+		GridCell startGridCell,
+		GridCell targetGridCell,
+		Dictionary<Enums.Stat, int> costs
+	)
 	{
-		return new MeleeAttackAction(parent, startGridCell, targetGridCell, this, costs);
+		return new MeleeAttackAction(parent, startGridCell, targetGridCell, this, costs)
+		{
+			Item = Item
+		};
 	}
 
-	public override bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell, out Dictionary<Enums.Stat, int> costs,
-		out string reason)
+	protected override bool OnValidateAndBuildCosts(
+		GridObject gridObject,
+		GridCell startingGridCell,
+		GridCell targetGridCell,
+		Dictionary<Enums.Stat, int> costs,
+		out string reason
+	)
 	{
-		costs = new Dictionary<Enums.Stat, int>()
+		if (Item == null)
 		{
-			{ Enums.Stat.TimeUnits, 0 },
-			{ Enums.Stat.Stamina, 0 }
-		};
-		reason = "N/A";
+			reason = "No melee item equipped";
+			return false;
+		}
+		
+		if(!Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanMelee))
+		{
+			reason = "No melee item equipped";
+			return false;
+		}
 
-		Item item = Item;
+		if (!targetGridCell.HasGridObject())
+		{
+			{
+				reason = "No grid object found";
+				return false;
+			}
+		}
+		
+		if (targetGridCell.currentGridObject == parentGridObject)
+		{
+			{
+				reason = "Target grid object is equal to parent";
+				return false;
+			}
+		}
 
 		
-		if (gridObject == null)
-		{
-			costs[Enums.Stat.TimeUnits] = -1;
-			costs[Enums.Stat.Stamina] = -1;
-			reason = "Gridobject is null";
-			return false;
-		}
-
-		if (startingGridCell == null || targetGridCell == null)
-		{
-			costs[Enums.Stat.TimeUnits] = -1;
-			costs[Enums.Stat.Stamina] = -1;
-			reason = "Starting or target gridcell is null";
-			return false;
-		}
-
 		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, out var neighbors))
 		{
-			costs[Enums.Stat.TimeUnits] = -1;
-			costs[Enums.Stat.Stamina] = -1;
 			reason = "Could not find neighbors for target gridcell";
 			return false;
 		}
 
-		if (neighbors.Contains(startingGridCell))
+		// Already adjacent?
+		if (neighbors.Any(gridCell => gridCell.gridCoordinates == startingGridCell.gridCoordinates))
 		{
-			//Unit Already adjacent, no need to move unit
-			Enums.Direction targetDirection = RotationHelperFunctions.GetDirectionBetweenCells(startingGridCell, targetGridCell);
-			if (targetDirection != gridObject.GridPositionData.Direction)
+			// Face the target if needed
+			if (
+				!AddRotateCostsIfNeeded(
+					gridObject,
+					startingGridCell,
+					targetGridCell,
+					costs,
+					out var rotateReason
+				)
+			)
 			{
-				//Gridobject still needs rotation to face the correct direction
-				RotateActionDefinition rotateAction = gridObject.ActionDefinitions.FirstOrDefault(a => a is RotateActionDefinition) as RotateActionDefinition;
-
-				if (rotateAction == null)
-				{
-					costs[Enums.Stat.TimeUnits] = -1;
-					costs[Enums.Stat.Stamina] = -1;
-					reason = "unit cannot rotate when it is needed";
-					return false;
-				}
-
-				if (!rotateAction.CanTakeAction(gridObject, startingGridCell, targetGridCell,
-					    out var rotateCosts, out string rotateReason))
-				{
-					costs[Enums.Stat.TimeUnits] = -1;
-					costs[Enums.Stat.Stamina] = -1;
-					reason = $"Rotate Action CanTakeAction failed: {rotateReason}";
-					return false;
-				}
-
-				foreach (var statCost in rotateCosts)
-				{
-					costs[statCost.Key] += statCost.Value;
-				}
+				reason = rotateReason;
+				return false;
 			}
 		}
 		else
 		{
-			GridCell target = neighbors.FirstOrDefault(neighbor =>
+			// Need to move to an adjacent tile first
+			var walkableNeighbors = neighbors.Where(n =>
+				n.state.HasFlag(Enums.GridCellState.Walkable)
+			).ToList();
+
+			if (walkableNeighbors.Count == 0)
 			{
-				if (neighbor.state.HasFlag(Enums.GridCellState.Walkable)) return true;
-				else return false;
-			});
-			
-			if (target == null)
-			{
-				GD.Print("Target gridcell is null");
+				reason = "No adjacent walkable cell near target";
+				return false;
 			}
-			List<GridCell> path = Pathfinder.Instance.FindPath(startingGridCell, target, false);
-			
-			//Gridobject needs movement to be adjacent
-			MoveActionDefinition moveAction = gridObject.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
+
+			var targetAdjacent = walkableNeighbors.OrderBy(n =>
+				startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)
+			).First();
+
+			var moveAction =
+				gridObject.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
+					as MoveActionDefinition;
 
 			if (moveAction == null)
 			{
-				costs[Enums.Stat.TimeUnits] = -1;
-				costs[Enums.Stat.Stamina] = -1;
 				reason = "unit cannot move when it is needed";
 				return false;
 			}
 
-			if (!moveAction.CanTakeAction(gridObject, startingGridCell, target,
-				    out var  moveCosts, out string moveReason))
+			if (
+				!moveAction.TryBuildCostsOnly(
+					gridObject,
+					startingGridCell,
+					targetAdjacent,
+					out var moveCosts,
+					out var moveReason
+				)
+			)
 			{
-				costs[Enums.Stat.TimeUnits] = -1;
-				costs[Enums.Stat.Stamina] = -1;
-				reason = $"move Action CanTakeAction failed: {moveReason}";
+				reason = $"move Action validation failed: {moveReason}";
 				return false;
 			}
 
-			foreach (var statCost in moveCosts)
+			AddCosts(costs, moveCosts);
+
+			if (
+				!AddRotateCostsIfNeeded(
+					gridObject,
+					targetAdjacent,
+					targetGridCell,
+					costs,
+					out var rotateReason2
+				)
+			)
 			{
-				costs[statCost.Key] += statCost.Value;
+				reason = rotateReason2;
+				return false;
 			}
 		}
-		
-		//TODO: Have custom costs per Item
-		costs[Enums.Stat.TimeUnits] = 6 * item.ItemData.weight;
-		costs[Enums.Stat.TimeUnits] = 8 * item.ItemData.weight;
+
+		AddCost(costs, Enums.Stat.TimeUnits, 6 * Item.ItemData.weight);
+		AddCost(costs, Enums.Stat.Stamina, 8 * Item.ItemData.weight);
+
 		reason = "success";
-
-
-		if (!gridObject.CanAffordStatCost(costs))
-		{
-			reason = $"unit cannot afford action costs";
-			return false;
-		}
-		
+		GD.Print($"Costs {costs[Enums.Stat.TimeUnits]}");
 		return true;
 	}
 
-	protected override List<GridCell> GetValidGridCells(GridObject gridObject, GridCell startingGridCell)
+	protected override List<GridCell> GetValidGridCells(
+		GridObject gridObject,
+		GridCell startingGridCell
+	)
 	{
-		if (!GridSystem.Instance.TryGetGridCellsInRange(startingGridCell, new Vector2I(8, 2),
-			    out List<GridCell> neighbors))
+		if (
+			!GridSystem.Instance.TryGetGridCellsInRange(
+				startingGridCell,
+				new Vector2I(20, 5),
+				out List<GridCell> neighbors
+			)
+		)
 		{
-			return null;
+			return new List<GridCell>();
 		}
-		return neighbors.Where(n =>
-		{
-			return n.HasGridObject();
-		}).ToList();
+
+		return neighbors.Where(n => n.HasGridObject()).ToList();
 	}
 
+	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
+	{
+		if (!targetGridCell.HasGridObject() || targetGridCell.currentGridObject.Team.HasFlag(parentGridObject.Team) || !targetGridCell.currentGridObject.IsActive) 
+		{
+			return (targetGridCell, 0);
+		}
+		else
+		{
+			return (targetGridCell, 85);
+		}
+	}
+	
+	
 	public override bool GetIsUIAction() => true;
-
 	public override string GetActionName() => "Melee";
-
 	public override MouseButton GetActionInput() => MouseButton.Left;
-
 	public override bool GetIsAlwaysActive() => false;
-
+	public override bool GetRemainSelected() => true;
 }

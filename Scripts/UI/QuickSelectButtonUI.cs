@@ -22,6 +22,12 @@ public partial class QuickSelectButtonUI : UIElement
 
 	}
 
+	public override void _ExitTree()
+	{
+		_button.Pressed -= QuickSelectUnit;
+		base._ExitTree();
+	}
+
 	private void QuickSelectUnit()
 	{
 		if(TargetGridObject == null)

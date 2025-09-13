@@ -34,7 +34,7 @@ GridPositionData = NodePath("GridPositionData")
 GridObjectNodeHolder = NodePath("GridObjectComponents")
 ActionDefinitions = Array[Resource]([SubResource("Resource_b652i"), SubResource("Resource_wmjhw"), SubResource("Resource_ikfb6")])
 statHolder = NodePath("GridObjectComponents/GridObjectStats/Health")
-inventoryTypes = Array[int]([2])
+inventoryTypes = Array[int]([2, 5, 6])
 metadata/_custom_type_script = "uid://bqrvnoliwqt26"
 
 [node name="GridPositionData" type="Node" parent="." node_paths=PackedStringArray("parentGridObject")]
@@ -60,11 +60,14 @@ metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"
 [node name="TimeUnits" type="Node" parent="GridObjectComponents/GridObjectStats"]
 script = ExtResource("6_ppost")
 Stat = 4
-maxValue = 120
+maxValue = 84
+turnBehavior = 1
 metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"
 
 [node name="Stamia" type="Node" parent="GridObjectComponents/GridObjectStats"]
 script = ExtResource("6_ppost")
 Stat = 2
-maxValue = 400
+maxValue = 100
+turnBehavior = 3
+incrementValue = 0.3
 metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"

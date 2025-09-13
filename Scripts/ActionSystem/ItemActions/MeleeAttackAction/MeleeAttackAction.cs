@@ -25,27 +25,63 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 	{
 		ParentAction = this;
 
+		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, out var neighbors))
+		{
+			GD.PrintErr("MeleeAttackAction.Setup: Could not find neighbors for target gridcell");
+			return;
+		}
+
+		// Are we already adjacent?
+		bool isAdjacent = neighbors.Any(c => c.gridCoordinates == startingGridCell.gridCoordinates);
+
+		if (isAdjacent)
+		{
+			// No move needed.
+			return;
+		}
+		
+		// Not adjacent. We need to move.
+		var walkableNeighbors = neighbors.Where(n => n.state.HasFlag(Enums.GridCellState.Walkable)).ToList();
+		if (!walkableNeighbors.Any())
+		{
+			GD.PrintErr("MeleeAttackAction.Setup: No walkable cell near target to move to.");
+			return;
+		}
+
+		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)).First();
+
 		MoveActionDefinition moveActionDefinition =
 			parentGridObject.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
 		
 		if (moveActionDefinition == null)
 		{
 			GD.Print("HELP: Move action definition not found");
-
 			return;
 		}
-
-			MoveAction moveAction = moveActionDefinition.InstantiateAction(parentGridObject,
-				startingGridCell, targetGridCell, costs) as MoveAction;
-			SubActions.Add(moveAction);
-
-			return;
-
+		
+		MoveAction moveAction = moveActionDefinition.InstantiateAction(parentGridObject,
+			startingGridCell, moveDestination, new Dictionary<Enums.Stat, int>()) as MoveAction;
+		AddSubAction(moveAction);
 	}
 
 	protected override async Task Execute()
 	{
 		GD.Print("Melee Attck Execute");
+		GridObject targetGridObject = targetGridCell.currentGridObject;
+		
+
+		if (!targetGridObject.TryGetStat(Enums.Stat.Health, out var health))
+		{
+			GD.Print("Target Grid Object does not have Health stat");
+			return;
+		}
+
+		if (Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanMelee))
+		{
+			health.RemoveValue(Item.ItemData.Damage);
+			GD.Print($"Target unit Damaged for {Item.ItemData.Damage} damage, remaining health is {health.CurrentValue}");
+
+		}
 		return;
 	}
 

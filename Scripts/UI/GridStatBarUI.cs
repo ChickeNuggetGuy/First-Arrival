@@ -1,6 +1,5 @@
 using Godot;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
@@ -11,67 +10,64 @@ public partial class GridStatBarUI : UIElement
 {
 	[Export] ProgressBar statBar;
 	[Export] private Enums.Stat stat;
-	private GridObject _currentGridObject;
 	[Export] private Enums.UnitTeam team;
+
 	private GridObjectStat _stat;
-	[Export] Color fillColor;
+
 	protected override async Task _Setup()
 	{
-		GridObjectTeamHolder teamHolder =GridObjectManager.Instance.GetGridObjectTeamHolder(team);
+		if (statBar == null)
+		{
+			GD.PushError("statBar is not assigned!");
+			return;
+		}
 
 		var sb = new StyleBoxFlat();
-		
+
 		switch (stat)
 		{
 			case Enums.Stat.None:
-				fillColor = Colors.Black;
+				sb.BgColor = Colors.Black;
 				break;
 			case Enums.Stat.Health:
-				fillColor = Colors.Tomato;
+				sb.BgColor = Colors.Tomato;
 				break;
 			case Enums.Stat.Stamina:
-				fillColor = Colors.Gold;
+				sb.BgColor = Colors.Gold;
 				break;
 			case Enums.Stat.Bravery:
-				fillColor = Colors.Indigo;
+				sb.BgColor = Colors.Indigo;
 				break;
 			case Enums.Stat.TimeUnits:
-				fillColor = Colors.ForestGreen;
+				sb.BgColor = Colors.ForestGreen;
 				break;
 			default:
 				throw new ArgumentOutOfRangeException();
 		}
 
-		StyleBoxFlat styleBox = new StyleBoxFlat();
 		statBar.AddThemeStyleboxOverride("fill", sb);
-		sb.BgColor = fillColor;
-		;
 	}
-	
+
 	public void SetupStatBar(GridObject gridObject)
 	{
 		if (_stat != null)
 		{
-			//Clear any previous stat references and event listeners
 			_stat.CurrentValueChanged -= StatOnCurrentValueChanged;
 			_stat = null;
 		}
-		
-		
 
-		GridObjectStat gridObjectStat = gridObject.Stats.FirstOrDefault(stat => stat.Stat == this.stat);
+		GridObjectStat gridObjectStat = gridObject.Stats.FirstOrDefault(s => s.Stat == stat);
 		if (gridObjectStat == null) return;
-		
+
 		_stat = gridObjectStat;
 		statBar.MinValue = _stat.MinMaxValue.min;
 		statBar.MaxValue = _stat.MinMaxValue.max;
 		statBar.Value = _stat.CurrentValue;
-		
+
 		_stat.CurrentValueChanged += StatOnCurrentValueChanged;
-		
 	}
 
-	private void StatOnCurrentValueChanged(int value)
+	private void StatOnCurrentValueChanged(int value, GridObject gridObject)
 	{
 		statBar.Value = value;
 	}

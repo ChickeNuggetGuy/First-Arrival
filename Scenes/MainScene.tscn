@@ -1,4 +1,4 @@
-[gd_scene load_steps=36 format=3 uid="uid://ci5t5ugjnmjr"]
+[gd_scene load_steps=41 format=3 uid="uid://ci5t5ugjnmjr"]
 
 [ext_resource type="Script" uid="uid://dr5vsk7v685hc" path="res://Scripts/Managers/GameManager.cs" id="1_hpc76"]
 [ext_resource type="Script" uid="uid://cmh00onxfeox7" path="res://Scripts/Terrain Gen/ChunkData.cs" id="3_c1ier"]
@@ -15,21 +15,25 @@
 [ext_resource type="Script" uid="uid://bmp20rrcufi2e" path="res://Scripts/CameraController.cs" id="7_q68mp"]
 [ext_resource type="Script" uid="uid://t7kecr7hiqah" path="res://Scripts/Managers/InputManager.cs" id="8_f140w"]
 [ext_resource type="Script" uid="uid://dnnq5vqxylmsk" path="res://Scripts/Managers/Pathfinder.cs" id="8_xb4mg"]
-[ext_resource type="Script" uid="uid://lh8kdv34nvel" path="res://Scripts/UI/QuickSelectUI.cs" id="10_6rnll"]
+[ext_resource type="Script" uid="uid://lh8kdv34nvel" path="res://Scripts/UI/UIWindows/QuickSelectUI.cs" id="10_6rnll"]
 [ext_resource type="PackedScene" uid="uid://dsp47ijjmg8gf" path="res://Scenes/UI/quick_select_button_ui.tscn" id="11_enc0b"]
-[ext_resource type="Script" uid="uid://g45a50cfefjk" path="res://Scripts/UI/UnitActionUI.cs" id="12_hx8n4"]
+[ext_resource type="Script" uid="uid://g45a50cfefjk" path="res://Scripts/UI/UIWindows/UnitActionUI.cs" id="12_hx8n4"]
 [ext_resource type="Script" uid="uid://cw8v24j03uqg2" path="res://Scripts/Managers/UIManager.cs" id="13_6t1o7"]
 [ext_resource type="Script" uid="uid://cl2f3rnpmng0i" path="res://Scripts/Managers/ActionManager.cs" id="13_enc0b"]
 [ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="13_hx8n4"]
 [ext_resource type="PackedScene" uid="uid://dsh6gqixhv5ls" path="res://Scenes/UI/action_button_ui.tscn" id="14_i0j58"]
 [ext_resource type="Script" uid="uid://byqfcs7esjitb" path="res://Scripts/UI/UIAnimations/TranslateUIAnimation.cs" id="16_u5v48"]
 [ext_resource type="Script" uid="uid://bc6x81kp7kdgk" path="res://Scripts/UI/UIWindow.cs" id="17_bpy1e"]
-[ext_resource type="Script" uid="uid://ckjuiwq2v6s4o" path="res://Scripts/UI/InventoryGridUI.cs" id="18_p5ymy"]
+[ext_resource type="Script" uid="uid://ckjuiwq2v6s4o" path="res://Scripts/UI/UIWindows/InventoryGridUI.cs" id="18_p5ymy"]
 [ext_resource type="Script" uid="uid://342n07onmffs" path="res://Scripts/UI/GridStatBarUI.cs" id="19_c3pre"]
 [ext_resource type="PackedScene" uid="uid://bowk2i3ys78tu" path="res://Scenes/UI/blank_slot_ui.tscn" id="20_wmecs"]
-[ext_resource type="Script" uid="uid://yaqinydnxa3a" path="res://Scripts/UI/MouseHeldInventoryUI.cs" id="21_mymud"]
+[ext_resource type="Script" uid="uid://yaqinydnxa3a" path="res://Scripts/UI/UIWindows/MouseHeldInventoryUI.cs" id="21_mymud"]
 [ext_resource type="Script" uid="uid://bv7f34s83qmss" path="res://Scripts/UI/ContextMenu/ContextMenuUI.cs" id="22_4sso6"]
 [ext_resource type="PackedScene" uid="uid://duwd8xrwmsgdi" path="res://Scenes/UI/context_menu_button_ui.tscn" id="23_r0vnq"]
+[ext_resource type="Script" uid="uid://bk1nahap6yn15" path="res://Scripts/UI/UIWindows/TurnUI.cs" id="26_dtg5n"]
+[ext_resource type="Script" uid="uid://bmbv6cyk3moxw" path="res://Scripts/Managers/TurnManager.cs" id="27_s1acj"]
+[ext_resource type="Resource" uid="uid://tbsvcgnevki7" path="res://Data/Turns/PlayerTurn.tres" id="28_rv6c1"]
+[ext_resource type="Resource" uid="uid://dydb2scxl4eyb" path="res://Data/Turns/EnemyTurn.tres" id="29_dtg5n"]
 
 [sub_resource type="Resource" id="Resource_c1ier"]
 script = ExtResource("3_c1ier")
@@ -50,6 +54,9 @@ metadata/_custom_type_script = "uid://byqfcs7esjitb"
 
 [sub_resource type="LabelSettings" id="LabelSettings_c1ier"]
 font_size = 20
+
+[sub_resource type="LabelSettings" id="LabelSettings_rv6c1"]
+font_size = 12
 
 [sub_resource type="Resource" id="Resource_q68mp"]
 script = ExtResource("6_y4jh7")
@@ -348,11 +355,47 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer"]
+[node name="LeftHandInventory" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("18_p5ymy")
+inventoryType = 5
+slotHolder = NodePath("AspectRatioContainer/GridContainer")
+Visual = NodePath("AspectRatioContainer")
+uiName = "LeftHand"
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory/AspectRatioContainer"]
+layout_mode = 2
+
+[node name="RightHandInventory" type="Control" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("18_p5ymy")
+inventoryType = 6
+slotHolder = NodePath("AspectRatioContainer/GridContainer")
+Visual = NodePath("AspectRatioContainer")
+uiName = "LeftHand"
+metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory/AspectRatioContainer"]
+layout_mode = 2
 
 [node name="InventoryWindow" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("Visual")]
 custom_minimum_size = Vector2(550, 400)
@@ -514,9 +557,54 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
+[node name="CurrentTurnUI" type="Control" parent="GameManager/UIManager/Control" node_paths=PackedStringArray("endTurnButton", "Visual")]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("26_dtg5n")
+endTurnButton = NodePath("Panel/VBoxContainer/Button")
+Visual = NodePath("Panel")
+metadata/_custom_type_script = "uid://bk1nahap6yn15"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/Control/CurrentTurnUI"]
+custom_minimum_size = Vector2(125, 75)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -152.0
+offset_top = 25.0
+offset_right = -27.0
+offset_bottom = 100.0
+grow_horizontal = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/Control/CurrentTurnUI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="GameManager/UIManager/Control/CurrentTurnUI/Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+text = "Current Turn: Player "
+label_settings = SubResource("LabelSettings_rv6c1")
+vertical_alignment = 1
+
+[node name="Button" type="Button" parent="GameManager/UIManager/Control/CurrentTurnUI/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "End Turn"
+
 [node name="ActionManager" type="Node" parent="GameManager"]
 script = ExtResource("13_enc0b")
 metadata/_custom_type_script = "uid://cl2f3rnpmng0i"
+
+[node name="TurnManager" type="Node" parent="GameManager"]
+script = ExtResource("27_s1acj")
+turns = Array[Object]([ExtResource("28_rv6c1"), ExtResource("29_dtg5n")])
+metadata/_custom_type_script = "uid://bmbv6cyk3moxw"
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(-0.9999999, 0, 0, 0, 0.8944272, 0.44721365, 0, 0.44721365, -0.89442706, 0, 5.44639, -10.892779)
@@ -530,7 +618,7 @@ script = ExtResource("4_qxria")
 transform = Transform3D(0.9291326, -0.36974674, 0, 0.34046704, 0.85555595, 0.39000806, -0.14420421, -0.3623692, 0.9208115, 0, 0, 0)
 
 [node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
-transform = Transform3D(-0.6537938, 0, 0, 0, 0.89442694, 0.4463899, 0, 0.44721353, -0.8927796, 0, 5.44639, -10.892779)
+transform = Transform3D(-0.61875296, 0, 0, 0, 0.89442694, 0.4463899, 0, 0.44721353, -0.8927796, 0, 5.44639, -10.892779)
 top_level = true
 script = ExtResource("5_y4jh7")
 follow_mode = 5

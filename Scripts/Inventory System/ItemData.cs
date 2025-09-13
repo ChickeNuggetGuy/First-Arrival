@@ -1,4 +1,5 @@
 using FirstArrival.Scripts.ActionSystem.ItemActions;
+using FirstArrival.Scripts.Utility;
 using Godot;
 using Godot.Collections;
 
@@ -7,6 +8,8 @@ namespace FirstArrival.Scripts.Inventory_System;
 [GlobalClass]
 public partial class ItemData : Resource
 {
+	
+
 	[Export]
 	public string ItemName { get; protected set; }
 
@@ -25,7 +28,11 @@ public partial class ItemData : Resource
 	public ActionDefinition[] ActionDefinitions;
 
 	[Export] public int weight { get; protected set; } = 2; 
-
+	
+	[Export] public int maxStack { get; protected set; }
+	[Export] public Enums.ItemSettings ItemSettings { get; protected set; }
+	[Export]public int Damage { get; set; }
+	[Export] public int Range { get; protected set; } = 1;
 	public static Item CreateItem(ItemData itemData)
 	{
 		Item retVal = new Item();
@@ -34,4 +41,6 @@ public partial class ItemData : Resource
 		retVal.Init((ItemData)itemData.Duplicate());
 		return retVal;
 	}
+
+
 }

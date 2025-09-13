@@ -55,7 +55,7 @@ public partial class ContextMenuUI : UIWindow
 		ContextMenuButtonUI contextButton = contextButtonScene.Instantiate() as ContextMenuButtonUI;
 		if (contextButton == null) return;
 		
-		contextButton.Init(callable);
+		contextButton.Init(callable, name);
 		contextButtons.Add(contextButton);
 		contextButtonHolder.AddChild(contextButton);
 	}
