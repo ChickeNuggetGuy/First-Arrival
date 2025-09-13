@@ -44,6 +44,8 @@ public class Enums
 	}
 
 	#endregion
+	
+	[Flags]
 	public enum UnitTeam
 	{
 		None = 0,

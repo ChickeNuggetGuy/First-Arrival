@@ -94,7 +94,7 @@ public partial class MoveActionDefinition : ActionDefinition
     GridCell startingGridCell
   )
   {
-    GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(10,3), out List<GridCell> cellsInRange, Enums.GridCellState.Walkable);
+    GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(20,3), out List<GridCell> cellsInRange, Enums.GridCellState.Walkable);
     return cellsInRange.Where( cell => Pathfinder.Instance.IsPathPossible(startingGridCell, cell)).ToList();
   }
 
@@ -112,7 +112,8 @@ public partial class MoveActionDefinition : ActionDefinition
 		  GD.Print("Starting grid cell is null");
 		  return (null, 0);
 	  }
-
+	  
+	  
 	  float distance = startingCell.worldCenter.DistanceTo(targetGridCell.worldCenter);
     
 	  // Normalize distance to a score. Let's say max distance we care about is 20 tiles.

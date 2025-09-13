@@ -38,7 +38,6 @@ public partial class RotateAction : Action
 
   protected override async Task Execute()
   {
-	  GD.Print($"RotateAction, starting direction: {parentGridObject.GridPositionData.Direction}. ");
     if (_targetDirection == Enums.Direction.None)
     {
       await Task.CompletedTask;

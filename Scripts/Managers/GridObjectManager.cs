@@ -86,6 +86,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		gridObjectTeams[team].AddGridObject(gridObjectInstance);
 		gridObjectTeams[team].AddChild(gridObjectInstance);
 		gridObjectInstance.GlobalPosition = cell.worldCenter;
+		gridObjectInstance.Name = $"{Enum.GetName(team)}  {GetGridObjectTeamHolder(team).GridObjects[Enums.GridObjectState.Active].Count}";
 		 await gridObjectInstance.Initialize(team, cell);
 		return;
 	}

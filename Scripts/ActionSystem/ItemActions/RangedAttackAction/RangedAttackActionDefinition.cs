@@ -102,7 +102,7 @@ public partial class RangedAttackActionDefinition
 		}
 
 		// TODO: Add Line of Sight Check
-		return cellsInRange.Where(cell => cell.HasGridObject() && cell.currentGridObject.Team != parentGridObject.Team).ToList();
+		return cellsInRange.Where(cell => cell.HasGridObject() && cell.currentGridObject.Team != parentGridObject.Team && cell.currentGridObject.IsActive).ToList();
 	}
 
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)

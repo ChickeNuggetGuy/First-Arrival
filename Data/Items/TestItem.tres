@@ -35,6 +35,6 @@ ItemIcon = ExtResource("1_8fx0k")
 ItemShape = SubResource("Resource_qct33")
 ActionDefinitions = Array[Object]([SubResource("Resource_3n6qk"), SubResource("Resource_14h5b"), SubResource("Resource_hs4ol")])
 ItemSettings = 15
-Damage = 100
+Damage = 20
 Range = 200
 metadata/_custom_type_script = "uid://da4j8smky5g6x"

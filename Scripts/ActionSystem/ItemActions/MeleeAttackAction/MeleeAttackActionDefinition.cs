@@ -149,7 +149,6 @@ public partial class MeleeAttackActionDefinition
 		AddCost(costs, Enums.Stat.Stamina, 8 * Item.ItemData.weight);
 
 		reason = "success";
-		GD.Print($"Costs {costs[Enums.Stat.TimeUnits]}");
 		return true;
 	}
 

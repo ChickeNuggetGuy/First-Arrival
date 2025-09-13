@@ -108,14 +108,16 @@ spawnCounts = Dictionary[int, int]({
 gridObjectScene = ExtResource("6_4b75m")
 metadata/_custom_type_script = "uid://bi115b7eyqu8y"
 
-[node name="GridObjectTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
+[node name="PlayerTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
 script = ExtResource("7_8ju71")
 team = 1
+enemyTeams = 2
 metadata/_custom_type_script = "uid://dm3rb1e6uleo1"
 
-[node name="GridObjectTeamHolder2" type="Node" parent="GameManager/GridObjectManager"]
+[node name="EnemyTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
 script = ExtResource("7_8ju71")
 team = 2
+enemyTeams = 5
 metadata/_custom_type_script = "uid://dm3rb1e6uleo1"
 
 [node name="Pathfinder" type="Node" parent="GameManager"]
@@ -603,7 +605,7 @@ metadata/_custom_type_script = "uid://cl2f3rnpmng0i"
 
 [node name="TurnManager" type="Node" parent="GameManager"]
 script = ExtResource("27_s1acj")
-turns = Array[Object]([ExtResource("28_rv6c1"), ExtResource("29_dtg5n")])
+turns = [ExtResource("28_rv6c1"), ExtResource("29_dtg5n")]
 metadata/_custom_type_script = "uid://bmbv6cyk3moxw"
 
 [node name="Camera3D" type="Camera3D" parent="."]
@@ -618,7 +620,7 @@ script = ExtResource("4_qxria")
 transform = Transform3D(0.9291326, -0.36974674, 0, 0.34046704, 0.85555595, 0.39000806, -0.14420421, -0.3623692, 0.9208115, 0, 0, 0)
 
 [node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
-transform = Transform3D(-0.61875296, 0, 0, 0, 0.89442694, 0.4463899, 0, 0.44721353, -0.8927796, 0, 5.44639, -10.892779)
+transform = Transform3D(-0.6051639, 0, 0, 0, 0.89442694, 0.4463899, 0, 0.44721353, -0.8927796, 0, 5.44639, -10.892779)
 top_level = true
 script = ExtResource("5_y4jh7")
 follow_mode = 5

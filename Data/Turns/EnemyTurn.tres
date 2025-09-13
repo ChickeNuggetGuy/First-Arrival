@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://c545g83g71bd6" path="res://Scripts/TurnSystem/Turn.cs" id="1_trxta"]
 [ext_resource type="Script" uid="uid://hn2sdgvlyvdp" path="res://Scripts/TurnSystem/TurnSegments/ProcessGridObjectsSegment.cs" id="2_l5t4u"]
 [ext_resource type="Script" uid="uid://cjjspey10irdo" path="res://Scripts/TurnSystem/TurnSegments/EndTurnSegment.cs" id="2_qycj8"]
-[ext_resource type="Script" uid="uid://fyedku3cmcx1" path="res://Scripts/TurnSystem/TurnSegments/AIActionSegement.cs" id="3_b1qxc"]
+[ext_resource type="Script" uid="uid://fyedku3cmcx1" path="res://Scripts/TurnSystem/TurnSegments/AIActionSegment.cs" id="3_b1qxc"]
 
 [sub_resource type="Resource" id="Resource_lsvtv"]
 script = ExtResource("2_l5t4u")

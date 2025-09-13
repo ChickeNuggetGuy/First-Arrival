@@ -32,7 +32,6 @@ public partial class ActionManager : Manager<ActionManager>
 
 		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
 		{
-			GD.Print("_Input event button pressed");
 			GridObject selectedGridObject = GridObjectManager.Instance
 				.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
 			if (selectedGridObject == null)
@@ -50,7 +49,6 @@ public partial class ActionManager : Manager<ActionManager>
 
 			if (SelectedAction != null)
 			{
-				GD.Print("_Input: SelectedAction != null");
 				MouseButton actionInput = SelectedAction.GetActionInput();
 
 				if (mouseButton.ButtonIndex == actionInput)
@@ -129,7 +127,6 @@ public partial class ActionManager : Manager<ActionManager>
 		Dictionary<string, Variant> extraData = null
 	)
 	{
-		GD.Print("try taking action");
 		if (action == null)
 		{
 			GD.Print("TryTakeAction: action is null");
@@ -171,7 +168,6 @@ public partial class ActionManager : Manager<ActionManager>
 			SetIsBusy(true);
 			try
 			{
-				GD.Print($"{action} {gridObject} {startingGridCell} {costs}");
 				await action.InstantiateActionCall(
 					gridObject,
 					startingGridCell,
@@ -204,8 +200,6 @@ public partial class ActionManager : Manager<ActionManager>
 	// New API: only clear IsBusy if the completed action is the root (no parent)
 	public void ActionCompleteCall(ActionDefinition actionDef, global::Action actionInst)
 	{
-		GD.Print("action complete");
-
 		switch (actionDef)
 		{
 			case null:
@@ -225,7 +219,14 @@ public partial class ActionManager : Manager<ActionManager>
 
 		if (isRoot)
 		{
-			SetIsBusy(false);
+			GD.Print($"{actionDef.GetActionName()} complete");
+			
+			// Only manage the busy flag if it's the player's turn.
+			// During the AI turn, the TurnManager is responsible for the busy state.
+			if (TurnManager.Instance.CurrentTurn.team == Enums.UnitTeam.Player)
+			{
+				SetIsBusy(false);
+			}
 
 			if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
 			{

@@ -35,13 +35,11 @@ public partial class QuickSelectUI : UIWindow
 
 	private void PlayerTeamHolderOnGridObjectListChanged(GridObjectTeamHolder gridObjectTeamHolder)
 	{
-		GD.Print($"Try Remove Quick select button {quickSelectButtons.Count}");
 		for (var index = quickSelectButtons.Count -1; index > 0; index--)
 		{
 			var button = quickSelectButtons[index];
 			if (gridObjectTeamHolder.GridObjects[Enums.GridObjectState.Inactive].Contains(button.TargetGridObject))
 			{
-				GD.Print("Remove Quick select button");
 				RemoveQuickSelectBtoon(button);
 			}
 			else

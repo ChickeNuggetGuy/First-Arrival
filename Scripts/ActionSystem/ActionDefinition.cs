@@ -1,3 +1,4 @@
+using System;
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
@@ -141,20 +142,42 @@ public abstract partial class ActionDefinition : Resource
     GridCell startingGridCell
   );
 
-  public (GridCell gridCell, int score) DetermineBestAIAction()
+  public (GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs) DetermineBestAIAction()
   {
-
 	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.GridCell);
-	  List< (GridCell gridCell, int score) > gridCellScores = new List<(GridCell, int)>();
-	  
-	  foreach (GridCell possibleGridCell in possibleGridCells)
+	  if (possibleGridCells == null || !possibleGridCells.Any())
 	  {
-		  if(!CanTakeAction(parentGridObject, parentGridObject.GridPositionData.GridCell,possibleGridCell, out var costs,
-			     out string reason)) continue;
-		  
-		  gridCellScores.Add(GetAIActionScore(possibleGridCell));
+		  return (null, int.MinValue, null);
 	  }
-	  gridCellScores.Sort((a, b) => a.Item2.CompareTo(b.Item2));
+
+	  // --- Optimization: If there are too many cells, only check a random sample. ---
+	  const int maxCellsToCheck = 50; // This value can be tweaked for performance vs. AI quality.
+	  if (possibleGridCells.Count > maxCellsToCheck)
+	  {
+		  // Simple random sampling. A more sophisticated approach could prioritize cells
+		  // (e.g., closer to enemies), but this is a good starting point for performance.
+		  possibleGridCells = possibleGridCells.OrderBy(c => Guid.NewGuid()).Take(maxCellsToCheck).ToList();
+	  }
+
+	  var gridCellScores = new List<(GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs)>();
+
+	  foreach (var possibleGridCell in possibleGridCells)
+	  {
+		  if (!CanTakeAction(parentGridObject, parentGridObject.GridPositionData.GridCell, possibleGridCell, out var costs, out _))
+		  {
+			  continue;
+		  }
+		  var result = GetAIActionScore(possibleGridCell);
+		  gridCellScores.Add((result.gridCell, result.score, costs));
+	  }
+
+	  if (!gridCellScores.Any())
+	  {
+		  return (null, int.MinValue, null);
+	  }
+
+	  // Sort descending to get the highest score first.
+	  gridCellScores.Sort((a, b) => b.score.CompareTo(a.score));
 	  return gridCellScores.First();
   }
   public abstract (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell);

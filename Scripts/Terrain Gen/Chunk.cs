@@ -52,7 +52,6 @@ public partial class Chunk : Node3D
 	    meshInstance = GetNodeOrNull<MeshInstance3D>("MeshInstance");
 	    if (meshInstance == null)
 	    {
-		    GD.Print("MeshInstance not found, creating new MeshInstance3D.");
 		    meshInstance = new MeshInstance3D { Name = "MeshInstance" };
 		    AddChild(meshInstance);
 	    }

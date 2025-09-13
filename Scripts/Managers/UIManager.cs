@@ -24,7 +24,6 @@ public partial class UIManager : Manager<UIManager>
 
 		foreach (var window in _windows)
 		{
-			GD.Print($"UIManager - Setting up window: {window.uiName}");
 			await window.SetupCall();
 		}
 	}

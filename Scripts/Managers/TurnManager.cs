@@ -80,7 +80,6 @@ namespace FirstArrival.Scripts.Managers
 
         public void RequestEndOfTurn()
         {
-            GD.Print("---> Requesting End of Turn");
             CallDeferred("EndTurn");
         }
 

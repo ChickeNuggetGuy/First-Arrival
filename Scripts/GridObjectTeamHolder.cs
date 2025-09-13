@@ -7,6 +7,7 @@ using Godot;
 public partial class GridObjectTeamHolder : Node
 {
 	[Export] public Enums.UnitTeam team { get; private set; }
+	[Export] public Enums.UnitTeam enemyTeams { get; private set; }
 	[Export] private Node _activeUnitsHolder;
 	[Export] private Node _inactiveUnitsHolder;
 
@@ -29,22 +30,12 @@ public partial class GridObjectTeamHolder : Node
 		{
 			_activeUnitsHolder = new Node { Name = "ActiveUnits" };
 			AddChild(_activeUnitsHolder);
-			GD.Print($"GridObjectTeamHolder: Created _activeUnitsHolder: {_activeUnitsHolder.Name}");
-		}
-		else
-		{
-			GD.Print($"GridObjectTeamHolder: _activeUnitsHolder already set: {_activeUnitsHolder.Name}");
 		}
 
 		if (_inactiveUnitsHolder == null)
 		{
 			_inactiveUnitsHolder = new Node { Name = "InactiveUnits" };
 			AddChild(_inactiveUnitsHolder);
-			GD.Print($"GridObjectTeamHolder: Created _inactiveUnitsHolder: {_inactiveUnitsHolder.Name}");
-		}
-		else
-		{
-			GD.Print($"GridObjectTeamHolder: _inactiveUnitsHolder already set: {_inactiveUnitsHolder.Name}");
 		}
 	}
 
