@@ -1,17 +1,31 @@
 using System.Collections.Generic;
+using System.Linq;
 using FirstArrival.Scripts.Utility;
 using Godot;
+using Godot.Collections;
 
 namespace FirstArrival.Scripts.Inventory_System;
 
-[GlobalClass]
+[GlobalClass, Tool]
 public partial class InventoryGrid : Resource
 {
 	[Export] public Enums.InventoryType InventoryType { get; protected set; }
 
-	[Export] public GridShape GridShape { get; protected set; }
-	[Export(PropertyHint.Enum)] public Enums.InventorySettings InventorySettings { get; protected set; }
-	public Item[,] Items{get; private set;}
+	[Export(PropertyHint.ResourceType, "GridShape")] public GridShape GridShape { get; protected set; }
+
+	private Enums.InventorySettings _inventorySettings;
+	[Export(PropertyHint.Enum)]
+	public Enums.InventorySettings InventorySettings
+	{
+		get => _inventorySettings;
+		protected set{			
+			_inventorySettings = value;
+			NotifyPropertyListChanged();}
+	}
+	
+	public int maxItemCount = 0;
+	public int maxWeight { get; protected set; }
+	public (Item item, int count)[,] Items{get; private set;}
 
 	/// <summary>
 	/// Gets the nummber of unique Items in the grid
@@ -20,6 +34,7 @@ public partial class InventoryGrid : Resource
 	{
 		get
 		{
+			int count = 0;
 			if (Items == null) return -1;
 			List<Item> uniqueItems = new  List<Item>();
 
@@ -27,26 +42,49 @@ public partial class InventoryGrid : Resource
 			{
 				for (int y = 0; y < Items.GetLength(1); y++)
 				{
-					if  (Items[x, y] == null) continue;
-					if (uniqueItems.Contains(Items[x, y])) continue;
-					uniqueItems.Add(Items[x, y]);
+					if  (Items[x, y].item == null) continue;
+					if (uniqueItems.Contains(Items[x, y].item)) continue;
+					if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
+					{
+						count += Items[x, y].count;
+					}
+					else
+					{
+						count++;
+					}
+					uniqueItems.Add(Items[x, y].item);
 				}
 			}
 			return uniqueItems.Count;
 		}
 	}
-
-	public List<Item> uniqueItems
+	
+	public int ItemWeight
 	{
 		get
 		{
-			List<Item> uniqueItems = new  List<Item>();
+			int totalWeight = 0;
+			if (Items == null) return -1;
+			List<(Item item, int count)> uniqueItems = UniqueItems;
+
+			foreach ((Item item, int count) i in uniqueItems)
+			{
+				totalWeight += i.item.ItemData.weight * i.count;
+			}
+			return totalWeight;
+		}
+	}
+	public List<(Item item, int count)> UniqueItems
+	{
+		get
+		{
+			List<(Item item, int count)> uniqueItems = new  List<(Item item, int count)>();
 
 			for (int x = 0; x < Items.GetLength(0); x++)
 			{
 				for (int y = 0; y < Items.GetLength(1); y++)
 				{
-					if  (Items[x, y] == null) continue;
+					if  (Items[x, y].item == null) continue;
 					if (uniqueItems.Contains(Items[x, y])) continue;
 					uniqueItems.Add(Items[x, y]);
 				}
@@ -69,22 +107,57 @@ public partial class InventoryGrid : Resource
 
 	#region Functions
 
+	public override Godot.Collections.Array<Godot.Collections.Dictionary> _GetPropertyList()
+	{
+		Godot.Collections.Array<Godot.Collections.Dictionary> properties = [];
+
+		if (InventorySettings.HasFlag(Enums.InventorySettings.MaxItemAmount))
+		{
+			properties.Add(new Godot.Collections.Dictionary()
+			{
+				{ "name", $"maxItemCount" },
+				{ "type", (int)Variant.Type.Int },
+				{ "hint_string", "Item Count" },
+			});
+		}
+		
+		if (InventorySettings.HasFlag(Enums.InventorySettings.MaxWeight))
+		{
+			properties.Add(new Godot.Collections.Dictionary()
+			{
+				{ "name", $"maxWeight" },
+				{ "type", (int)Variant.Type.Int },
+				{ "hint_string", "1,2,3,4,5,6,7,8,9" },
+			});
+		}
+
+		return properties;
+	}
+	
 	public void Initialize()
 	{
-		Items = new Item[GridShape.GridWidth, GridShape.GridHeight];
+		Items = new (Item item, int count)[GridShape.GridSizeX, GridShape.GridSizeZ];
+
+		for (int x = 0; x < GridShape.GridSizeX; x++)
+		{
+			for (int y = 0; y < GridShape.GridSizeZ; y++)
+			{
+				Items[x, y] = (null, 0);
+			}
+		}
 	}
 
-	private void AddItem(Item item)
+	private void AddItem(Item item, int count)
 	{
 		if (item == null) return;
 
-		if (!CanAddItem(item, out var position)) return;
-		AddItemAt(position, item);
+		if (!CanAddItem(item, out var position,count)) return;
+		AddItemAt(position, item, count);
 	}
 	
-	private void AddItemAt(Vector2I position, Item item) => AddItemAt(position.X, position.Y, item);
+	private void AddItemAt(Vector2I position, Item item, int count) => AddItemAt(position.X, position.Y, item,count);
 
-	private void AddItemAt(int x, int y, Item item)
+	private void AddItemAt(int x, int y, Item item, int count)
 	{
 		// --- Corrected Logic ---
 		if (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes))
@@ -96,22 +169,22 @@ public partial class InventoryGrid : Resource
 			{
 				// Fallback or error handling. Placing in single cell as a default.
 				GD.PushWarning($"AddItemAt: Item '{item?.ItemData?.ItemName ?? "Unknown"}' has no ItemShape but UseItemSize is true. Placing in single cell ({x},{y}).");
-				if (x >= 0 && x < GridShape.GridWidth && y >= 0 && y < GridShape.GridHeight && GridShape.GetGridShapeCell(x, y))
+				if (x >= 0 && x < GridShape.GridSizeX && y >= 0 && y < GridShape.GridSizeZ && GridShape.GetGridShapeCell(x, y))
 				{
-					Items[x, y] = item;
+					Items[x, y] = (item, count);
 				}
 			}
 			else
 			{
 				// Place the item in all cells defined by its ItemShape, offset by (x, y).
-				for (int relX = 0; relX < itemShape.GridWidth; relX++)
+				for (int relX = 0; relX < itemShape.GridSizeX; relX++)
 				{
-					for (int relY = 0; relY < itemShape.GridHeight; relY++)
+					for (int relY = 0; relY < itemShape.GridSizeZ; relY++)
 					{
-						// Check if this part of the item's shape is actually occupied/used.
+						// Check if this part of the item's shape is  occupied/used.
 						if (!itemShape.GetGridShapeCell(relX, relY))
 						{
-							continue; // Skip unused cells within the item's shape bounds.
+							continue;
 						}
 
 						int gridX = x + relX;
@@ -119,28 +192,21 @@ public partial class InventoryGrid : Resource
 
 						// Bounds check (should ideally be done in CanAddItemAt, but safe here as a safeguard)
 						// Also check if the calculated grid cell is part of the inventory's shape.
-						if (gridX >= 0 && gridX < GridShape.GridWidth && gridY >= 0 && gridY < GridShape.GridHeight && GridShape.GetGridShapeCell(gridX, gridY))
+						if (gridX >= 0 && gridX < GridShape.GridSizeX && gridY >= 0 && gridY < GridShape.GridSizeZ && GridShape.GetGridShapeCell(gridX, gridY))
 						{
-							Items[gridX, gridY] = item;
+							Items[gridX, gridY] = (item, count);
 						}
-						// Optionally, else log error if CanAddItemAt was supposed to prevent this.
-						// else { GD.PrintErr($"AddItemAt: Calculated position ({gridX},{gridY}) is out of bounds or invalid for inventory shape."); }
 					}
 				}
 			}
 		}
 		else
 		{
-			// --- Corrected Logic for UseItemSize = false ---
-			// Place the item reference only in the single specified cell (x, y).
-
 			// Bounds and shape check (should be ensured by CanAddItemAt, but safe here as a safeguard)
-			if (x >= 0 && x < GridShape.GridWidth && y >= 0 && y < GridShape.GridHeight && GridShape.GetGridShapeCell(x, y))
+			if (x >= 0 && x < GridShape.GridSizeX && y >= 0 && y < GridShape.GridSizeZ && GridShape.GetGridShapeCell(x, y))
 			{
-				Items[x, y] = item;
+				Items[x, y] = (item, count);;
 			}
-			// Optionally, else log error if CanAddItemAt was supposed to prevent this.
-			// else { GD.PrintErr($"AddItemAt: Position ({x},{y}) is out of bounds or invalid for inventory shape (UseItemSize=false)."); }
 		}
 		// --- End of Correction ---
 		item.currentGrid = this;
@@ -148,66 +214,68 @@ public partial class InventoryGrid : Resource
 		EmitSignal(SignalName.InventoryChanged);
 	}
 
-	public bool TryAddItem(Item item)
+	public bool TryAddItem(Item item, int count)
 	{
-		if (!CanAddItem(item, out Vector2I position))
+		if (!CanAddItem(item, out Vector2I position, count))
 			return false;
 
-		AddItemAt(position.X, position.Y, item);
+		AddItemAt(position.X, position.Y, item, count);
 		return true;
 	}
 
-	public bool TryAddItemAt(Item item, Vector2I position)
+	public bool TryAddItemAt(Item item, Vector2I position, int count)
 	{
-		// Delegate the core logic to the existing CanAddItemAt and AddItemAt(int, int, Item) functions.
-		// This ensures consistent validation and addition behavior.
-		if (CanAddItemAt(position.X, position.Y, item))
+
+		if (CanAddItemAt(position.X, position.Y, item, count))
 		{
-			// If validation passes, proceed to add the item at the specified location.
-			AddItemAt(position.X, position.Y, item);
+			AddItemAt(position.X, position.Y, item, count);
 			return true; // Indicate successful addition.
 		}
-		// If CanAddItemAt returned false, the item cannot be placed at the given position.
-		// Reasons might include: out of bounds, overlaps with existing item, invalid inventory shape cell, etc.
-		// The function implicitly returns false in this case.
-		return false; // Indicate failure to add.
+
+		return false; 
 	}
 	
-	private void RemoveItem(Item item)
+	private void RemoveItem(Item item, int count)
 	{
 		if (item == null) return;
 		List<Vector2I> positions = GetItemPositions(item);
 		foreach (Vector2I pos in positions)
 		{
-			Items[pos.X, pos.Y] = null;
+			if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking) && Items[pos.X, pos.Y].count >= count)
+			{
+				Items[pos.X, pos.Y].count -= count;
+			}
+			else
+			{
+				Items[pos.X, pos.Y] = (null, 0);
+			}
 		}
 		item.currentGrid = null;
 		EmitSignal(SignalName.ItemRemoved, item);
 		EmitSignal(SignalName.InventoryChanged);
 	}
 
-	public bool TryRemoveItem(Item item)
+	public bool TryRemoveItem(Item item, int count)
 	{
 		if (!HasItem(item)) return false;
-		RemoveItem(item);
+		RemoveItem(item, count);
 		return true;
 	}
 
-	public bool CanAddItem(Item item, out Vector2I position)
+	public bool CanAddItem(Item item, out Vector2I position, int count)
 	{
 		position = new Vector2I(-1, -1);
 		if (item == null) return false;
-		// TODO: Check stacking logic
 
 		GridShape itemShape = item.ItemData?.ItemShape;
 
-		// Iterate through potential top-left corners in the inventory grid
-		for (int x = 0; x <= GridShape.GridWidth - (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null ? itemShape.GridWidth : 1); x++)
+
+		for (int x = 0; x <= GridShape.GridSizeX - (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null ? itemShape.GridSizeX : 1); x++)
 		{
-			for (int y = 0; y <= GridShape.GridHeight - (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null ? itemShape.GridHeight : 1); y++)
+			for (int y = 0; y <= GridShape.GridSizeZ - (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null ? itemShape.GridSizeZ : 1); y++)
 			{
-				// The logic for checking if an item fits is now consolidated in CanAddItemAt.
-				if (CanAddItemAt(x, y, item)) 
+
+				if (CanAddItemAt(x, y, item, count)) 
 				{
 					position = new Vector2I(x, y);
 					return true;
@@ -218,7 +286,7 @@ public partial class InventoryGrid : Resource
 		return false;
 	}
 
-	public bool CanAddItemAt(int x, int y, Item item)
+	public bool CanAddItemAt(int x, int y, Item item, int count)
 	{
 		if (item == null) return false;
 		// TODO: Check stacking logic
@@ -233,9 +301,9 @@ public partial class InventoryGrid : Resource
 				return false;
 			}
 			
-			for (int relX = 0; relX < itemShape.GridWidth; relX++)
+			for (int relX = 0; relX < itemShape.GridSizeX; relX++)
 			{
-				for (int relY = 0; relY < itemShape.GridHeight; relY++)
+				for (int relY = 0; relY < itemShape.GridSizeZ; relY++)
 				{
 					if (!itemShape.GetGridShapeCell(relX, relY))
 					{
@@ -245,7 +313,7 @@ public partial class InventoryGrid : Resource
 					int gridX = x + relX;
 					int gridY = y + relY;
 					
-					if (gridX < 0 || gridX >= GridShape.GridWidth || gridY < 0 || gridY >= GridShape.GridHeight)
+					if (gridX < 0 || gridX >= GridShape.GridSizeX || gridY < 0 || gridY >= GridShape.GridSizeZ)
 					{
 						return false; // Part of the item would be placed outside the inventory grid.
 					}
@@ -254,10 +322,25 @@ public partial class InventoryGrid : Resource
 					{
 						return false; // This cell in the inventory is not part of the usable space.
 					}
-					
-					if (Items[gridX, gridY] != null)
+
+		
+					if (Items[gridX, gridY].item != null)
 					{
-						return false; // Cell is already occupied by another item.
+						if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
+						{
+							if (Items[gridX,gridY].item.ItemData == item.ItemData && Items[gridX, gridY].count < item.ItemData.MaxStackSize)
+							{
+								return true;
+							}
+							else
+							{
+								return false;
+							}
+						}
+						else
+						{
+							return false;
+						}
 					}
 
 				}
@@ -265,7 +348,7 @@ public partial class InventoryGrid : Resource
 		}
 		else
 		{
-			if (x < 0 || x >= GridShape.GridWidth || y < 0 || y >= GridShape.GridHeight)
+			if (x < 0 || x >= GridShape.GridSizeX || y < 0 || y >= GridShape.GridSizeZ)
 			{
 				return false; // Position is outside the grid dimensions.
 			}
@@ -276,13 +359,25 @@ public partial class InventoryGrid : Resource
 			}
 
 
-			if (Items[x, y] != null)
+			if (Items[x, y].item != null)
 			{
-				return false; // Cell is already occupied.
+				if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
+				{
+					if (Items[x, y].item.ItemData == item.ItemData && Items[x, y].count < item.ItemData.MaxStackSize)
+					{
+						return true;
+					}
+					else
+					{
+						return false;
+					}
+				}
+				else
+				{
+					return false;
+				}
 			}
 		}
-
-
 		return true;
 	}
 	
@@ -292,11 +387,11 @@ public partial class InventoryGrid : Resource
 		if (item == null) return false;
 		if (Items == null) return false;
 
-		for (int x = 0; x < GridShape.GridWidth; x++)
+		for (int x = 0; x < GridShape.GridSizeX; x++)
 		{
-			for (int y = 0; y < GridShape.GridHeight; y++)
+			for (int y = 0; y < GridShape.GridSizeZ; y++)
 			{
-				if (Items[x, y] == item) return true;
+				if (Items[x, y].item.ItemData == item.ItemData) return true;
 			}
 		}
 
@@ -306,33 +401,33 @@ public partial class InventoryGrid : Resource
 	public bool HasItemAt(int x, int y)
 	{
 		if (Items == null) return false;
-		if (x < 0 || x >= GridShape.GridWidth || y < 0 || y >= GridShape.GridHeight) return false;
+		if (x < 0 || x >= GridShape.GridSizeX || y < 0 || y >= GridShape.GridSizeZ) return false;
 		if (!GridShape.GetGridShapeCell(x, y)) return false; // Check inventory shape validity
 
-		return Items[x, y] != null; // Check if cell is occupied
+		return Items[x, y].item != null; // Check if cell is occupied
 	}
 
 	public bool HasItemAt(int x, int y, Item item)
 	{
 		if (!HasItemAt(x, y)) return false;
 
-		if (Items[x, y] == item) return true;
+		if (Items[x, y].item.ItemData == item.ItemData) return true;
 		else return false;
 	}
 
-	private Item GetItemAt(int x, int y)
+	private (Item item, int count) GetItemAt(int x, int y)
 	{
 		if (HasItemAt(x, y))
 		{
 			return Items[x, y];
 		}
 
-		return null;
+		return (null,0);
 	}
 
-	public bool TryGetItemAt(int x, int y, out Item item)
+	public bool TryGetItemAt(int x, int y, out (Item item, int count) item)
 	{
-		item = null;
+		item = (null,0);
 		if (!HasItemAt(x, y)) return false;
 		item = GetItemAt(x, y);
 		return true;
@@ -343,11 +438,11 @@ public partial class InventoryGrid : Resource
 		List<Vector2I> result = new List<Vector2I>();
 		if (item == null || Items == null) return result;
 
-		for (int x = 0; x < GridShape.GridWidth; x++)
+		for (int x = 0; x < GridShape.GridSizeX; x++)
 		{
-			for (int y = 0; y < GridShape.GridHeight; y++)
+			for (int y = 0; y < GridShape.GridSizeZ; y++)
 			{
-				if (Items[x, y] == item)
+				if (Items[x, y].item.ItemData == item.ItemData)
 				{
 					Vector2I pos = new Vector2I(x, y);
 					if (!result.Contains(pos))
@@ -361,15 +456,16 @@ public partial class InventoryGrid : Resource
 		return result;
 	}
 
-/// <summary>
-/// Attempts to transfer an item from one inventory grid to another.
-/// Performs all validation checks upfront.
-/// </summary>
-/// <param name="sourceInventory">The inventory grid to remove the item from.</param>
-/// <param name="destinationInventory">The inventory grid to add the item to.</param>
-/// <param name="item">The item to transfer. Must not be null.</param>
-/// <returns>True if the item was successfully transferred; otherwise, false.</returns>
-public static bool TryTransferItem(InventoryGrid sourceInventory, InventoryGrid destinationInventory, Item item)
+	/// <summary>
+	/// Attempts to transfer an item from one inventory grid to another.
+	/// Performs all validation checks upfront.
+	/// </summary>
+	/// <param name="sourceInventory">The inventory grid to remove the item from.</param>
+	/// <param name="destinationInventory">The inventory grid to add the item to.</param>
+	/// <param name="item">The item to transfer. Must not be null.</param>
+	/// <param name="count">The amount of said item to transfer</param>
+	/// <returns>True if the item was successfully transferred; otherwise, false.</returns>
+	public static bool TryTransferItem(InventoryGrid sourceInventory, InventoryGrid destinationInventory, Item item, int count)
 {
 	if (sourceInventory == null || destinationInventory == null || item == null)
 	{
@@ -383,14 +479,14 @@ public static bool TryTransferItem(InventoryGrid sourceInventory, InventoryGrid 
 		return false;
 	}
 
-	if (!destinationInventory.CanAddItem(item, out _))
+	if (!destinationInventory.CanAddItem(item, out _, count))
 	{
 		GD.Print($"TryTransferItem: Cannot add item '{item.ItemData?.ItemName ?? "Unknown"}' to destination inventory.");
 		return false;
 	}
 
-	sourceInventory.RemoveItem(item);
-	destinationInventory.AddItem(item);
+	sourceInventory.RemoveItem(item, count);
+	destinationInventory.AddItem(item, count);
 	GD.Print($"TryTransferItem: Successfully transferred item '{item.ItemData?.ItemName ?? "Unknown"}'.");
 	return true;
 }
@@ -417,21 +513,23 @@ public static bool TryTransferItemAt(InventoryGrid sourceInventory, Vector2I sou
 		return false;
 	}
 
-	if (!sourceInventory.TryGetItemAt(sourcePosition.X, sourcePosition.Y, out item) || item == null)
+	if (!sourceInventory.TryGetItemAt(sourcePosition.X, sourcePosition.Y, out var itemInfo) || itemInfo.item == null)
 	{
 		GD.Print($"TryTransferItemAt: No item found at source position ({sourcePosition.X}, {sourcePosition.Y}).");
 		return false;
 	}
 
-	if (!destinationInventory.CanAddItemAt(destinationPosition.X, destinationPosition.Y, item))
+	item = itemInfo.item;
+
+	if (!destinationInventory.CanAddItemAt(destinationPosition.X, destinationPosition.Y, item, itemInfo.count))
 	{
 		GD.Print($"TryTransferItemAt: Cannot add item '{item.ItemData?.ItemName ?? "Unknown"}' to destination position ({destinationPosition.X}, {destinationPosition.Y}).");
 		item = null; // Reset item output as the transfer failed
 		return false;
 	}
 
-	sourceInventory.RemoveItem(item);
-	destinationInventory.AddItemAt(destinationPosition, item);
+	sourceInventory.RemoveItem(itemInfo.item, itemInfo.count);
+	destinationInventory.AddItemAt(destinationPosition, item, itemInfo.count);
 	GD.Print($"TryTransferItemAt: Successfully transferred item '{item.ItemData?.ItemName ?? "Unknown"}' from ({sourcePosition.X}, {sourcePosition.Y}) to ({destinationPosition.X}, {destinationPosition.Y}).");
 	return true;
 }

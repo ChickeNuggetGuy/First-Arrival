@@ -27,4 +27,16 @@ public partial class UIManager : Manager<UIManager>
 			await window.SetupCall();
 		}
 	}
+	
+	#region manager Data
+	protected override void GetInstanceData(ManagerData data)
+	{
+		GD.Print("No data to transfer");
+	}
+
+	public override ManagerData SetInstanceData()
+	{
+		return null;
+	}
+	#endregion
 }

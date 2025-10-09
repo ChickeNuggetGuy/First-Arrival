@@ -52,7 +52,7 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
-		if (targetGridCell.currentGridObject == parentGridObject)
+		if (targetGridCell.gridObjects.Contains(parentGridObject))
 		{
 			reason = "Target grid object is equal to parent";
 			return false;
@@ -90,10 +90,15 @@ public partial class RangedAttackActionDefinition
 			return new List<GridCell>();
 		}
 
+		GridObjectSight sightArea = parentGridObject.gridObjectNodesDictionary["all"].FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
+		if (sightArea == null) return new List<GridCell>();
+		
+		
 		if (
 			!GridSystem.Instance.TryGetGridCellsInRange(
 				startingGridCell,
 				new Vector2I(Item.ItemData.Range, Item.ItemData.Range),
+				false,
 				out List<GridCell> cellsInRange
 			)
 		)
@@ -102,14 +107,28 @@ public partial class RangedAttackActionDefinition
 		}
 
 		// TODO: Add Line of Sight Check
-		return cellsInRange.Where(cell => cell.HasGridObject() && cell.currentGridObject.Team != parentGridObject.Team && cell.currentGridObject.IsActive).ToList();
+		return cellsInRange.Where(cell =>
+		{
+			if(!cell.HasGridObject()) return false;
+			
+			bool anyValid = false;
+			foreach (GridObject gridObject in cell.gridObjects)
+			{
+				if( gridObject.Team == parentGridObject.Team ||
+				    !gridObject.IsActive ) continue;
+				anyValid = true;
+			}
+			
+			if(!anyValid) return false;
+				
+			if(!sightArea.SeenGridObjects.Any(GridObject => cell.gridObjects.Contains(gridObject))) return false;
+			
+			return cell.gridObjects.Any(gridObject => gridObject.IsActive);
+		}).ToList();
 	}
 
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
 	{
-		// Placeholder implementation:
-		// You would implement actual AI logic here to determine the score
-		// based on factors like target health, distance, tactical advantage, etc.
 		int score = 0;
 
 		if (!targetGridCell.HasGridObject())
@@ -117,28 +136,41 @@ public partial class RangedAttackActionDefinition
 			GD.Print("RANGED ATTACK: No grid object found");
 			return (null, 0);
 		}
-
-		if (targetGridCell.currentGridObject == parentGridObject)
+		
+		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
-			GD.Print("RANGED ATTACK: Target grid object is equal to parent");
-			return (null, 0);
-		}
+			if(gridObject == null) return false;
+			if(!gridObject.IsActive) return false;
+			if(gridObject == parentGridObject) return false;
+			if(gridObject.Team == parentGridObject.Team) return false;
+			return true;
+		});
 
-		if (!targetGridCell.currentGridObject.IsActive)
+		if (targetGridObject == null)
 		{
-			GD.Print("RANGED ATTACK: Grid object is not active");
-			return (null, 0);
+			GD.Print("Target grid object is null, failed all conditions");
 		}
-
-		if (targetGridCell.currentGridObject.Team.HasFlag(parentGridObject.Team))
-		{
-			GD.Print($"RANGED ATTACK: Target grid object team: {targetGridCell.currentGridObject.Team} is equal to parent: {parentGridObject.Team}");
-		}
+		// if (targetGridCell.gridObjects.Contains( parentGridObject))
+		// {
+		// 	GD.Print("RANGED ATTACK: Target grid object is parent");
+		// 	return (null, 0);
+		// }
+		//
+		// if (!targetGridCell.gridObjects.Any(gridObject => gridObject.IsActive))
+		// {
+		// 	GD.Print("RANGED ATTACK: Grid object is not active");
+		// 	return (null, 0);
+		// }
+		//
+		// if (targetGridCell.gridObjects.Any(gridObject => gridObject.Team.HasFlag(parentGridObject.Team)))
+		// {
+		// 	GD.Print($"RANGED ATTACK: Target grid object team is equal to parent: {parentGridObject.Team}");
+		// }
 
 
 		score += 80; // Base score for attacking an enemy
 		// Add more score based on enemy health (e.g., higher score for lower health)
-		if (targetGridCell.currentGridObject.TryGetStat(Enums.Stat.Health, out var healthStat))
+		if (targetGridObject.TryGetStat(Enums.Stat.Health, out var healthStat))
 		{
 			score += (100 - Mathf.RoundToInt(healthStat.CurrentValue)); // Higher score for lower health
 		}

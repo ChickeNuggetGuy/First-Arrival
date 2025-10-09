@@ -34,7 +34,7 @@ public partial class MoveStepActionDefinition : ActionDefinition
     }
 
     if (
-      !GridSystem.Instance.TryGetGridCellNeighbors(startingGridCell, out var neighbors)
+      !GridSystem.Instance.TryGetGridCellNeighbors(startingGridCell,true,false, out var neighbors)
       || neighbors == null
       || !neighbors.Contains(targetGridCell)
     )
@@ -88,7 +88,7 @@ public partial class MoveStepActionDefinition : ActionDefinition
     GridCell startingGridCell
   )
   {
-    GridSystem.Instance.TryGetGridCellNeighbors(startingGridCell, out var neighbors);
+    GridSystem.Instance.TryGetGridCellNeighbors(startingGridCell,true, false, out var neighbors);
     return neighbors;
   }
 

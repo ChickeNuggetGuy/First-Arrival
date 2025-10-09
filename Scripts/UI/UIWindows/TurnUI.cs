@@ -13,13 +13,11 @@ public partial class TurnUI : UIWindow
 	{
 		if (endTurnButton != null)
 		{
-			endTurnButton.Pressed -= EndTurnButtonOnPressed;
 			endTurnButton.Pressed += EndTurnButtonOnPressed;
 		}
 
 		if (TurnManager.Instance != null)
 		{
-			TurnManager.Instance.TurnStarted -= InstanceOnTurnStarted;
 			TurnManager.Instance.TurnStarted += InstanceOnTurnStarted;
 		}
 

@@ -54,16 +54,23 @@ public partial class MeleeAttackActionDefinition
 			}
 		}
 		
-		if (targetGridCell.currentGridObject == parentGridObject)
+		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
-			{
-				reason = "Target grid object is equal to parent";
-				return false;
-			}
+			if(gridObject == null) return false;
+			if(!gridObject.IsActive) return false;
+			if(gridObject == parentGridObject) return false;
+			if(gridObject.Team == parentGridObject.Team) return false;
+			return true;
+		});
+
+		if (targetGridObject == null)
+		{
+			GD.Print("Target grid object is null, failed all conditions");
 		}
+		
 
 		
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, out var neighbors))
+		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, true, false, out var neighbors))
 		{
 			reason = "Could not find neighbors for target gridcell";
 			return false;
@@ -91,7 +98,7 @@ public partial class MeleeAttackActionDefinition
 		{
 			// Need to move to an adjacent tile first
 			var walkableNeighbors = neighbors.Where(n =>
-				n.state.HasFlag(Enums.GridCellState.Walkable)
+				n.IsWalkable
 			).ToList();
 
 			if (walkableNeighbors.Count == 0)
@@ -157,10 +164,15 @@ public partial class MeleeAttackActionDefinition
 		GridCell startingGridCell
 	)
 	{
+		
+		GridObjectSight sightArea = parentGridObject.gridObjectNodesDictionary["all"].FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
+		if (sightArea == null) return new List<GridCell>();
+
 		if (
 			!GridSystem.Instance.TryGetGridCellsInRange(
 				startingGridCell,
 				new Vector2I(20, 5),
+				false,
 				out List<GridCell> neighbors
 			)
 		)
@@ -168,15 +180,32 @@ public partial class MeleeAttackActionDefinition
 			return new List<GridCell>();
 		}
 
-		return neighbors.Where(n => n.HasGridObject()).ToList();
+		return neighbors.Where(n =>
+		{
+			if(!n.HasGridObject())return false;
+			if(!sightArea.SeenGridObjects.Any(gridObject => n.gridObjects.Contains(gridObject))) return false;
+			return n.gridObjects.Any(gridObject => gridObject.IsActive);
+		}).ToList();
 	}
 
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
 	{
-		if (!targetGridCell.HasGridObject() || targetGridCell.currentGridObject.Team.HasFlag(parentGridObject.Team) || !targetGridCell.currentGridObject.IsActive) 
+		
+		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
+			if(gridObject == null) return false;
+			if(!gridObject.IsActive) return false;
+			if(gridObject == parentGridObject) return false;
+			if(gridObject.Team == parentGridObject.Team) return false;
+			return true;
+		});
+
+		if (targetGridObject == null)
+		{
+			GD.Print("Target grid object is null, failed all conditions");
 			return (targetGridCell, 0);
 		}
+			
 		else
 		{
 			return (targetGridCell, 85);

@@ -18,10 +18,9 @@ public partial class GridCellStateOverride : Area3D
 	public override void _Ready()
 	{
 		base._Ready();
-		GridSystem.Instance.GridSystemInitialized += InstanceOnGridSystemInitialized;
 	}
 
-	private void InstanceOnGridSystemInitialized()
+	public void InitializeGridCellOverride()
 	{
 		if(!GridSystem.Instance.TryGetGridCellsInArea(this, out var gridCells))
 		{

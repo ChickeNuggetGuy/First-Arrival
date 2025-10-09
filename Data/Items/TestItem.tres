@@ -4,8 +4,8 @@
 [ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="1_8fx0k"]
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_50k2r"]
 [ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="2_14h5b"]
-[ext_resource type="Script" uid="uid://cqk2q16xxuf4n" path="res://Scripts/GridSystem/GridShape.cs" id="2_qct33"]
 [ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="3_q3em7"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="5_q3em7"]
 
 [sub_resource type="Resource" id="Resource_3n6qk"]
 resource_name = "Throw"
@@ -21,20 +21,20 @@ metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
 resource_name = "Ranged"
 script = ExtResource("3_q3em7")
 
-[sub_resource type="Resource" id="Resource_qct33"]
-script = ExtResource("2_qct33")
+[sub_resource type="Resource" id="Resource_6rvun"]
+script = ExtResource("5_q3em7")
 GridWidth = 2
 GridHeight = 2
-ShapeGrid = Array[bool]([true, true, true, true])
-metadata/_custom_type_script = "uid://cqk2q16xxuf4n"
+ShapeGrid = Array[bool]([false, false, false, false])
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]
 script = ExtResource("1_50k2r")
 ItemName = "Test"
 ItemIcon = ExtResource("1_8fx0k")
-ItemShape = SubResource("Resource_qct33")
+ItemShape = SubResource("Resource_6rvun")
 ActionDefinitions = Array[Object]([SubResource("Resource_3n6qk"), SubResource("Resource_14h5b"), SubResource("Resource_hs4ol")])
 ItemSettings = 15
-Damage = 20
+Damage = 200
 Range = 200
 metadata/_custom_type_script = "uid://da4j8smky5g6x"

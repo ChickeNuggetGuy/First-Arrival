@@ -50,12 +50,13 @@ public partial class GridStatBarUI : UIElement
 
 	public void SetupStatBar(GridObject gridObject)
 	{
+		if(gridObject == null) return;
 		if (_stat != null)
 		{
 			_stat.CurrentValueChanged -= StatOnCurrentValueChanged;
 			_stat = null;
 		}
-
+	
 		GridObjectStat gridObjectStat = gridObject.Stats.FirstOrDefault(s => s.Stat == stat);
 		if (gridObjectStat == null) return;
 

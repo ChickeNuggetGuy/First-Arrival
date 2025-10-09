@@ -30,7 +30,20 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		{
 			if (gridObjectNodesDictionary == null) return null;
 			if (gridObjectNodesDictionary.Count == 0) return null;
-			return	gridObjectNodesDictionary["stats"].Cast<GridObjectStat>().ToList();
+			if (!gridObjectNodesDictionary.ContainsKey("stats")) return null;
+			return gridObjectNodesDictionary["stats"].Cast<GridObjectStat>().ToList();
+		}
+		private set{}
+	}
+	
+	public List<GridObjectSight> Sights
+	{
+		get
+		{
+			if (gridObjectNodesDictionary == null) return null;
+			if (gridObjectNodesDictionary.Count == 0) return null;
+			if (!gridObjectNodesDictionary.ContainsKey("sights")) return null;
+			return gridObjectNodesDictionary["sights"].Cast<GridObjectSight>().ToList();
 		}
 		private set{}
 	}
@@ -41,18 +54,30 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	private System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids =
 		new System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid>();
 
+	[Export]public Enums.GridObjectSettings gridObjectSettings = Enums.GridObjectSettings.None;
+
 	public bool IsInitialized { get; protected set; }= false;
 	[Export] public bool IsActive { get; protected set; } = true;
+
 	
 
 	public virtual async Task Initialize(Enums.UnitTeam team, GridCell gridCell)
 	{
-		GridPositionData.SetGridCell(gridCell);
+		
+		GD.Print($"GridObject: {Name} :Initialize");
 		Team = team;
+
+		if (gridCell == null)
+		{
+			GridSystem.Instance.TyGetGridCellFromWorldPosition(GridPositionData.GlobalPosition, out gridCell, true);
+		}
 		
 		InitializeGridObjectNodes();
+		GridPositionData.Setup();
+		GridPositionData.SetGridCell(gridCell);
+
 		await Task.Yield();
-				InitializeRuntimeInventories();
+		InitializeRuntimeInventories();
 		InitializeActionDefinitions();
 		GridPositionData.SetDirection(Enums.Direction.North);
 		IsInitialized = true;
@@ -81,6 +106,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			{
 				{ "all", new List<GridObjectNode>() },
 				{ "stats", new List<GridObjectNode>() },
+				{ "sights", new List<GridObjectNode>() },
 				{ "actionDefinitions", new List<GridObjectNode>() }
 			};
 
@@ -96,9 +122,13 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			{
 				gridObjectNodesDict["stats"].Add(stat);
 			}
+			else if (node is GridObjectSight sight)
+			{
+				gridObjectNodesDict["sights"].Add(sight);
+			}
 			else
 			{
-				GD.Print("GridObjectNode found was not properly sorted!");
+				GD.Print($"GridObjectNode of type {node.GetType()} found was not properly sorted!");
 			}
 		}
 
@@ -117,7 +147,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 
 			if (inventoryType == Enums.InventoryType.LeftHand)
 			{
-				inventory.TryAddItem(InventoryManager.Instance.GetRandomItem());
+				inventory.TryAddItem(InventoryManager.Instance.GetRandomItem(),1);
 			}
 		}	
 	}
@@ -179,7 +209,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			
 			if(inventoryPair.Value.ItemCount < 1) continue;
 			
-			List<Item> items = inventoryPair.Value.uniqueItems;
+			List<Item> items = inventoryPair.Value.UniqueItems.Select(i =>i.item).ToList();
 
 			foreach (var item in items)
 			{
@@ -194,5 +224,15 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public void SetIsActive(bool isActive)
 	{
 		IsActive = isActive;
+		GridPositionData.SetGridCell(null);
+	}
+
+	public bool TryGetGridObjectNode<T>(out T node) where T : GridObjectNode
+	{
+		node = null;
+		if(gridObjectNodesDictionary == null) return false;
+		
+		node = gridObjectNodesDictionary["all"].FirstOrDefault(n => n is T) as T;
+		return node != null;
 	}
 }

@@ -1,7 +1,10 @@
-<Project Sdk="Godot.NET.Sdk/4.5.0-rc.1">
+<Project Sdk="Godot.NET.Sdk/4.5.0">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>FirstArrival</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Scripts\GridSystem\GridShape\" />
+  </ItemGroup>
 </Project>

@@ -12,17 +12,25 @@ public class Enums
 	}
 	
 	[System.Flags]
+	public enum GridObjectSettings
+	{
+		None = 0,
+		CanWalkThrough,
+	}
+	[System.Flags]
 	public enum GridCellState
 	{
 		None = 0,
-		Walkable = 1,
-		Unwalkable = 2,
-		Obstructed = 4,
-		Empty = 8,
-		Ground = 16,
-		Air = 32,
+		Disabled = 1,
+		Enabled = 2,
+		Obstructed = 16,
+		Empty = 32,
+		Ground = 64,
+		Air = 128,
+		RootNode = 256,
+		DoorNode = 512,
+		
 	}
-
 	public enum FogState
 	{
 		Unseen, 
@@ -94,7 +102,11 @@ public class Enums
 		None = 0,
 		IsEquipmentinventory = 1,
 		UseItemSizes = 2,
-		CanExecuteActions = 4 
+		CanExecuteActions = 4,
+		MaxItemAmount = 8,
+		MaxWeight = 16,
+		AllowItemStacking = 32
+		
 	}
 
 	[Flags]
@@ -117,4 +129,10 @@ public class Enums
 		Rotate,
 	}
 	#endregion
+	
+	public enum InventoyShapeData
+	{
+		Enabled,
+		Disabled
+	}
 }

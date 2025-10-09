@@ -20,81 +20,104 @@ public partial class MoveActionDefinition : ActionDefinition
   }
 
   protected override bool OnValidateAndBuildCosts(
-    GridObject gridObject,
-    GridCell startingGridCell,
-    GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs,
-    out string reason
-  )
+  GridObject gridObject,
+  GridCell startingGridCell,
+  GridCell targetGridCell,
+  Dictionary<Enums.Stat, int> costs,
+  out string reason
+)
+{
+  var gs = GridSystem.Instance;
+  if (gs == null)
   {
-    if (!targetGridCell.state.HasFlag(Enums.GridCellState.Walkable))
-    {
-      reason = "Target grid cell is not walkable";
-      return false;
-    }
+    reason = "GridSystem not initialized";
+    return false;
+  }
 
-    List<GridCell> tempPath =
-      Pathfinder.Instance.FindPath(startingGridCell, targetGridCell);
+  // Rebind to canonical instances in the grid
+  var start = gs.GetGridCell(startingGridCell.gridCoordinates);
+  var goal = gs.GetGridCell(targetGridCell.gridCoordinates);
 
-    if (tempPath == null || tempPath.Count == 0)
-    {
-      reason = "No path found";
-      return false;
-    }
+  if (start == null || goal == null)
+  {
+    reason = "Start or target out of grid bounds";
+    return false;
+  }
 
-    // Simulate costs along the path with evolving facing, based on transform.
-    var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-      gridObject.Rotation.Y
+  if (!goal.IsWalkable)
+  {
+    reason = "Target grid cell is not walkable";
+    return false;
+  }
+
+  if (!start.IsWalkable)
+  {
+    reason = "Starting grid cell is not walkable";
+    GD.Print(
+    );
+    return false;
+  }
+
+  var tempPath = Pathfinder.Instance.FindPath(start, goal);
+  if (tempPath == null || tempPath.Count == 0)
+  {
+    reason = "No path found";
+    return false;
+  }
+
+  // Cost simulation (same logic you already had)
+  var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
+    gridObject.Rotation.Y
+  );
+
+  for (int i = 0; i < tempPath.Count - 1; i++)
+  {
+    var current = tempPath[i];
+    var next = tempPath[i + 1];
+
+    var stepDir = RotationHelperFunctions.GetDirectionBetweenCells(
+      current,
+      next
     );
 
-    for (int i = 0; i < tempPath.Count - 1; i++)
+    if (facing != stepDir)
     {
-      GridCell current = tempPath[i];
-      GridCell next = tempPath[i + 1];
-
-      var stepDir = RotationHelperFunctions.GetDirectionBetweenCells(
-        current,
-        next
+      int steps = RotationHelperFunctions.GetRotationStepsBetweenDirections(
+        facing,
+        stepDir
       );
-
-      if (facing != stepDir)
-      {
-        int steps = RotationHelperFunctions.GetRotationStepsBetweenDirections(
-          facing,
-          stepDir
-        );
-        AddCost(costs, Enums.Stat.TimeUnits, Mathf.Abs(steps) * 1);
-        AddCost(costs, Enums.Stat.Stamina, Mathf.Abs(steps) * 1);
-        facing = stepDir;
-      }
-
-      bool diagonal =
-        Mathf.Abs(current.gridCoordinates.X - next.gridCoordinates.X) == 1
-        && Mathf.Abs(current.gridCoordinates.Z - next.gridCoordinates.Z) == 1;
-
-      if (diagonal)
-      {
-        AddCost(costs, Enums.Stat.TimeUnits, 6);
-        AddCost(costs, Enums.Stat.Stamina, 2);
-      }
-      else
-      {
-        AddCost(costs, Enums.Stat.TimeUnits, 4);
-        AddCost(costs, Enums.Stat.Stamina, 2);
-      }
+      AddCost(costs, Enums.Stat.TimeUnits, Mathf.Abs(steps) * 1);
+      AddCost(costs, Enums.Stat.Stamina, Mathf.Abs(steps) * 1);
+      facing = stepDir;
     }
 
-    path = tempPath;
-    reason = "Success!";
-    return true;
+    bool diagonal =
+      Mathf.Abs(current.gridCoordinates.X - next.gridCoordinates.X) == 1 &&
+      Mathf.Abs(current.gridCoordinates.Z - next.gridCoordinates.Z) == 1;
+
+    if (diagonal)
+    {
+      AddCost(costs, Enums.Stat.TimeUnits, 6);
+      AddCost(costs, Enums.Stat.Stamina, 2);
+    }
+    else
+    {
+      AddCost(costs, Enums.Stat.TimeUnits, 4);
+      AddCost(costs, Enums.Stat.Stamina, 2);
+    }
   }
+
+  path = tempPath;
+  reason = "Success!";
+  return true;
+}
 
   protected override List<GridCell> GetValidGridCells(
     GridObject gridObject,
     GridCell startingGridCell
   )
   {
-    GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(20,3), out List<GridCell> cellsInRange, Enums.GridCellState.Walkable);
+    GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(20,3),true, out List<GridCell> cellsInRange);
     return cellsInRange.Where( cell => Pathfinder.Instance.IsPathPossible(startingGridCell, cell)).ToList();
   }
 
@@ -121,6 +144,7 @@ public partial class MoveActionDefinition : ActionDefinition
 	  float normalizedScore = (distance / maxDistance) * 70.0f;
     
 	  int score = (int)Mathf.Clamp(normalizedScore, 0, 70);
+	  score += GD.RandRange(0, 15);
 	  return (targetGridCell, score);
   }
 

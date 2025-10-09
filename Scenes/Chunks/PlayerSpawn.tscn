@@ -1,39 +1,127 @@
-[gd_scene load_steps=4 format=3 uid="uid://cbkn47re2fiqg"]
+[gd_scene load_steps=9 format=4 uid="uid://cbkn47re2fiqg"]
 
 [ext_resource type="Script" uid="uid://bmqyp63b54y4q" path="res://Scripts/Terrain Gen/Chunk.cs" id="1_pid7i"]
 [ext_resource type="Script" uid="uid://ojqwcp715d0s" path="res://Scripts/GridSystem/GridCellStateOverride.cs" id="2_k62n0"]
+[ext_resource type="PackedScene" uid="uid://gr7hq12fakuk" path="res://Scenes/GridObjects/2WideDoor.tscn" id="3_m58r4"]
+[ext_resource type="PackedScene" uid="uid://qu7a3gnji34n" path="res://Third-Party Assets/Polygon Prototype/FBX/SM_Buildings_Wall_2x3_01P.fbx" id="4_r8uur"]
+
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_k62n0"]
+data = PackedVector3Array(-8, -0.5, 8, -8, -0.5, -8, -8, 0.5, -8, 8, -0.5, -8, -8, -0.5, -8, -8, -0.5, 8, -8, 0.5, -8, -8, -0.5, -8, 8, -0.5, -8, -8, 0.5, -8, -8, 0.5, 8, -8, -0.5, 8, -8, -0.5, 8, -8, 0.5, 8, 8, 0.5, 8, 8, 0.5, 8, -8, 0.5, 8, -8, 0.5, -8, -8, -0.5, 8, 8, -0.5, 8, 8, -0.5, -8, 8, 0.5, 8, 8, -0.5, 8, -8, -0.5, 8, 8, -0.5, -8, 8, -0.5, 8, 8, 0.5, 8, 8, -0.5, -8, 8, 0.5, -8, -8, 0.5, -8, -8, 0.5, -8, 8, 0.5, -8, 8, 0.5, 8, 8, 0.5, 8, 8, 0.5, -8, 8, -0.5, -8)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_k62n0"]
+_surfaces = [{
+"aabb": AABB(-8, -0.5, -8, 16, 1, 16),
+"attribute_data": PackedByteArray("AACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAPwAAgD8AAIA/"),
+"format": 34359738391,
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 36,
+"vertex_data": PackedByteArray("AAAAwQAAAL8AAABBAAAAwQAAAL8AAADBAAAAwQAAAD8AAADBAAAAQQAAAL8AAADBAAAAwQAAAL8AAADBAAAAwQAAAL8AAABBAAAAwQAAAD8AAADBAAAAwQAAAL8AAADBAAAAQQAAAL8AAADBAAAAwQAAAD8AAADBAAAAwQAAAD8AAABBAAAAwQAAAL8AAABBAAAAwQAAAL8AAABBAAAAwQAAAD8AAABBAAAAQQAAAD8AAABBAAAAQQAAAD8AAABBAAAAwQAAAD8AAABBAAAAwQAAAD8AAADBAAAAwQAAAL8AAABBAAAAQQAAAL8AAABBAAAAQQAAAL8AAADBAAAAQQAAAD8AAABBAAAAQQAAAL8AAABBAAAAwQAAAL8AAABBAAAAQQAAAL8AAADBAAAAQQAAAL8AAABBAAAAQQAAAD8AAABBAAAAQQAAAL8AAADBAAAAQQAAAD8AAADBAAAAwQAAAD8AAADBAAAAwQAAAD8AAADBAAAAQQAAAD8AAADBAAAAQQAAAD8AAABBAAAAQQAAAD8AAABBAAAAQQAAAD8AAADBAAAAQQAAAL8AAADBAAD/f/9//n8AAP9//3/+fwAA/3//f/5//38AAP//AAD/fwAA//8AAP9/AAD//wAA/////wAA/z//////AAD/P/////8AAP8/AAD/f/9//n8AAP9//3/+fwAA/3//f/5//3//fwAA/z//f/9/AAD/P/9//38AAP8//3//////AAD/f/////8AAP9//////wAA/38AAP//AAD/fwAA//8AAP9/AAD//wAA/3//fwAA/z//f/9/AAD/P/9//38AAP8/////f/9//n////9//3/+f////3//f/5//////wAA/z//////AAD/P/////8AAP8//3//////AAD/f/////8AAP9//////wAA////f/9//n////9//3/+f////3//f/5/")
+}]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_pid7i"]
-size = Vector3(3.3886108, 2.0489502, 5.987549)
+size = Vector3(3.2, 2.0489502, 5.987549)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ev72g"]
+size = Vector3(2, 3, 0.8)
 
 [node name="Node3D" type="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 script = ExtResource("1_pid7i")
 metadata/_custom_type_script = "uid://bmqyp63b54y4q"
 
-[node name="CSGBox3D" type="CSGBox3D" parent="."]
+[node name="Terrain2" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.5, 8)
-use_collision = true
 collision_layer = 2
-size = Vector3(16, 1, 16)
 
-[node name="CSGBox3D2" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.604497, 4.6527596, 3)
-use_collision = true
-collision_layer = 2
-size = Vector3(3.3842773, 1, 6)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Terrain2"]
+shape = SubResource("ConcavePolygonShape3D_k62n0")
 
-[node name="CSGBox3D3" type="CSGBox3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.8660254, -0.5, 0, 0.5, 0.8660254, 7.6103563, 2.7204447, 9.224303)
-use_collision = true
-collision_layer = 2
-size = Vector3(3.395996, 1, 8)
+[node name="CSGBakedMeshInstance3D" type="MeshInstance3D" parent="Terrain2"]
+mesh = SubResource("ArrayMesh_k62n0")
+skeleton = NodePath("../..")
 
-[node name="Area3D" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 5.6527596, 2)
+[node name="Area3D" type="Area3D" parent="." groups=["GridCellOverride"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.5999999, 2)
+input_ray_pickable = false
+monitoring = false
+monitorable = false
 script = ExtResource("2_k62n0")
+fogState = 2
 useunitTeamSpawnOverride = true
+unitTeamSpawn = 1
 metadata/_custom_type_script = "uid://ojqwcp715d0s"
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6010437, 0.47950602, 0.9923096)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" groups=["GridCellOverride"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.09326172, 1.0929792, 0.9923096)
 shape = SubResource("BoxShape3D_pid7i")
+debug_fill = false
+
+[node name="Wall" type="StaticBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 8.611563, 2.5999992, 4.9425206)
+collision_layer = 17
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.10000038, 0.40000057)
+shape = SubResource("BoxShape3D_ev72g")
+
+[node name="SM_Buildings_Wall_2x3_01P4" parent="Wall" instance=ExtResource("4_r8uur")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -1.5999999, 0)
+
+[node name="Wall2" type="StaticBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 8.511562, 2.5999992, 1.0425205)
+collision_layer = 17
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.10000038, 0.05000019)
+shape = SubResource("BoxShape3D_ev72g")
+
+[node name="SM_Buildings_Wall_2x3_01P3" parent="Wall2" instance=ExtResource("4_r8uur")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9999999, -1.5999999, 0)
+
+[node name="Wall3" type="StaticBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 8.511562, 2.5999992, 2.9425206)
+collision_layer = 17
+
+[node name="SM_Buildings_Wall_2x3_01P5" parent="Wall3" instance=ExtResource("4_r8uur")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -1.5999999, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.10000038, 0.05000019)
+shape = SubResource("BoxShape3D_ev72g")
+
+[node name="Wall4" type="StaticBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 5.4115615, 2.5999992, 4.9425206)
+collision_layer = 17
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.10000038, 0.05000019)
+shape = SubResource("BoxShape3D_ev72g")
+
+[node name="SM_Buildings_Wall_2x3_01P6" parent="Wall4" instance=ExtResource("4_r8uur")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -1.5999999, -4.7683716e-07)
+
+[node name="Wall5" type="StaticBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 5.611562, 3.199999, 1.0425203)
+collision_layer = 17
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.70000035, 0.25000018)
+shape = SubResource("BoxShape3D_ev72g")
+
+[node name="SM_Buildings_Wall_2x3_01P7" parent="Wall5" instance=ExtResource("4_r8uur")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -2.1999998, 0.2)
+
+[node name="Wall6" type="StaticBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 5.4115615, 2.5999992, 2.9425204)
+collision_layer = 17
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.10000038, 0.05000019)
+shape = SubResource("BoxShape3D_ev72g")
+
+[node name="SM_Buildings_Wall_2x3_01P8" parent="Wall6" instance=ExtResource("4_r8uur")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -1.5999999, 0)
+
+[node name="DoorGridObject" parent="." instance=ExtResource("3_m58r4")]
+transform = Transform3D(-1, -1.509958e-07, 0, -1.509958e-07, 1, 0, 0, 0, -1, 6.9963202, 0.39999932, 5.8651624)

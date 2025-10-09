@@ -1,5 +1,4 @@
 using System;
-using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Inventory_System;
@@ -22,8 +21,16 @@ public partial class InventoryManager : Manager<InventoryManager>
 	
 	[Export]public PackedScene InventorySlotPrefab{ get; protected set;}
 	[Export]public PackedScene BlankSlotPrefab{ get; protected set;}
+	
+	[Export]public Item[] startingItems = new Item[0];
 	protected override async Task _Setup()
 	{
+		// startingItems = new Item[GD.RandRange(0, 10)];
+		//
+		// for (int i = 0; i < startingItems.Length; i++)
+		// {
+		// 	startingItems[i] = GetRandomItem();
+		// }
 		return;
 	}
 
@@ -89,4 +96,16 @@ public partial class InventoryManager : Manager<InventoryManager>
 		int randIndex = GD.RandRange(0, itemDatas.Count - 1);
 		return ItemData.CreateItem(itemDatas[randIndex]); 
 	}
+	
+	#region manager Data
+	protected override void GetInstanceData(ManagerData data)
+	{
+		GD.Print("No data to transfer");
+	}
+
+	public override ManagerData SetInstanceData()
+	{
+		return null;
+	}
+	#endregion
 }

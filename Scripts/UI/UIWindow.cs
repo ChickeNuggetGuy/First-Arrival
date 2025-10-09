@@ -45,13 +45,6 @@ public partial class UIWindow : UIElement
 			IsShown = true;
 		}
 		
-		
-		
-		if (toggleButton != null)
-		{
-			toggleButton.Pressed += ToggleButtonOnPressed;
-		}
-		
 		return;
 	}
 
@@ -181,4 +174,23 @@ public partial class UIWindow : UIElement
 	}
 	
 	public Control GetVisual() => Visual;
+
+
+	public override void _EnterTree()
+	{
+		base._EnterTree();
+		if (toggleButton != null)
+		{
+			toggleButton.Pressed += ToggleButtonOnPressed;
+		}
+	}
+
+	public override void _ExitTree()
+	{
+		base._ExitTree();
+		if (toggleButton != null)
+		{
+			toggleButton.Pressed -= ToggleButtonOnPressed;
+		}
+	}
 }

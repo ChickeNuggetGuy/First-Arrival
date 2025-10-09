@@ -1,14 +1,17 @@
 using Godot;
-using System;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.TurnSystem;
+using FirstArrival.Scripts.Utility;
 using Godot.Collections;
-using Array = Godot.Collections.Array;
-
 namespace FirstArrival.Scripts.Managers;
+
 [GlobalClass]
 public partial class GameManager : Manager<GameManager>
 {
 	[Export] private Array<ManagerBase> managers;
+
+	public Vector2I mapSize = new Vector2I(1, 1);
+	public Vector2I unitCounts = new Vector2I(1, 1);
 	
 	public enum gameScene {MainMenu, BattleScene, GlobeScene}
 	[Export] Dictionary<gameScene, string> scenePaths = new Dictionary<gameScene, string>();
@@ -18,6 +21,8 @@ public partial class GameManager : Manager<GameManager>
 		base._Ready();
 		await SetupCall();
 	}
+
+
 
 	protected override async Task _Setup()
 	{
@@ -49,7 +54,7 @@ public partial class GameManager : Manager<GameManager>
 		}
 	}
 
-	public bool TryChangeScene(gameScene sceneName, bool saveOldScene = false)
+	public bool TryChangeScene(gameScene sceneName, Callable callback, bool saveOldScene = false)
 	{
 		if (!scenePaths.ContainsKey(sceneName)) return false;
 
@@ -63,7 +68,46 @@ public partial class GameManager : Manager<GameManager>
 		}
 		else
 		{
+			callback.Call();
 			return true;
 		}
+	}
+
+	public void CheckGameState(Turn currentTurn)
+	{
+		Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> teamHolders =
+			GridObjectManager.Instance.GetGridObjectTeamHolders();
+		
+		foreach (var kvp in teamHolders)
+		{
+			if(kvp.Value == null) continue;
+			if (kvp.Key == Enums.UnitTeam.Enemy || kvp.Key == Enums.UnitTeam.Player)
+			{
+				if (kvp.Value.GridObjects[Enums.GridObjectState.Active].Count < 1)
+				{
+					//All GridObjects on team Inactive, Game Should end!
+					EndGame();
+				}
+			}
+		}
+	}
+
+	private void EndGame()
+	{
+		GD.Print("EndGame");
+	}
+	
+	protected override void GetInstanceData(ManagerData data)
+	{
+		mapSize = (Vector2I)data.managerData["mapSize"];
+		unitCounts = (Vector2I)data.managerData["unitCounts"];
+	}
+
+	public override ManagerData SetInstanceData()
+	{
+		ManagerData data = new ManagerData();
+		data.managerData.Add("mapSize", mapSize);
+		data.managerData.Add("unitCounts", unitCounts);
+		return data;
 	}
 }

@@ -120,7 +120,7 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
     if (!InventoryGrid.TryTransferItem(
           Item.currentGrid,
           targetGridCell.InventoryGrid,
-          Item
+          Item,1
         ))
     {
       GD.Print("Failed to transfer item");

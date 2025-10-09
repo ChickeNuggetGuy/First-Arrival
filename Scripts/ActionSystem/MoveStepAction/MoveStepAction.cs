@@ -99,8 +99,8 @@ public class MoveStepAction : Action, ICompositeAction
     }
 
     Tween tween = parentGridObject.CreateTween();
-    tween.SetTrans(Tween.TransitionType.Sine);
-    tween.SetEase(Tween.EaseType.InOut);
+    tween.SetTrans(Tween.TransitionType.Linear);
+    tween.SetEase(Tween.EaseType.OutIn);
     tween.TweenProperty(
       parentGridObject,
       "position",

@@ -15,6 +15,8 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 		get => this; set{} }
 	protected InventoryGridUI parentGridUI;
 	public Vector2I inventoryCoords;
+	
+	[Export]Label itemCountLabel;
 	#endregion
 
 
@@ -32,14 +34,16 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 	}
 
 	
-	public void SetItem(Item item, Vector2I coords)
+	public void SetItem(Item item,int count, Vector2I coords)
 	{
 		if (item == null)
 		{ 
 			Icon = null;
+			itemCountLabel.Text = "";
 			return;
 		}
-
+		
+		itemCountLabel.Text = count.ToString();
 		Icon = item.ItemData.ItemIcon;
 	}
 
@@ -50,12 +54,12 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 			GD.Print("ItemSlotUI.GetContextActions(): parentGridUI.inventoryGrid == null");
 			return null;
 		}
-		if (!parentGridUI.InventoryGrid.TryGetItemAt(inventoryCoords.X, inventoryCoords.Y, out Item item))
+		if (!parentGridUI.InventoryGrid.TryGetItemAt(inventoryCoords.X, inventoryCoords.Y, out var itemInfo))
 		{
 			GD.Print("GetContextActions(): item == null");
 			return null;
 		}
-		return item.GetContextActions();
+		return itemInfo.item.GetContextActions();
 	}
 
 

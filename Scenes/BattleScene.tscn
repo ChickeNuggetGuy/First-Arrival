@@ -1,0 +1,685 @@
+[gd_scene load_steps=43 format=3 uid="uid://ci5t5ugjnmjr"]
+
+[ext_resource type="Script" uid="uid://csjccrhj5wnx7" path="res://addons/phantom_camera/scripts/phantom_camera/phantom_camera_3d.gd" id="1_ar6iy"]
+[ext_resource type="Script" uid="uid://8umksf8e80fw" path="res://addons/phantom_camera/scripts/resources/tween_resource.gd" id="2_x3tt7"]
+[ext_resource type="Script" uid="uid://dr5vsk7v685hc" path="res://Scripts/Managers/GameManager.cs" id="3_segcg"]
+[ext_resource type="Script" uid="uid://dsci870xrigt6" path="res://Scripts/Terrain Gen/MeshTerrainGenerator.cs" id="4_0ia2v"]
+[ext_resource type="Script" uid="uid://cmh00onxfeox7" path="res://Scripts/Terrain Gen/ChunkData.cs" id="5_tkpxd"]
+[ext_resource type="Script" uid="uid://h1v27m0p54g" path="res://Scripts/Managers/InventoryManager.cs" id="6_5hyi2"]
+[ext_resource type="PackedScene" uid="uid://daeffx1rbwqt6" path="res://Scenes/UI/item_slot_ui.tscn" id="7_6jix8"]
+[ext_resource type="PackedScene" uid="uid://bowk2i3ys78tu" path="res://Scenes/UI/blank_slot_ui.tscn" id="8_kf0x2"]
+[ext_resource type="Script" uid="uid://conicv373rw7m" path="res://Scripts/Managers/GridSystem.cs" id="9_nn4bo"]
+[ext_resource type="Script" uid="uid://t7kecr7hiqah" path="res://Scripts/Managers/InputManager.cs" id="10_qrbtu"]
+[ext_resource type="Script" uid="uid://bmp20rrcufi2e" path="res://Scripts/Managers/CameraController.cs" id="11_h22wu"]
+[ext_resource type="Script" uid="uid://bi115b7eyqu8y" path="res://Scripts/Managers/GridObjectManager.cs" id="12_ait8s"]
+[ext_resource type="PackedScene" uid="uid://dwy3kjqle61gf" path="res://Scenes/GridObjects/Unit.tscn" id="13_3ldww"]
+[ext_resource type="Script" uid="uid://dm3rb1e6uleo1" path="res://Scripts/GridObjectTeamHolder.cs" id="14_g23mv"]
+[ext_resource type="Script" uid="uid://dnnq5vqxylmsk" path="res://Scripts/Managers/Pathfinder.cs" id="15_sw7ns"]
+[ext_resource type="Script" uid="uid://cw8v24j03uqg2" path="res://Scripts/Managers/UIManager.cs" id="16_r84ld"]
+[ext_resource type="Script" uid="uid://lh8kdv34nvel" path="res://Scripts/UI/UIWindows/QuickSelectUI.cs" id="17_11nuo"]
+[ext_resource type="PackedScene" uid="uid://dsp47ijjmg8gf" path="res://Scenes/UI/quick_select_button_ui.tscn" id="18_rdje0"]
+[ext_resource type="Script" uid="uid://byqfcs7esjitb" path="res://Scripts/UI/UIAnimations/TranslateUIAnimation.cs" id="19_00nmp"]
+[ext_resource type="Script" uid="uid://g45a50cfefjk" path="res://Scripts/UI/UIWindows/UnitActionUI.cs" id="20_klx2o"]
+[ext_resource type="PackedScene" uid="uid://dsh6gqixhv5ls" path="res://Scenes/UI/action_button_ui.tscn" id="21_2n1jk"]
+[ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="22_q7uf6"]
+[ext_resource type="Script" uid="uid://342n07onmffs" path="res://Scripts/UI/GridStatBarUI.cs" id="23_mvkch"]
+[ext_resource type="Script" uid="uid://ckjuiwq2v6s4o" path="res://Scripts/UI/UIWindows/InventoryGridUI.cs" id="24_p2k61"]
+[ext_resource type="Script" uid="uid://bc6x81kp7kdgk" path="res://Scripts/UI/UIWindow.cs" id="25_2hhhs"]
+[ext_resource type="Script" uid="uid://yaqinydnxa3a" path="res://Scripts/UI/UIWindows/MouseHeldInventoryUI.cs" id="26_ymbyw"]
+[ext_resource type="Script" uid="uid://bv7f34s83qmss" path="res://Scripts/UI/ContextMenu/ContextMenuUI.cs" id="27_1b87o"]
+[ext_resource type="PackedScene" uid="uid://duwd8xrwmsgdi" path="res://Scenes/UI/context_menu_button_ui.tscn" id="28_biaam"]
+[ext_resource type="Script" uid="uid://bk1nahap6yn15" path="res://Scripts/UI/UIWindows/TurnUI.cs" id="29_q6fnw"]
+[ext_resource type="Script" uid="uid://cl2f3rnpmng0i" path="res://Scripts/Managers/ActionManager.cs" id="30_o4c5p"]
+[ext_resource type="Script" uid="uid://bmbv6cyk3moxw" path="res://Scripts/Managers/TurnManager.cs" id="31_evef4"]
+[ext_resource type="Resource" uid="uid://tbsvcgnevki7" path="res://Data/Turns/PlayerTurn.tres" id="32_5pes1"]
+[ext_resource type="Resource" uid="uid://dydb2scxl4eyb" path="res://Data/Turns/EnemyTurn.tres" id="33_mha8k"]
+[ext_resource type="Script" uid="uid://bd046eokvcnu2" path="res://addons/phantom_camera/scripts/phantom_camera_host/phantom_camera_host.gd" id="34_43h4d"]
+
+[sub_resource type="Resource" id="Resource_q68mp"]
+script = ExtResource("2_x3tt7")
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_dtg5n"]
+radius = 10.0
+
+[sub_resource type="Resource" id="Resource_c1ier"]
+script = ExtResource("5_tkpxd")
+chunkType = 1
+chunkGOIndex = "PlayerSpawn"
+metadata/_custom_type_script = "uid://cmh00onxfeox7"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dtg5n"]
+albedo_color = Color(0.618231, 0.929807, 0.5581166, 1)
+
+[sub_resource type="Resource" id="Resource_u5v48"]
+script = ExtResource("19_00nmp")
+duration = 0.2
+metadata/_custom_type_script = "uid://byqfcs7esjitb"
+
+[sub_resource type="Resource" id="Resource_s1acj"]
+script = ExtResource("19_00nmp")
+position = Vector2(-200, 0)
+duration = 0.2
+metadata/_custom_type_script = "uid://byqfcs7esjitb"
+
+[sub_resource type="LabelSettings" id="LabelSettings_c1ier"]
+font_size = 20
+
+[sub_resource type="LabelSettings" id="LabelSettings_rv6c1"]
+font_size = 12
+
+[node name="BattleScene" type="Node3D"]
+
+[node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 0.19611597, 0.98058075, 0, -0.98058075, 0.19611597, 0, 5, 1)
+script = ExtResource("1_ar6iy")
+follow_mode = 6
+follow_target = NodePath("../GameManager/CameraController/Transposer")
+look_at_mode = 2
+look_at_target = NodePath("../GameManager/CameraController/Transposer")
+tween_resource = SubResource("Resource_q68mp")
+tween_on_load = false
+follow_offset = Vector3(0, 5, 0)
+follow_damping = true
+follow_damping_value = Vector3(0, 0, 0)
+collision_mask = 0
+shape = SubResource("SphereShape3D_dtg5n")
+
+[node name="GameManager" type="Node" parent="." node_paths=PackedStringArray("managers")]
+script = ExtResource("3_segcg")
+managers = []
+metadata/_custom_type_script = "uid://dr5vsk7v685hc"
+
+[node name="MeshTerrainGenerator" type="Node" parent="GameManager"]
+script = ExtResource("4_0ia2v")
+chunkSize = 16
+cellSize = Vector2(1, 1)
+chunkOverrides = [SubResource("Resource_c1ier")]
+manmadeRaycastMask = 2
+metadata/_custom_type_script = "uid://dsci870xrigt6"
+
+[node name="InventoryManager" type="Node" parent="GameManager" node_paths=PackedStringArray("mouseHeldInventoryUI")]
+script = ExtResource("6_5hyi2")
+mouseHeldInventoryUI = NodePath("../UIManager/CanvasLayer/Control/MouseHeldInventoryUI")
+InventorySlotPrefab = ExtResource("7_6jix8")
+BlankSlotPrefab = ExtResource("8_kf0x2")
+metadata/_custom_type_script = "uid://h1v27m0p54g"
+
+[node name="GridSystem" type="Node" parent="GameManager"]
+script = ExtResource("9_nn4bo")
+_connectionObstacleMask = 16
+_cellSize = Vector2(1, 1)
+_raycastCheck = true
+_raycastDistance = 1.1
+_raycastOffset = Vector3(0, 0.9, 0)
+_blockDiagonalCornerCutting = false
+metadata/_custom_type_script = "uid://conicv373rw7m"
+
+[node name="InputManager" type="Node" parent="GameManager" node_paths=PackedStringArray("mouseMarker")]
+script = ExtResource("10_qrbtu")
+mouseMarker = NodePath("MouseMarker")
+metadata/_custom_type_script = "uid://t7kecr7hiqah"
+
+[node name="MouseMarker" type="Node3D" parent="GameManager/InputManager"]
+
+[node name="CSGBox3D" type="CSGBox3D" parent="GameManager/InputManager/MouseMarker"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.6, -0.5)
+material_override = SubResource("StandardMaterial3D_dtg5n")
+
+[node name="CameraController" type="Node" parent="GameManager" node_paths=PackedStringArray("transposer", "MainCamera")]
+script = ExtResource("11_h22wu")
+transposer = NodePath("Transposer")
+MainCamera = NodePath("../../Camera3D")
+moveSpeed = 5.0
+zoomSpeed = 0.75
+rotationSpeed = 5.0
+minDistanceToTarget = 0.0
+metadata/_custom_type_script = "uid://bmp20rrcufi2e"
+
+[node name="Transposer" type="Node3D" parent="GameManager/CameraController"]
+
+[node name="GridObjectManager" type="Node" parent="GameManager" node_paths=PackedStringArray("gridObjectTeams")]
+script = ExtResource("12_ait8s")
+spawnCounts = Dictionary[int, int]({
+1: 3,
+2: 4
+})
+gridObjectTeams = {
+1: NodePath("PlayerTeamHolder"),
+2: NodePath("EnemyTeamHolder")
+}
+gridObjectScene = ExtResource("13_3ldww")
+metadata/_custom_type_script = "uid://bi115b7eyqu8y"
+
+[node name="PlayerTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
+script = ExtResource("14_g23mv")
+Team = 1
+EnemyTeams = 2
+metadata/_custom_type_script = "uid://dm3rb1e6uleo1"
+
+[node name="EnemyTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
+script = ExtResource("14_g23mv")
+Team = 2
+EnemyTeams = 5
+metadata/_custom_type_script = "uid://dm3rb1e6uleo1"
+
+[node name="Pathfinder" type="Node" parent="GameManager"]
+script = ExtResource("15_sw7ns")
+metadata/_custom_type_script = "uid://dnnq5vqxylmsk"
+
+[node name="UIManager" type="Node" parent="GameManager" node_paths=PackedStringArray("uiHolder")]
+script = ExtResource("16_r84ld")
+uiHolder = NodePath("CanvasLayer/Control")
+metadata/_custom_type_script = "uid://cw8v24j03uqg2"
+
+[node name="CanvasLayer" type="CanvasLayer" parent="GameManager/UIManager"]
+
+[node name="Control" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/margin_top = 50
+theme_override_constants/margin_bottom = 25
+
+[node name="QuickSelectPanel" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("quickSelectHolder", "Visual", "toggleButton")]
+custom_minimum_size = Vector2(200, 300)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+script = ExtResource("17_11nuo")
+quickSelectHolder = NodePath("Panel/ScrollContainer/VBoxContainer")
+quickSelectButtonScene = ExtResource("18_rdje0")
+Visual = NodePath("Panel")
+toggleButton = NodePath("Panel/Button")
+uiName = "Player Quick Select"
+toggleKey = 84
+showAnimation = SubResource("Resource_u5v48")
+hideAnimation = SubResource("Resource_s1acj")
+metadata/_custom_type_script = "uid://lh8kdv34nvel"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel"]
+layout_mode = 0
+offset_right = 200.0
+offset_bottom = 350.0
+size_flags_horizontal = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Button" type="Button" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel"]
+custom_minimum_size = Vector2(25, 40)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.528
+offset_top = -15.800003
+offset_right = 25.0
+offset_bottom = 15.800003
+grow_horizontal = 0
+grow_vertical = 2
+text = ">"
+
+[node name="Unit Action Panel" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("_actionButtonContainer", "_statBarContainer", "Visual")]
+custom_minimum_size = Vector2(375, 200)
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 8
+script = ExtResource("20_klx2o")
+_actionButtonContainer = NodePath("Panel/VerticalSplit/Right Half/ActionHolder")
+_actionButtonScene = ExtResource("21_2n1jk")
+_statBarContainer = NodePath("Panel/VerticalSplit/Right Half/HBoxContainer")
+Visual = NodePath("Panel")
+metadata/_custom_type_script = "uid://g45a50cfefjk"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VerticalSplit" type="HBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -3.5
+offset_bottom = 3.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Left Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+
+[node name="Top Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half"]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Unit Name" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/Top Half"]
+layout_mode = 2
+size_flags_vertical = 6
+text = "Player Playerson"
+label_settings = SubResource("LabelSettings_c1ier")
+
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half"]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Unit Image" type="TextureRect" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/MarginContainer/VBoxContainer"]
+layout_mode = 2
+texture = ExtResource("22_q7uf6")
+
+[node name="Right Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ActionHolder" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half"]
+custom_minimum_size = Vector2(0, 55)
+layout_mode = 2
+size_flags_vertical = 3
+columns = 3
+
+[node name="HBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half"]
+custom_minimum_size = Vector2(0, 140)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 5
+
+[node name="StatBar" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+script = ExtResource("23_mvkch")
+statBar = NodePath("ProgressBar")
+stat = 1
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
+
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StatBar5" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+script = ExtResource("23_mvkch")
+statBar = NodePath("ProgressBar")
+stat = 4
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
+
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar5"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StatBar2" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+script = ExtResource("23_mvkch")
+statBar = NodePath("ProgressBar")
+stat = 2
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
+
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StatBar4" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+script = ExtResource("23_mvkch")
+statBar = NodePath("ProgressBar")
+stat = 3
+team = 1
+metadata/_custom_type_script = "uid://342n07onmffs"
+
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel"]
+custom_minimum_size = Vector2(200, 100)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -100.0
+offset_right = 200.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LeftHandInventory" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("24_p2k61")
+inventoryType = 5
+slotHolder = NodePath("AspectRatioContainer/GridContainer")
+Visual = NodePath("AspectRatioContainer")
+uiName = "LeftHand"
+metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory/AspectRatioContainer"]
+layout_mode = 2
+
+[node name="RightHandInventory" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("24_p2k61")
+inventoryType = 6
+slotHolder = NodePath("AspectRatioContainer/GridContainer")
+Visual = NodePath("AspectRatioContainer")
+uiName = "LeftHand"
+metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory/AspectRatioContainer"]
+layout_mode = 2
+
+[node name="InventoryWindow" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("Visual")]
+custom_minimum_size = Vector2(550, 400)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("25_2hhhs")
+Visual = NodePath("MarginContainer")
+uiName = "Inventory"
+toggleKey = 73
+startHidden = true
+metadata/_custom_type_script = "uid://bc6x81kp7kdgk"
+
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 350
+theme_override_constants/margin_bottom = 100
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer"]
+custom_minimum_size = Vector2(550, 400)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -150.0
+offset_bottom = 150.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("24_p2k61")
+inventoryType = 2
+slotHolder = NodePath("Panel/GridContainer")
+Visual = NodePath("Panel")
+metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 3
+
+[node name="GroundInventoryContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -165.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 15
+
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("24_p2k61")
+inventoryType = 1
+slotHolder = NodePath("Panel/GridContainer")
+Visual = NodePath("Panel")
+metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 3
+
+[node name="MouseHeldInventoryUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("slotHolder", "Visual")]
+custom_minimum_size = Vector2(50, 50)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("26_ymbyw")
+inventoryType = 9
+slotHolder = NodePath("Control")
+Visual = NodePath("Control")
+uiName = "Mouse Held"
+startHidden = true
+metadata/_custom_type_script = "uid://yaqinydnxa3a"
+
+[node name="Control" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/MouseHeldInventoryUI"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 2
+
+[node name="ContextMenuUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("contextButtonHolder", "Visual")]
+custom_minimum_size = Vector2(75, 25)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+script = ExtResource("27_1b87o")
+contextButtonHolder = NodePath("Panel/VBoxContainer")
+contextButtonScene = ExtResource("28_biaam")
+Visual = NodePath("Panel")
+uiName = "Context Menu"
+startHidden = true
+metadata/_custom_type_script = "uid://bv7f34s83qmss"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/ContextMenuUI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/ContextMenuUI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CurrentTurnUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("endTurnButton", "Visual")]
+layout_mode = 2
+mouse_filter = 2
+script = ExtResource("29_q6fnw")
+endTurnButton = NodePath("Panel/VBoxContainer/Button")
+Visual = NodePath("Panel")
+metadata/_custom_type_script = "uid://bk1nahap6yn15"
+
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI"]
+custom_minimum_size = Vector2(125, 75)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -152.0
+offset_top = 25.0
+offset_right = -27.0
+offset_bottom = 100.0
+grow_horizontal = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+text = "Current Turn: Player "
+label_settings = SubResource("LabelSettings_rv6c1")
+vertical_alignment = 1
+
+[node name="Button" type="Button" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "End Turn"
+
+[node name="TextureRect" type="TextureRect" parent="GameManager/UIManager/CanvasLayer/Control"]
+custom_minimum_size = Vector2(75, 75)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 0
+
+[node name="Label" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/TextureRect"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -23.0
+offset_bottom = 23.0
+grow_horizontal = 2
+grow_vertical = 0
+pivot_offset = Vector2(0, -23)
+
+[node name="ActionManager" type="Node" parent="GameManager"]
+script = ExtResource("30_o4c5p")
+metadata/_custom_type_script = "uid://cl2f3rnpmng0i"
+
+[node name="TurnManager" type="Node" parent="GameManager"]
+script = ExtResource("31_evef4")
+turns = [ExtResource("32_5pes1"), ExtResource("33_mha8k")]
+metadata/_custom_type_script = "uid://bmbv6cyk3moxw"
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.19611597, 0.98058075, 0, -0.98058075, 0.19611597, 0, 5, 1)
+
+[node name="PhantomCameraHost" type="Node" parent="Camera3D"]
+process_priority = 300
+process_physics_priority = 300
+script = ExtResource("34_43h4d")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.9291326, -0.36974674, 0, 0.34046704, 0.85555595, 0.39000806, -0.14420421, -0.3623692, 0.9208115, 0, 0, 0)
+
+[node name="SceneHolder" type="Node" parent="."]

@@ -89,7 +89,7 @@ public partial class InventoryGridUI : UIWindow
 		
 		
 		// Now it's safe to access InventoryShape properties.
-		slotHolder.Columns = InventoryGrid.GridShape.GridWidth;
+		slotHolder.Columns = InventoryGrid.GridShape.GridSizeX;
 		
 		slotUIs = new ItemSlotUI[inventory.Items.GetLength(0), inventory.Items.GetLength(1)];
 		GenerateGridSlots();
@@ -114,19 +114,19 @@ public partial class InventoryGridUI : UIWindow
     {
 		ClearSlots();
 
-        for (int y = 0; y < InventoryGrid.GridShape.GridHeight; y++)
+        for (int y = 0; y < InventoryGrid.GridShape.GridSizeZ; y++)
         {
-            for (int x = 0; x < InventoryGrid.GridShape.GridWidth; x++)
+            for (int x = 0; x < InventoryGrid.GridShape.GridSizeX; x++)
             {
                 ItemSlotUI newSlot;
                 if (InventoryGrid.GridShape.GetGridShapeCell(x, y))
                 {
                     // Use the prefab for a real slot
                     newSlot = (ItemSlotUI)InventoryManager.Instance.InventorySlotPrefab.Instantiate<Control>();
-                    Item itemOrNull = null;
+                    (Item item, int count) item = (null, 0);
                     
-                    InventoryGrid.TryGetItemAt(x,y, out itemOrNull);
-                    newSlot.SetItem(itemOrNull, new Vector2I(x, y));
+                    InventoryGrid.TryGetItemAt(x,y, out item);
+                    newSlot.SetItem(item.item,item.count, new Vector2I(x, y));
                     newSlot.Init(this, new Vector2I(x,y));
                     slotUIs[x, y] = newSlot;
 
@@ -155,13 +155,13 @@ public partial class InventoryGridUI : UIWindow
                 ItemSlotUI currentSlot = slotUIs[x, y];
                 Vector2I currentCoords = new Vector2I(x, y);
                 
-                if (InventoryGrid.TryGetItemAt(currentCoords.X,  currentCoords.Y, out Item item))
+                if (InventoryGrid.TryGetItemAt(currentCoords.X,  currentCoords.Y, out var item))
                 {
-                    currentSlot.SetItem(item, currentCoords);
+                    currentSlot.SetItem(item.item, item.count, currentCoords);
                 }
                 else
                 {
-                    currentSlot.SetItem(null, currentCoords);
+                    currentSlot.SetItem(null,0, currentCoords);
                 }
             }
         }
@@ -170,10 +170,10 @@ public partial class InventoryGridUI : UIWindow
     public void ItemSlot_Pressed(ItemSlotUI slotPressed)
     {
         MouseHeldInventoryUI mouseHeldInventory = InventoryManager.Instance.mouseHeldInventoryUI;
-        if (InventoryGrid.TryGetItemAt(slotPressed.inventoryCoords.X, slotPressed.inventoryCoords.Y, out Item item))
+        if (InventoryGrid.TryGetItemAt(slotPressed.inventoryCoords.X, slotPressed.inventoryCoords.Y, out var itemInfo))
         {
             //Item at slot, should be picked up by MouseHeld slot if empty
-            if (mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out Item mouseHeldItem))
+            if (mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out var mouseHeldItemInfo))
             {
                 //MouseHeldInventory has Item, nothing can be done
                 return;
@@ -181,7 +181,7 @@ public partial class InventoryGridUI : UIWindow
             else
             {
                 //MouseHeldInventory does not have an Item, "pickup" item from clicked slot
-                if (!InventoryGrid.TryTransferItem(InventoryGrid, mouseHeldInventory.InventoryGrid, item))
+                if (!InventoryGrid.TryTransferItem(InventoryGrid, mouseHeldInventory.InventoryGrid, itemInfo.item, itemInfo.count))
                 {
                     return;
                 }
@@ -192,7 +192,7 @@ public partial class InventoryGridUI : UIWindow
         else
         {
             //Clicked Slot is empty, Check if MouseHeld slot has item. If so place that item.
-            if (mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out Item mouseHeldItem))
+            if (mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out var mouseHeldItemInfo))
             {
                 if (!InventoryGrid.TryTransferItemAt(mouseHeldInventory.InventoryGrid,new Vector2I(0,0) , InventoryGrid,slotPressed.inventoryCoords, out Item transferedItem))
                 {

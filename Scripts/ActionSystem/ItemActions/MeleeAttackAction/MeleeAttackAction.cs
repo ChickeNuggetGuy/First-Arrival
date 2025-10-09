@@ -25,7 +25,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 	{
 		ParentAction = this;
 
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, out var neighbors))
+		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, true, false, out var neighbors))
 		{
 			GD.PrintErr("MeleeAttackAction.Setup: Could not find neighbors for target gridcell");
 			return;
@@ -41,7 +41,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 		}
 		
 		// Not adjacent. We need to move.
-		var walkableNeighbors = neighbors.Where(n => n.state.HasFlag(Enums.GridCellState.Walkable)).ToList();
+		var walkableNeighbors = neighbors.Where(n => n.IsWalkable).ToList();
 		if (!walkableNeighbors.Any())
 		{
 			GD.PrintErr("MeleeAttackAction.Setup: No walkable cell near target to move to.");
@@ -67,8 +67,20 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 	protected override async Task Execute()
 	{
 		GD.Print("Melee Attck Execute");
-		GridObject targetGridObject = targetGridCell.currentGridObject;
-		
+		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
+		{
+			if(gridObject == null) return false;
+			if(!gridObject.IsActive) return false;
+			if(gridObject == parentGridObject) return false;
+			if(gridObject.Team == parentGridObject.Team) return false;
+			return true;
+		});
+
+		if (targetGridObject == null)
+		{
+			GD.Print("Target grid object is null, failed all conditions");
+			return;
+		}
 
 		if (!targetGridObject.TryGetStat(Enums.Stat.Health, out var health))
 		{

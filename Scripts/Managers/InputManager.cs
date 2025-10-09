@@ -1,11 +1,13 @@
 using Godot;
 using System;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Utility;
 
 namespace FirstArrival.Scripts.Managers;
 [GlobalClass]
 public partial class InputManager : Manager<InputManager>
 {
+	private GridSystem gridSystem;
 	public GridCell currentGridCell
 	{
 		get;
@@ -18,6 +20,7 @@ public partial class InputManager : Manager<InputManager>
 		get => IsMouseOverUI(); private set{}}
 	protected override Task _Setup()
 	{
+		gridSystem = GridSystem.Instance;
 		return Task.CompletedTask;
 	}
 
@@ -31,14 +34,16 @@ public partial class InputManager : Manager<InputManager>
 		base._Process(delta);
 		if( !ExecuteComplete) return;
 		WorldMouseMarker();
-		//GD.Print(currentGridCell.gridCoordinates);
+		if (DebugMode && currentGridCell != null)
+		{
+			GD.Print($"Mouse position: {currentGridCell.gridCoordinates} {gridSystem.HasConnections(currentGridCell.gridCoordinates)}");
+		}
 	}
 
 	public override void _Input(InputEvent @event)
 	{
 		if( !ExecuteComplete) return;
 		base._Input(@event);
-		
 	}
 
 	private void WorldMouseMarker()
@@ -51,31 +56,43 @@ public partial class InputManager : Manager<InputManager>
 		if (node is GridObject gridObject)
 		{
 			var cell = gridObject.GridPositionData?.GridCell;
+			
 			if (cell != null)
 			{
 				currentGridCell = cell;
 				if (mouseMarker != null)
-					mouseMarker.GlobalPosition = cell.worldCenter;
+					mouseMarker.GlobalPosition = cell.gridCoordinates * new Vector3I(1,1,-1);
 				return;
 			}
+			else
+			{
 
-			GD.PrintErr(
-				$"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell."
-			);
+				GD.PrintErr(
+					$"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell."
+				);
+			}
 			// Fall through to position-based lookup.
 		}
 
-		if (GridSystem.Instance != null
-		    && GridSystem.Instance.TyGetGridCellFromWorldPosition(
+		if (gridSystem != null
+		    && gridSystem.TyGetGridCellFromWorldPosition(
 			    hitPosition,
 			    out GridCell gridCell,
 			    true
 		    )
 		    && gridCell != null)
 		{
-			currentGridCell = gridCell;
-			if (mouseMarker != null)
-				mouseMarker.GlobalPosition = gridCell.worldCenter;
+			if (gridCell.state.HasFlag(Enums.GridCellState.Air))
+			{
+				gridCell = gridSystem.GetGridCell(gridCell.gridCoordinates - new Vector3I(0,1,0));
+			}
+			
+			if(gridCell != null)
+			{
+				currentGridCell = gridCell;
+				if (mouseMarker != null)
+					mouseMarker.GlobalPosition = gridCell.gridCoordinates * new Vector3I(1,1,-1);
+			}
 		}
 		else
 		{
@@ -83,7 +100,8 @@ public partial class InputManager : Manager<InputManager>
 			if (mouseMarker != null)
 				mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
 		}
-		// GD.Print($"currentGridCell: {currentGridCell.gridCoordinates}");
+
+
 	}
 	
 	public GodotObject GetObjectAtMousePosition(out Vector3 worldPosition)
@@ -106,6 +124,7 @@ public partial class InputManager : Manager<InputManager>
 			var query = PhysicsRayQueryParameters3D.Create(from, to);
 			query.CollideWithAreas = true;
 			query.CollideWithBodies = true;
+			query.CollisionMask = PhysicsLayer.TERRAIN | PhysicsLayer.PLAYER;
 
 			var result = space.IntersectRay(query);
 
@@ -119,9 +138,45 @@ public partial class InputManager : Manager<InputManager>
 
 			worldPosition = result["position"].As<Vector3>();
 			var colliderObject = result["collider"].As<GodotObject>();
-			var node = colliderObject as Node;
+			Node node = colliderObject as Node;
+
+			// Recursively check for GridObject parent
+			GridObject gridObject = null;
+			Node current = node;
+			while (current != null)
+			{
+				if (current is GridObject go)
+				{
+					gridObject = go;
+					break;
+				}
+				current = current.GetParent();
+			}
+			
+			if (gridObject != null)
+			{
+				currentGridCell = gridObject.GridPositionData?.GridCell;
+				if (mouseMarker != null && currentGridCell != null)
+					mouseMarker.GlobalPosition = currentGridCell.worldCenter;
+				return gridObject;
+			}
+			
+			
+			
 			return node;
 		}
 	}
+	
+	#region manager Data
+	protected override void GetInstanceData(ManagerData data)
+	{
+		GD.Print("No data to transfer");
+	}
+
+	public override ManagerData SetInstanceData()
+	{
+		return null;
+	}
+	#endregion
 	
 }

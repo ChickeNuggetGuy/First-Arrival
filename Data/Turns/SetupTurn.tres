@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="Turn" load_steps=2 format=3 uid="uid://cjrvllj8jya1w"]
+
+[ext_resource type="Script" uid="uid://c545g83g71bd6" path="res://Scripts/TurnSystem/Turn.cs" id="1_vpems"]
+
+[resource]
+script = ExtResource("1_vpems")
+turnSegments = null
+metadata/_custom_type_script = "uid://c545g83g71bd6"

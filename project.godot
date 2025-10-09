@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="First Arrival"
-run/main_scene="uid://ci5t5ugjnmjr"
+run/main_scene="uid://b1snx3p0mm70d"
 config/features=PackedStringArray("4.5", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -39,9 +39,18 @@ enabled=PackedStringArray("res://addons/fancy_folder_icons/plugin.cfg", "res://a
 [file_customization]
 
 folder_colors={
+"res://Data/": "purple",
+"res://Scenes/": "green",
+"res://Scenes/UI/": "teal",
 "res://Scripts/": "red",
+"res://Shaders/": "blue",
 "res://Third-Party Assets/": "gray"
 }
+
+[global_group]
+
+GridObjects=""
+GridCellOverride=""
 
 [input]
 

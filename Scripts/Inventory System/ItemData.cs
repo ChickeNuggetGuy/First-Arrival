@@ -19,7 +19,7 @@ public partial class ItemData : Resource
 	[Export]
 	public Texture2D ItemIcon { get; protected set; }
 
-	[Export]
+	[Export(PropertyHint.ResourceType, "GridShape")]
 	public GridShape ItemShape { get; set; }
 	
 	[Export]public PackedScene ItemScene { get; protected set; }
@@ -27,9 +27,9 @@ public partial class ItemData : Resource
 	[Export(PropertyHint.ResourceType, "ActionDefinition")]
 	public ActionDefinition[] ActionDefinitions;
 
-	[Export] public int weight { get; protected set; } = 2; 
-	
-	[Export] public int maxStack { get; protected set; }
+	[Export] public int weight { get; protected set; } = 2;
+
+	[Export] public int MaxStackSize { get; protected set; } = 1;
 	[Export] public Enums.ItemSettings ItemSettings { get; protected set; }
 	[Export]public int Damage { get; set; }
 	[Export] public int Range { get; protected set; } = 1;

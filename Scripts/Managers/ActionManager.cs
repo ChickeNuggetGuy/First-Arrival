@@ -14,13 +14,17 @@ public partial class ActionManager : Manager<ActionManager>
 {
 	public ActionDefinition SelectedAction { get; private set; }
 
+	[Signal]
+	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
 	protected override async Task _Setup()
 	{
+		ActionCompleted += GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).UpdateGridObjects;
 		await Task.CompletedTask;
 	}
 
 	protected override async Task _Execute()
 	{
+
 		await Task.CompletedTask;
 	}
 
@@ -194,12 +198,15 @@ public partial class ActionManager : Manager<ActionManager>
 
 	public void ActionCompleteCall(ActionDefinition actionDef)
 	{
+		
 		ActionCompleteCall(actionDef, null);
+		EmitSignal(SignalName.ActionCompleted, actionDef, SelectedAction);
 	}
 
 	// New API: only clear IsBusy if the completed action is the root (no parent)
 	public void ActionCompleteCall(ActionDefinition actionDef, global::Action actionInst)
 	{
+		EmitSignal(SignalName.ActionCompleted, actionDef, SelectedAction);
 		switch (actionDef)
 		{
 			case null:
@@ -238,5 +245,16 @@ public partial class ActionManager : Manager<ActionManager>
 		}
 	}
 
+	#region manager Data
+	protected override void GetInstanceData(ManagerData data)
+	{
+		GD.Print("No data to transfer");
+	}
+
+	public override ManagerData SetInstanceData()
+	{
+		return null;
+	}
+	#endregion
 
 }

@@ -85,6 +85,7 @@ public partial class ThrowActionDefinition : ActionDefinition, IItemActionDefini
       !GridSystem.Instance.TryGetGridCellsInRange(
         startingGridCell,
         new Vector2I(5, 3),
+        false,
         out List<GridCell> gridCells
       )
     )

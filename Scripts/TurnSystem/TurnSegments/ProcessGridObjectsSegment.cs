@@ -26,6 +26,11 @@ public partial class ProcessGridObjectsSegment: TurnSegment
 		
 		foreach (var gridObject in teamHolder.GridObjects[Enums.GridObjectState.Active])
 		{
+			foreach (var sight in gridObject.Sights)
+			{
+				sight.CalculateSightArea();
+			}
+			
 			GridObjectStat[]stats = gridObject.Stats.Where(stat => stat.turnBehavior != Enums.StatTurnBehavior.None).ToArray();
 
 			foreach (GridObjectStat stat in stats)

@@ -7,6 +7,8 @@ namespace FirstArrival.Scripts.TurnSystem;
 [GlobalClass]
 public partial class Turn : Resource
 {
+	[Export] public bool repeatable = true;
+	public int timesExectuted = 0;
 	[Export] public Enums.UnitTeam team {get; private set; }= Enums.UnitTeam.None;
 	[Export(PropertyHint.ResourceType,"TurnSegment")] private TurnSegment[] turnSegments;
 	
@@ -31,6 +33,7 @@ public partial class Turn : Resource
 	public async Task ExecuteCall()
 	{
 		await _Execute();
+		timesExectuted++;
 	}
 
 	protected virtual async Task _Execute()

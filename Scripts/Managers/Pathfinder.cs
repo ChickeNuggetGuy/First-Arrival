@@ -39,76 +39,62 @@ public partial class Pathfinder : Manager<Pathfinder>
 	)
 	{
 		// Quick check for invalid inputs
-		if (start == null || goal == null) return new List<GridCell>();
-
-		// If adjacentIsValid is false, the goal must be walkable
-		if (!adjacentIsValid && !goal.state.HasFlag(Enums.GridCellState.Walkable))
+		if (start == null || goal == null)
+		{
+			GD.Print("Either start or goal is null.");
 			return new List<GridCell>();
+		}
 
-		// If start and goal are the same cell and goal is walkable, return just that
-		if (start == goal) return new List<GridCell> { start };
+		var gridSystem = GetGridSystemThreadSafe();
+		if (gridSystem == null)
+		{
+			GD.Print("GridSystem is null.");
+			return new List<GridCell>();
+		}
 
-		// For adjacentIsValid, collect all walkable cells adjacent to the goal
+		// If adjacentIsValid is false, the goal must be walkable (have connections)
+		if (!adjacentIsValid && !goal.IsWalkable)
+		{
+			GD.Print("Goal is not walkable (no connections).");
+			return new List<GridCell>();
+		}
+
+		// If start and goal are the same cell, return just that
+		if (start == goal)
+		{
+			GD.Print("Start and goal are equal.");
+			return new List<GridCell> { start };
+		}
+
+		// For adjacentIsValid, collect all "walkable" cells adjacent to the goal
 		HashSet<GridCell> validTargets = new HashSet<GridCell>();
 		if (adjacentIsValid)
 		{
-			for (int dy = -1; dy <= 1; dy++)
+			// Get all neighbors of the goal cell
+			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.gridCoordinates, 1);
+			
+			foreach (var neighbor in goalNeighbors)
 			{
-				foreach (var offset in new Vector3I[]
-				         {
-					         new Vector3I(1, dy, 0),
-					         new Vector3I(-1, dy, 0),
-					         new Vector3I(0, dy, 1),
-					         new Vector3I(0, dy, -1),
-					         new Vector3I(1, dy, 1),
-					         new Vector3I(1, dy, -1),
-					         new Vector3I(-1, dy, 1),
-					         new Vector3I(-1, dy, -1),
-				         })
+				// Only include walkable neighbors
+				if (neighbor.IsWalkable)
 				{
-					Vector3I neighborCoords = new Vector3I(
-						goal.gridCoordinates.X + offset.X,
-						goal.gridCoordinates.Y + offset.Y,
-						goal.gridCoordinates.Z + offset.Z
-					);
-
-					var gridSystem = GetGridSystemThreadSafe();
-					if (gridSystem == null) continue;
-					var gridCells = gridSystem.GridCells;
-
-					if (
-						neighborCoords.Y >= 0
-						&& neighborCoords.Y < gridCells.Length
-						&& neighborCoords.X >= 0
-						&& neighborCoords.X
-						< gridCells[neighborCoords.Y].GetLength(0)
-						&& neighborCoords.Z >= 0
-						&& neighborCoords.Z
-						< gridCells[neighborCoords.Y].GetLength(1)
-					)
-					{
-						GridCell neighbor = gridCells[neighborCoords.Y][
-							neighborCoords.X,
-							neighborCoords.Z
-						];
-						if (
-							neighbor != null
-							&& neighbor.state.HasFlag(
-								Enums.GridCellState.Walkable
-							)
-						)
-						{
-							validTargets.Add(neighbor);
-						}
-					}
+					validTargets.Add(neighbor);
 				}
 			}
 
-			// If there are no walkable cells adjacent to the goal, return empty path
-			if (validTargets.Count == 0) return new List<GridCell>();
+			// If there are no "walkable" cells adjacent to the goal, return empty
+			if (validTargets.Count == 0)
+			{
+				GD.Print("No valid walkable targets adjacent to goal.");
+				return new List<GridCell>();
+			}
 
-			// If the start cell is one of the valid targets, return just that cell
-			if (validTargets.Contains(start)) return new List<GridCell> { start };
+			// If the start cell is one of the valid targets, return just that
+			if (validTargets.Contains(start))
+			{
+				GD.Print("Start is adjacent to goal.");
+				return new List<GridCell> { start };
+			}
 		}
 		else
 		{
@@ -153,7 +139,8 @@ public partial class Pathfinder : Manager<Pathfinder>
 			foreach (GridCell neighbor in GetNeighbors(current.Cell))
 			{
 				// Skip if neighbor is already evaluated.
-				if (closedSet.Contains(neighbor)) continue;
+				if (closedSet.Contains(neighbor))
+					continue;
 
 				float cost = current.CostSoFar + Cost(current.Cell, neighbor);
 
@@ -164,9 +151,10 @@ public partial class Pathfinder : Manager<Pathfinder>
 				if (neighborRecord == null)
 				{
 					// Create a new record.
-					float heuristic = validTargets.Count == 1
-						? Heuristic(neighbor, validTargets.First())
-						: validTargets.Min(t => Heuristic(neighbor, t));
+					float heuristic =
+						validTargets.Count == 1
+							? Heuristic(neighbor, validTargets.First())
+							: validTargets.Min(t => Heuristic(neighbor, t));
 
 					neighborRecord = new NodeRecord
 					{
@@ -182,9 +170,10 @@ public partial class Pathfinder : Manager<Pathfinder>
 					// Update the record since we found a cheaper path.
 					neighborRecord.CostSoFar = cost;
 
-					float heuristic = validTargets.Count == 1
-						? Heuristic(neighbor, validTargets.First())
-						: validTargets.Min(t => Heuristic(neighbor, t));
+					float heuristic =
+						validTargets.Count == 1
+							? Heuristic(neighbor, validTargets.First())
+							: validTargets.Min(t => Heuristic(neighbor, t));
 
 					neighborRecord.EstimatedTotalCost = cost + heuristic;
 					neighborRecord.Parent = current;
@@ -193,7 +182,11 @@ public partial class Pathfinder : Manager<Pathfinder>
 		}
 
 		// If we never reached a valid target, return an empty path.
-		if (targetRecord == null) return new List<GridCell>();
+		if (targetRecord == null)
+		{
+			GD.Print("Target record is null - no path found.");
+			return new List<GridCell>();
+		}
 
 		// Reconstruct the path.
 		var path = new List<GridCell>();
@@ -263,71 +256,45 @@ public partial class Pathfinder : Manager<Pathfinder>
 		return await Task.Run(() => IsPathPossibleInternal(start, goal, adjacentIsValid), cancellationToken);
 	}
 
-	/// <summary>
-	/// Internal implementation of IsPathPossible
-	/// </summary>
-	private bool IsPathPossibleInternal(GridCell start, GridCell goal, bool adjacentIsValid = false)
+	private bool IsPathPossibleInternal(
+		GridCell start,
+		GridCell goal,
+		bool adjacentIsValid = false
+	)
 	{
 		// Quick check for invalid inputs
 		if ((start == null || start == GridCell.Null) || (goal == null || goal == GridCell.Null))
 			return false;
 
-		// If adjacentIsValid is false, the goal must be walkable
-		if (!adjacentIsValid && !goal.state.HasFlag(Enums.GridCellState.Walkable))
-			return false;
-
-		// If start and goal are the same cell, return true
-		if (start == goal && goal.state.HasFlag(Enums.GridCellState.Walkable))
-			return true;
-
-		// If adjacentIsValid and start is adjacent to goal, return true immediately
-		if (adjacentIsValid && GetNeighbors(start).Contains(goal))
-			return true;
-
-		// For adjacentIsValid, we'll collect all cells adjacent to the goal
-		HashSet<GridCell> validTargets = new HashSet<GridCell>();
 		var gridSystem = GetGridSystemThreadSafe();
 		if (gridSystem == null)
 			return false;
 
-		var gridCells = gridSystem.GridCells;
+		// If adjacentIsValid is false, the goal must be walkable
+		if (!adjacentIsValid && !goal.IsWalkable)
+			return false;
+
+		// If start and goal are the same cell, require it to be walkable
+		if (start == goal)
+			return start.IsWalkable;
+
+		// For adjacentIsValid, collect all walkable cells adjacent to the goal
+		HashSet<GridCell> validTargets = new HashSet<GridCell>();
 
 		if (adjacentIsValid)
 		{
-			for (int y = goal.gridCoordinates.Y - 1; y <= goal.gridCoordinates.Y + 1; y++)
+			// Get all neighbors of the goal within radius 1
+			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.gridCoordinates, 1);
+			
+			foreach (var neighbor in goalNeighbors)
 			{
-				// Get all walkable cells adjacent to the goal
-				foreach (var offset in new Vector3I[]
-				         {
-					         new Vector3I(1, y, 0),
-					         new Vector3I(-1, y, 0),
-					         new Vector3I(0, y, 1),
-					         new Vector3I(0, y, -1),
-					         new Vector3I(1, y, 1),
-					         new Vector3I(1, y, -1),
-					         new Vector3I(-1, y, 1),
-					         new Vector3I(-1, y, -1)
-				         })
+				if (neighbor.IsWalkable)
 				{
-					Vector3I neighborCoords = new Vector3I(
-						goal.gridCoordinates.X + offset.X,
-						y,
-						goal.gridCoordinates.Z + offset.Z
-					);
-
-					// Check if neighborCoords are within the grid bounds
-					if (y >= 0 && y < gridCells.Length &&
-					    neighborCoords.X >= 0 && neighborCoords.X < gridCells[y].GetLength(0) &&
-					    neighborCoords.Z >= 0 && neighborCoords.Z < gridCells[y].GetLength(1))
-					{
-						GridCell neighbor = gridCells[y][neighborCoords.X, neighborCoords.Z];
-						if (neighbor.state.HasFlag(Enums.GridCellState.Walkable))
-							validTargets.Add(neighbor);
-					}
+					validTargets.Add(neighbor);
 				}
 			}
 
-			// If there are no walkable cells adjacent to the goal, return false
+			// If there are no adjacent cells with connections, return false
 			if (validTargets.Count == 0)
 				return false;
 
@@ -344,8 +311,6 @@ public partial class Pathfinder : Manager<Pathfinder>
 		// Our node record used during the search
 		var openSet = new HashSet<GridCell>();
 		var closedSet = new HashSet<GridCell>();
-
-		// Priority queue would be better, but using a simple list for compatibility
 		var openList = new List<NodeRecord>();
 
 		// Create the start record
@@ -396,20 +361,23 @@ public partial class Pathfinder : Manager<Pathfinder>
 				else
 				{
 					// Find the existing record
-					NodeRecord existingRecord = openList.First(n => n.Cell == neighbor);
+					NodeRecord existingRecord =
+						openList.First(n => n.Cell == neighbor);
 
 					// If we found a better path, update it
 					if (cost < existingRecord.CostSoFar)
 					{
 						existingRecord.CostSoFar = cost;
-						existingRecord.EstimatedTotalCost = cost + Heuristic(neighbor, goal);
+						existingRecord.EstimatedTotalCost =
+							cost + Heuristic(neighbor, goal);
 						existingRecord.Parent = current;
 					}
 				}
 			}
 		}
 
-		// If we've exhausted all possibilities without finding a valid target, no path exists
+		// If we've exhausted all possibilities without finding a valid target,
+		// no path exists
 		return false;
 	}
 
@@ -503,146 +471,175 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 	/// <summary>
 	/// Returns a list of walkable neighbor cells for a given cell.
-	/// Checks 6 cardinal directions in a 3D grid.
+	/// Uses the centralized connection system via GridSystem.
 	/// </summary>
 	private List<GridCell> GetNeighbors(GridCell cell)
 	{
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(cell, out var neighbors))
+		if (!GridSystem.Instance.TryGetGridCellNeighbors(cell, true, false, out var neighbors))
 			return new List<GridCell>();
+
+		return neighbors;
+	}
+
+	/// <summary>
+	/// Helper method to get all neighbors within a given radius (in grid cells).
+	/// Used for finding adjacent cells for adjacentIsValid parameter.
+	/// </summary>
+	private List<GridCell> GetNeighborsInRadius(GridSystem gridSystem, Vector3I center, int radius)
+	{
+		var neighbors = new List<GridCell>();
+
+		for (int dy = -radius; dy <= radius; dy++)
+		{
+			for (int dx = -radius; dx <= radius; dx++)
+			{
+				for (int dz = -radius; dz <= radius; dz++)
+				{
+					// Skip the center cell
+					if (dx == 0 && dy == 0 && dz == 0)
+						continue;
+
+					Vector3I neighborCoords = center + new Vector3I(dx, dy, dz);
+					GridCell neighbor = gridSystem.GetGridCell(neighborCoords);
+					
+					if (neighbor != null)
+					{
+						neighbors.Add(neighbor);
+					}
+				}
+			}
+		}
 
 		return neighbors;
 	}
 
 	#region Arc Pathfinding
 
-public class ArcPathResult
-{
-    public bool Success { get; set; }
-    public List<GridCell> GridCellPath { get; set; } = new List<GridCell>();
-    public Godot.Collections.Array<Vector3> Vector3Path { get; set; } = new Godot.Collections.Array<Vector3>();
-}
+	public class ArcPathResult
+	{
+		public bool Success { get; set; }
+		public List<GridCell> GridCellPath { get; set; } = new List<GridCell>();
+		public Godot.Collections.Array<Vector3> Vector3Path { get; set; } = new Godot.Collections.Array<Vector3>();
+	}
 
-public ArcPathResult TryCalculateArcPath(GridCell startCell, GridCell endCell, int attempts = 3)
-{
-    var result = new ArcPathResult { Success = false };
-    
-    if (startCell == null || endCell == null)
-    {
-        GD.Print("Start or end cell is null");
-        return result;
-    }
+	public ArcPathResult TryCalculateArcPath(GridCell startCell, GridCell endCell, int attempts = 3)
+	{
+		var result = new ArcPathResult { Success = false };
+		
+		if (startCell == null || endCell == null)
+		{
+			GD.Print("Start or end cell is null");
+			return result;
+		}
 
-    // Check if start or end is obstructed
-    if ((startCell.state & Enums.GridCellState.Obstructed) != 0 ||
-        (endCell.state & Enums.GridCellState.Obstructed) != 0)
-    {
-        GD.Print("Start or end point is obstructed.");
-        return result;
-    }
+		// Check if start or end is obstructed
+		if ((startCell.state & Enums.GridCellState.Obstructed) != 0 ||
+			(endCell.state & Enums.GridCellState.Obstructed) != 0)
+		{
+			GD.Print("Start or end point is obstructed.");
+			return result;
+		}
 
-    Vector3 startPos = startCell.worldCenter;
-    Vector3 endPos = endCell.worldCenter;
-    Vector3 direction = endPos - startPos;
-    float distance = direction.Length();
+		Vector3 startPos = startCell.worldCenter;
+		Vector3 endPos = endCell.worldCenter;
+		Vector3 direction = endPos - startPos;
+		float distance = direction.Length();
 
-    // Too close - return direct path
-    if (distance < 0.1f)
-    {
-        result.Success = true;
-        result.GridCellPath.Add(startCell);
-        result.Vector3Path.Add(startPos);
-        return result;
-    }
+		// Too close - return direct path
+		if (distance < 0.1f)
+		{
+			result.Success = true;
+			result.GridCellPath.Add(startCell);
+			result.Vector3Path.Add(startPos);
+			return result;
+		}
 
-    GridSystem gridSystem = GridSystem.Instance;
-    Vector2 cellSize = MeshTerrainGenerator.Instance.cellSize; // Assuming you have this property
+		GridSystem gridSystem = GridSystem.Instance;
+		Vector2 cellSize = MeshTerrainGenerator.Instance.cellSize;
 
-    // Try different arc heights
-    for (int attempt = 0; attempt < attempts; attempt++)
-    {
-        // Calculate arc height with variation for each attempt
-        float heightFactor = 0.3f + (attempt * 0.2f); // Start lower, go higher
-        float arcHeight = distance * heightFactor;
-        
+		// Try different arc heights
+		for (int attempt = 0; attempt < attempts; attempt++)
+		{
+			// Calculate arc height with variation for each attempt
+			float heightFactor = 0.3f + (attempt * 0.2f); // Start lower, go higher
+			float arcHeight = distance * heightFactor;
 
-        // Adaptive number of points based on distance and cell size
-        int numPoints = Mathf.Max(10, (int)(distance / Mathf.Min(cellSize.X, cellSize.X) * 2));
+			// Adaptive number of points based on distance and cell size
+			int numPoints = Mathf.Max(10, (int)(distance / Mathf.Min(cellSize.X, cellSize.X) * 2));
 
-        // Reset result for this attempt
-        var attemptResult = new ArcPathResult { Success = false };
-        GridCell lastGridCell = null;
-        var smoothPath = new Godot.Collections.Array<Vector3>();
+			// Reset result for this attempt
+			var attemptResult = new ArcPathResult { Success = false };
+			GridCell lastGridCell = null;
+			var smoothPath = new Godot.Collections.Array<Vector3>();
 
-        bool pathValid = true;
+			bool pathValid = true;
 
-        for (int i = 0; i <= numPoints; i++)
-        {
-            float t = (float)i / numPoints; // Interpolation factor (0 to 1)
+			for (int i = 0; i <= numPoints; i++)
+			{
+				float t = (float)i / numPoints; // Interpolation factor (0 to 1)
 
-            // Calculate the current position along the straight line
-            Vector3 currentPos = startPos.Lerp(endPos, t);
+				// Calculate the current position along the straight line
+				Vector3 currentPos = startPos.Lerp(endPos, t);
 
-            // Calculate the vertical offset for the arc (parabolic shape)
-            float verticalOffset = -4 * arcHeight * t * (t - 1); // Parabola formula
+				// Calculate the vertical offset for the arc (parabolic shape)
+				float verticalOffset = -4 * arcHeight * t * (t - 1); // Parabola formula
 
-            // Apply the vertical offset to create the arc
-            Vector3 arcPos = currentPos + Vector3.Up * verticalOffset;
+				// Apply the vertical offset to create the arc
+				Vector3 arcPos = currentPos + Vector3.Up * verticalOffset;
 
-            // Store the smooth path position
-            smoothPath.Add(arcPos);
+				// Store the smooth path position
+				smoothPath.Add(arcPos);
 
-            // Convert world position to grid coordinates
-            var getGridCellResult = gridSystem.TyGetGridCellFromWorldPosition(arcPos, out GridCell cell, true);
-            
-            if (!getGridCellResult)
-            {
-                GD.Print($"Failed to get grid cell at position: {arcPos}");
-                pathValid = false;
-                break;
-            }
+				// Convert world position to grid coordinates
+				var getGridCellResult = gridSystem.TyGetGridCellFromWorldPosition(arcPos, out GridCell cell, true);
+				
+				if (!getGridCellResult)
+				{
+					GD.Print($"Failed to get grid cell at position: {arcPos}");
+					pathValid = false;
+					break;
+				}
 
-            GridCell gridCell = cell;
+				GridCell gridCell = cell;
 
-            // For arc paths, allow AIR spaces but block solid obstacles
-            // Adjust this condition based on your Enums.CellState values
-            if ((gridCell.state & Enums.GridCellState.Obstructed) != 0 &&
-                (gridCell.state & Enums.GridCellState.Obstructed) == 0)
-            {
-                GD.Print($"Obstacle detected at: {gridCell.gridCoordinates}");
-                pathValid = false;
-                break;
-            }
+				// For arc paths, allow AIR spaces but block solid obstacles
+				if ((gridCell.state & Enums.GridCellState.Obstructed) != 0)
+				{
+					GD.Print($"Obstacle detected at: {gridCell.gridCoordinates}");
+					pathValid = false;
+					break;
+				}
 
-            // Only add the grid cell if it's different from the last one
-            if (lastGridCell == null || !AreGridCellsEqual(lastGridCell, gridCell))
-            {
-                attemptResult.GridCellPath.Add(gridCell);
-                lastGridCell = gridCell;
-            }
-        }
+				// Only add the grid cell if it's different from the last one
+				if (lastGridCell == null || !AreGridCellsEqual(lastGridCell, gridCell))
+				{
+					attemptResult.GridCellPath.Add(gridCell);
+					lastGridCell = gridCell;
+				}
+			}
 
-        // If path is valid, return it with both paths
-        if (pathValid && attemptResult.GridCellPath.Count > 0)
-        {
-            attemptResult.Success = true;
-            attemptResult.Vector3Path = smoothPath;
-            return attemptResult;
-        }
-    }
+			// If path is valid, return it with both paths
+			if (pathValid && attemptResult.GridCellPath.Count > 0)
+			{
+				attemptResult.Success = true;
+				attemptResult.Vector3Path = smoothPath;
+				return attemptResult;
+			}
+		}
 
-    // If all attempts failed
-    GD.Print($"All {attempts} attempts failed to find a valid arc path");
-    return result;
-}
+		// If all attempts failed
+		GD.Print($"All {attempts} attempts failed to find a valid arc path");
+		return result;
+	}
 
-// Helper function to compare grid cells
-private bool AreGridCellsEqual(GridCell cell1, GridCell cell2)
-{
-    if (cell1 == null || cell2 == null)
-        return cell1 == cell2;
-    
-    return cell1.gridCoordinates == cell2.gridCoordinates;
-}
+	// Helper function to compare grid cells
+	private bool AreGridCellsEqual(GridCell cell1, GridCell cell2)
+	{
+		if (cell1 == null || cell2 == null)
+			return cell1 == cell2;
+		
+		return cell1.gridCoordinates == cell2.gridCoordinates;
+	}
 
 	#endregion
 
@@ -657,14 +654,11 @@ private bool AreGridCellsEqual(GridCell cell1, GridCell cell2)
 		public float EstimatedTotalCost; // f = g + h
 	}
 
-
 	/// <summary>
 	/// Thread-safe access to GridSystem.Instance
 	/// </summary>
 	private GridSystem GetGridSystemThreadSafe()
 	{
-		// This method ensures we access GridSystem.Instance in a thread-safe way
-		// For a more robust solution, you might want to cache the reference or use a dependency injection pattern
 		return GridSystem.Instance;
 	}
 
@@ -677,4 +671,16 @@ private bool AreGridCellsEqual(GridCell cell1, GridCell cell2)
 	{
 		return Task.CompletedTask;
 	}
+	
+	#region manager Data
+	protected override void GetInstanceData(ManagerData data)
+	{
+		GD.Print("No data to transfer");
+	}
+
+	public override ManagerData SetInstanceData()
+	{
+		return null;
+	}
+	#endregion
 }

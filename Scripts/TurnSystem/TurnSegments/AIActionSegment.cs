@@ -37,76 +37,79 @@ namespace FirstArrival.Scripts.AI
             {
                 GD.Print($"Processing actions for {activeGridObject.Name}");
 
-                // Step 1: Find all possible actions and their best targets/scores/costs.
-                var allPossibleActions = new List<(GridCell target, int score, ActionDefinition actionDefinition, Dictionary<Enums.Stat, int> costs)>();
-
-                // Scan item actions
-                var inventoriesToScan = new List<InventoryGrid>();
-                if (activeGridObject.TryGetInventory(Enums.InventoryType.RightHand, out var rightHand)) inventoriesToScan.Add(rightHand);
-                if (activeGridObject.TryGetInventory(Enums.InventoryType.LeftHand, out var leftHand)) inventoriesToScan.Add(leftHand);
-
-                foreach (var inventory in inventoriesToScan)
+                for (int i = 0; i < _maxActionAttempts; i++)
                 {
-                    foreach (var item in inventory.uniqueItems)
+                    // Step 1: Find all possible actions and their best targets/scores/costs for the current state.
+                    var allPossibleActions = new List<(GridCell target, int score, ActionDefinition actionDefinition, Dictionary<Enums.Stat, int> costs)>();
+
+                    // Scan item actions
+                    var inventoriesToScan = new List<InventoryGrid>();
+                    if (activeGridObject.TryGetInventory(Enums.InventoryType.RightHand, out var rightHand)) inventoriesToScan.Add(rightHand);
+                    if (activeGridObject.TryGetInventory(Enums.InventoryType.LeftHand, out var leftHand)) inventoriesToScan.Add(leftHand);
+
+                    foreach (var inventory in inventoriesToScan)
                     {
-                        if (item.ItemData.ActionDefinitions == null) continue;
-
-                        foreach (var itemActionDef in item.ItemData.ActionDefinitions)
+                        foreach (var itemInfo in inventory.UniqueItems)
                         {
-                            if (itemActionDef is ActionDefinition actionDefInstance && actionDefInstance is IItemActionDefinition itemActionInterface)
-                            {
-                                itemActionInterface.Item = item;
-                                actionDefInstance.parentGridObject = activeGridObject;
+                            if (itemInfo.item.ItemData.ActionDefinitions == null) continue;
 
-                                var result = actionDefInstance.DetermineBestAIAction();
-                                if (result.gridCell != null)
+                            foreach (var itemActionDef in itemInfo.item.ItemData.ActionDefinitions)
+                            {
+                                if (itemActionDef is ActionDefinition actionDefInstance && actionDefInstance is IItemActionDefinition itemActionInterface)
                                 {
-                                    allPossibleActions.Add((result.gridCell, result.score, actionDefInstance, result.costs));
+                                    itemActionInterface.Item = itemInfo.item;
+                                    actionDefInstance.parentGridObject = activeGridObject;
+
+                                    var result = actionDefInstance.DetermineBestAIAction();
+                                    if (result.gridCell != null)
+                                    {
+                                        allPossibleActions.Add((result.gridCell, result.score, actionDefInstance, result.costs));
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Scan non-item actions
-                foreach (var action in activeGridObject.ActionDefinitions)
-                {
-                    if (action is not IItemActionDefinition)
+                    // Scan non-item actions
+                    foreach (var action in activeGridObject.ActionDefinitions)
                     {
-                        action.parentGridObject = activeGridObject;
-                        var result = action.DetermineBestAIAction();
-                        if (result.gridCell != null)
+                        if (action is not IItemActionDefinition)
                         {
-                            allPossibleActions.Add((result.gridCell, result.score, action, result.costs));
+                            action.parentGridObject = activeGridObject;
+                            var result = action.DetermineBestAIAction();
+                            if (result.gridCell != null)
+                            {
+                                allPossibleActions.Add((result.gridCell, result.score, action, result.costs));
+                            }
                         }
                     }
-                }
 
-                if (allPossibleActions.Count == 0)
-                {
-                    GD.Print($"No valid actions found for {activeGridObject.Name}. Skipping to next unit.");
-                    continue; // Go to the next grid object
-                }
-
-                // Step 2: Sort all actions by score.
-                allPossibleActions.Sort((a, b) => b.score.CompareTo(a.score));
-
-                // Step 3: Execute actions from the sorted list as long as they are affordable.
-                int actionsTaken = 0;
-                foreach (var potentialAction in allPossibleActions)
-                {
-                    if (actionsTaken >= _maxActionAttempts)
+                    if (allPossibleActions.Count == 0)
                     {
-                        GD.Print($"Max action limit reached for {activeGridObject.Name}.");
+                        GD.Print($"No valid actions found for {activeGridObject.Name}. Ending its turn.");
+                        break; 
+                    }
+
+                    // Step 2: Sort all actions by score and pick the best one.
+                    allPossibleActions.Sort((a, b) => b.score.CompareTo(a.score));
+                    var bestAction = allPossibleActions.First();
+
+                    if (bestAction.score <= 0)
+                    {
+                        GD.Print($"No more actions with score > 0 for {activeGridObject.Name}. Ending its actions.");
                         break;
                     }
 
-                    // Check affordability again, as previous actions may have spent stats.
-                    if (activeGridObject.CanAffordStatCost(potentialAction.costs))
+                    // Step 3: Execute the best action if affordable.
+                    if (activeGridObject.CanAffordStatCost(bestAction.costs))
                     {
-                        GD.Print($"Executing action for {activeGridObject.Name}: {potentialAction.actionDefinition.GetActionName()} with score {potentialAction.score}");
-                        await ExecuteAiAction(activeGridObject, potentialAction.target, potentialAction.score, potentialAction.actionDefinition);
-                        actionsTaken++;
+                        GD.Print($"Executing action for {activeGridObject.Name}: {bestAction.actionDefinition.GetActionName()} with score {bestAction.score}");
+                        await ExecuteAiAction(activeGridObject, bestAction.target, bestAction.score, bestAction.actionDefinition);
+                    }
+                    else
+                    {
+                        GD.Print($"Cannot afford best action {bestAction.actionDefinition.GetActionName()}. Ending turn for {activeGridObject.Name}.");
+                        break; 
                     }
                 }
                 GD.Print($"Finished processing actions for {activeGridObject.Name}.");

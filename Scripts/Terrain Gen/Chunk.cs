@@ -23,61 +23,63 @@ public partial class Chunk : Node3D
     public Aabb bounds;
 
     public void Initialize(
-	    int chunkIndexX,
-	    int chunkIndexY,
-	    int chunkSize,
-	    Vector3[,] globalVertices,
-	    float cellSize,
-	    ChunkData chunkData
+        int chunkIndexX,
+        int chunkIndexY,
+        int chunkSize,
+        Vector3[,] globalVertices,
+        float cellSize,
+        ChunkData chunkData
     )
     {
-	    this.gridCoords = new Vector2I(chunkIndexX, chunkIndexY);
-	    this.chunkSize = chunkSize;
-	    this.cellSize = cellSize;
-	    this.chunkData = chunkData;
+        this.gridCoords = new Vector2I(chunkIndexX, chunkIndexY);
+        this.chunkSize = chunkSize;
+        this.cellSize = cellSize;
+        this.chunkData = chunkData;
 
-	    // Keep the wrapper node reference unchanged; only link the component
-	    chunkData.chunk = this;
+        // Keep the wrapper node reference unchanged; only link the component
+        chunkData.chunk = this;
 
-	    GD.Print(
-		    $"Initializing chunk at {gridCoords}, Type: {chunkData.chunkType}"
-	    );
+        GD.Print(
+            $"Initializing chunk at {gridCoords}, Type: {chunkData.chunkType}"
+        );
 
-	    if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
-	    {
-		    GD.Print("Skipping mesh generation for ManMade chunk.");
-		    return;
-	    }
+        if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
+        {
+            GD.Print("Skipping mesh generation for ManMade chunk.");
+            return;
+        }
 
-	    meshInstance = GetNodeOrNull<MeshInstance3D>("MeshInstance");
-	    if (meshInstance == null)
-	    {
-		    meshInstance = new MeshInstance3D { Name = "MeshInstance" };
-		    AddChild(meshInstance);
-	    }
-	    meshInstance.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+        meshInstance = GetNodeOrNull<MeshInstance3D>("MeshInstance");
+        if (meshInstance == null)
+        {
+            meshInstance = new MeshInstance3D { Name = "MeshInstance" };
+            AddChild(meshInstance);
+        }
+        meshInstance.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
 
-	    localVertices = new Vector3[(chunkSize + 1) * (chunkSize + 1)];
-	    int startX = chunkIndexX * chunkSize;
-	    int startY = chunkIndexY * chunkSize;
+        localVertices = new Vector3[(chunkSize + 1) * (chunkSize + 1)];
+        int startX = chunkIndexX * chunkSize;
+        int startY = chunkIndexY * chunkSize;
 
-	    int i = 0;
-	    for (int y = 0; y <= chunkSize; y++)
-	    {
-		    for (int x = 0; x <= chunkSize; x++)
-		    {
-			    Vector3 worldPos = globalVertices[startX + x, startY + y];
-			    float localX = worldPos.X - (startX * this.cellSize);
-			    float localY = worldPos.Y;
-			    float localZ = worldPos.Z - (startY * this.cellSize);
+        // NOTE: With -Z forward, chunk node is placed at Z = -(startY * chunkSize * cellSize).
+        // Local Z is computed relative to that node, so localZ = worldZ - nodeZ = worldZ + startY*cellSize.
+        int i = 0;
+        for (int y = 0; y <= chunkSize; y++)
+        {
+            for (int x = 0; x <= chunkSize; x++)
+            {
+                Vector3 worldPos = globalVertices[startX + x, startY + y];
+                float localX = worldPos.X - (startX * this.cellSize);
+                float localY = worldPos.Y;
+                float localZ = worldPos.Z + (startY * this.cellSize);
 
-			    localVertices[i++] = new Vector3(localX, localY, localZ);
-		    }
-	    }
+                localVertices[i++] = new Vector3(localX, localY, localZ);
+            }
+        }
 
-	    GD.Print(
-		    $"Chunk {gridCoords} initialized with {localVertices.Length} vertices."
-	    );
+        GD.Print(
+            $"Chunk {gridCoords} initialized with {localVertices.Length} vertices."
+        );
     }
 
     public void Generate(Color color)
@@ -93,6 +95,8 @@ public partial class Chunk : Node3D
 
         // Build two triangles per cell in local space
         // localVertices is indexed row-major: idx = y*(chunkSize+1) + x
+        // IMPORTANT: Because -Z is forward (a reflection on Z), flip triangle winding
+        // so top faces remain front-facing with back-face culling.
         for (int y = 0; y < chunkSize; y++)
         {
             for (int x = 0; x < chunkSize; x++)
@@ -107,24 +111,26 @@ public partial class Chunk : Node3D
                 Vector3 topLeft = localVertices[topLeftIndex];
                 Vector3 topRight = localVertices[topRightIndex];
 
-                // Clockwise winding for Y-up
+                // Add vertices (same order), but reverse the index order to flip the winding
                 int v0 = meshVerts.Count;
                 meshVerts.Add(bottomLeft);
                 meshVerts.Add(bottomRight);
                 meshVerts.Add(topLeft);
-                triangles.Add(v0);
-                triangles.Add(v0 + 1);
+                // Flipped winding
                 triangles.Add(v0 + 2);
+                triangles.Add(v0 + 1);
+                triangles.Add(v0);
 
                 int v1 = meshVerts.Count;
                 meshVerts.Add(bottomRight);
                 meshVerts.Add(topRight);
                 meshVerts.Add(topLeft);
-                triangles.Add(v1);
-                triangles.Add(v1 + 1);
+                // Flipped winding
                 triangles.Add(v1 + 2);
+                triangles.Add(v1 + 1);
+                triangles.Add(v1);
 
-                // UVs (0..1 per chunk)
+                // UVs (0..1 per chunk) – in the same vertex order as added above
                 uv.Add(new Vector2((float)x / chunkSize, (float)y / chunkSize));
                 uv.Add(
                     new Vector2(
@@ -177,7 +183,8 @@ public partial class Chunk : Node3D
         {
             AlbedoColor = color,
             ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel,
-            CullMode = BaseMaterial3D.CullModeEnum.Back
+            CullMode = BaseMaterial3D.CullModeEnum.Back,
+            // ReceiveDecals = true
         };
         meshInstance.MaterialOverride = newMaterial;
 
@@ -220,7 +227,8 @@ public partial class Chunk : Node3D
             Vector3 edge1 = vertices[i1] - vertices[i0];
             Vector3 edge2 = vertices[i2] - vertices[i0];
 
-            Vector3 faceNormal = edge2.Cross(edge1);
+            // Use standard winding: edge1 x edge2
+            Vector3 faceNormal = edge1.Cross(edge2);
             if (faceNormal.LengthSquared() < Mathf.Epsilon)
                 continue;
 

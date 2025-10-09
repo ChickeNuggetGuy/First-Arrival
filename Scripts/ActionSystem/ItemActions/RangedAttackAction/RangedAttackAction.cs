@@ -23,7 +23,7 @@ public partial class RangedAttackAction : Action, IItemAction
 
 	protected override async Task Execute()
 	{
-		GridObject targetGridObject = targetGridCell.currentGridObject;
+		GridObject targetGridObject = targetGridCell.gridObjects[0];
 
 		if (targetGridObject == null)
 		{
@@ -36,12 +36,24 @@ public partial class RangedAttackAction : Action, IItemAction
 			GD.Print("Target Grid Object does not have Health stat");
 			return;
 		}
-
+		var visual = new CsgSphere3D { Radius = 0.5f };
+		parentGridObject.GetTree().Root.AddChild(visual);
+		visual.GlobalPosition = parentGridObject.GlobalPosition;
+		
+		Tween tween = parentGridObject.CreateTween();
+		tween.SetTrans(Tween.TransitionType.Linear);
+		tween.SetEase(Tween.EaseType.InOut);
+		tween.TweenProperty(visual, "position", targetGridObject.Position, 0.1);
+		await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+		visual.QueueFree();
+		
 		if (Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanRanged))
 		{
 			health.RemoveValue(Item.ItemData.Damage);
 			GD.Print($"Target unit: {targetGridObject} Damaged for {Item.ItemData.Damage} damage, remaining health is {health.CurrentValue}");
 		}
+		
+		
 	}
 
 	protected override async Task ActionComplete()

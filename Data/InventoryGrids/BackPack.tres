@@ -1,12 +1,12 @@
 [gd_resource type="Resource" script_class="InventoryGrid" load_steps=4 format=3 uid="uid://blg56tu5ivywj"]
 
 [ext_resource type="Script" uid="uid://bhryrg4yb7i00" path="res://Scripts/Inventory System/InventoryGrid.cs" id="1_4jmon"]
-[ext_resource type="Script" uid="uid://cqk2q16xxuf4n" path="res://Scripts/GridSystem/GridShape.cs" id="1_f21n0"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="1_f21n0"]
 
 [sub_resource type="Resource" id="Resource_51vov"]
 script = ExtResource("1_f21n0")
-ShapeGrid = Array[bool]([true, true, true, true, true, true, true, true, true])
-metadata/_custom_type_script = "uid://cqk2q16xxuf4n"
+ShapeGrid = Array[bool]([false, false, false, false, false, false, false, false, false])
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]
 script = ExtResource("1_4jmon")
