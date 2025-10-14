@@ -50,6 +50,7 @@ public partial class Turn : Resource
 			}
 			await turnSegment.ExecuteCall();
 		}
+		return;
 	}
 
 	public virtual void onTurnEnd()

@@ -32,7 +32,7 @@ public partial class GridCell
     public InventoryGrid InventoryGrid { get; protected set; }
 
     // Now queries GridSystem for connections
-    public bool IsWalkable => GridSystem.Instance?.HasConnections(gridCoordinates) ?? false;
+    public bool IsWalkable => state.HasFlag(Enums.GridCellState.Ground) && !state.HasFlag(Enums.GridCellState.Obstructed) && (GridSystem.Instance?.HasConnections(gridCoordinates) ?? false);
 
     public GridCell(
         Vector3I gridCoordinates,

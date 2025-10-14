@@ -18,13 +18,11 @@ public partial class ActionManager : Manager<ActionManager>
 	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
 	protected override async Task _Setup()
 	{
-		ActionCompleted += GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).UpdateGridObjects;
 		await Task.CompletedTask;
 	}
 
 	protected override async Task _Execute()
 	{
-
 		await Task.CompletedTask;
 	}
 
@@ -95,9 +93,27 @@ public partial class ActionManager : Manager<ActionManager>
 		Dictionary<string, Variant> extraData = null
 	)
 	{
+		if (action == null)
+		{
+			GD.Print("ActionManager.RunTryTakeActionAsync: action is null");
+			return;
+		}
+
+		if (gridObject == null)
+		{
+			GD.Print("ActionManager.RunTryTakeActionAsync: gridObject is null");
+			return;
+		}
+
+		if (start == null || target == null)
+		{
+			GD.Print("ActionManager.RunTryTakeActionAsync: start or target is null");
+			return;
+		}
+		
 		try
 		{
-			await TryTakeAction(action, gridObject, start, target, extraData);
+			await TryTakeAction(action, gridObject, start, target, null);
 		}
 		catch (Exception e)
 		{
@@ -206,6 +222,15 @@ public partial class ActionManager : Manager<ActionManager>
 	// New API: only clear IsBusy if the completed action is the root (no parent)
 	public void ActionCompleteCall(ActionDefinition actionDef, global::Action actionInst)
 	{
+		if (actionDef?.parentGridObject != null)
+		{
+			var teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(actionDef.parentGridObject.Team);
+			if (teamHolder != null)
+			{
+				teamHolder.UpdateGridObjects(actionDef, SelectedAction);
+			}
+		}
+		
 		EmitSignal(SignalName.ActionCompleted, actionDef, SelectedAction);
 		switch (actionDef)
 		{
@@ -228,19 +253,17 @@ public partial class ActionManager : Manager<ActionManager>
 		{
 			GD.Print($"{actionDef.GetActionName()} complete");
 			
-			// Only manage the busy flag if it's the player's turn.
-			// During the AI turn, the TurnManager is responsible for the busy state.
+			SetIsBusy(false);
+
 			if (TurnManager.Instance.CurrentTurn.team == Enums.UnitTeam.Player)
 			{
-				SetIsBusy(false);
-			}
-
-			if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
-			{
-				SetSelectedAction(GridObjectManager.Instance
-					.CurrentPlayerGridObject
-					.ActionDefinitions
-					.First());
+				if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
+				{
+					SetSelectedAction(GridObjectManager.Instance
+						.CurrentPlayerGridObject
+						.ActionDefinitions
+						.First());
+				}
 			}
 		}
 	}

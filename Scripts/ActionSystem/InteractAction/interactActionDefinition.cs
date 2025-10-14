@@ -156,7 +156,26 @@ public partial class interactActionDefinition : ActionDefinition
 
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
 	{
-		throw new NotImplementedException();
+		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
+		{
+			if(gridObject == null) return false;
+			if(gridObject is IInteractableGridobject) return false;
+			if(!gridObject.IsActive) return false;
+			if(gridObject == parentGridObject) return false;
+		
+			return true;
+		});
+
+		if (targetGridObject == null)
+		{
+			GD.Print("Target grid object is null, failed all conditions");
+			return (targetGridCell, 0);
+		}
+			
+		else
+		{
+			return (targetGridCell, 85);
+		}
 	}
 
 	public override bool GetIsUIAction() => true;

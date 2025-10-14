@@ -31,15 +31,9 @@
 [ext_resource type="Script" uid="uid://bk1nahap6yn15" path="res://Scripts/UI/UIWindows/TurnUI.cs" id="29_q6fnw"]
 [ext_resource type="Script" uid="uid://cl2f3rnpmng0i" path="res://Scripts/Managers/ActionManager.cs" id="30_o4c5p"]
 [ext_resource type="Script" uid="uid://bmbv6cyk3moxw" path="res://Scripts/Managers/TurnManager.cs" id="31_evef4"]
-[ext_resource type="Resource" uid="uid://tbsvcgnevki7" path="res://Data/Turns/PlayerTurn.tres" id="32_5pes1"]
+[ext_resource type="Resource" uid="uid://tbsvcgnevki7" path="res://Scenes/PlayerTurn.tres" id="32_5pes1"]
 [ext_resource type="Resource" uid="uid://dydb2scxl4eyb" path="res://Data/Turns/EnemyTurn.tres" id="33_mha8k"]
 [ext_resource type="Script" uid="uid://bd046eokvcnu2" path="res://addons/phantom_camera/scripts/phantom_camera_host/phantom_camera_host.gd" id="34_43h4d"]
-
-[sub_resource type="Resource" id="Resource_q68mp"]
-script = ExtResource("2_x3tt7")
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_dtg5n"]
-radius = 10.0
 
 [sub_resource type="Resource" id="Resource_c1ier"]
 script = ExtResource("5_tkpxd")
@@ -67,33 +61,37 @@ font_size = 20
 [sub_resource type="LabelSettings" id="LabelSettings_rv6c1"]
 font_size = 12
 
-[node name="BattleScene" type="Node3D"]
+[sub_resource type="Resource" id="Resource_q68mp"]
+script = ExtResource("2_x3tt7")
 
-[node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
-unique_name_in_owner = true
-transform = Transform3D(1, 0, 0, 0, 0.19611597, 0.98058075, 0, -0.98058075, 0.19611597, 0, 5, 1)
-script = ExtResource("1_ar6iy")
-follow_mode = 6
-follow_target = NodePath("../GameManager/CameraController/Transposer")
-look_at_mode = 2
-look_at_target = NodePath("../GameManager/CameraController/Transposer")
-tween_resource = SubResource("Resource_q68mp")
-tween_on_load = false
-follow_offset = Vector3(0, 5, 0)
-follow_damping = true
-follow_damping_value = Vector3(0, 0, 0)
-collision_mask = 0
-shape = SubResource("SphereShape3D_dtg5n")
+[sub_resource type="SphereShape3D" id="SphereShape3D_dtg5n"]
+radius = 10.0
+
+[node name="BattleScene" type="Node3D"]
 
 [node name="GameManager" type="Node" parent="." node_paths=PackedStringArray("managers")]
 script = ExtResource("3_segcg")
 managers = []
 metadata/_custom_type_script = "uid://dr5vsk7v685hc"
 
+[node name="CameraController" type="Node" parent="GameManager" node_paths=PackedStringArray("transposer", "MainCamera")]
+script = ExtResource("11_h22wu")
+transposer = NodePath("Transposer")
+MainCamera = NodePath("../../Camera3D")
+moveSpeed = 5.0
+zoomSpeed = 0.75
+rotationSpeed = 5.0
+minDistanceToTarget = 0.0
+metadata/_custom_type_script = "uid://bmp20rrcufi2e"
+
+[node name="Transposer" type="Node3D" parent="GameManager/CameraController"]
+
 [node name="MeshTerrainGenerator" type="Node" parent="GameManager"]
 script = ExtResource("4_0ia2v")
 chunkSize = 16
 cellSize = Vector2(1, 1)
+minHeightY = 1
+maxHeightY = 10
 chunkOverrides = [SubResource("Resource_c1ier")]
 manmadeRaycastMask = 2
 metadata/_custom_type_script = "uid://dsci870xrigt6"
@@ -111,7 +109,7 @@ _connectionObstacleMask = 16
 _cellSize = Vector2(1, 1)
 _raycastCheck = true
 _raycastDistance = 1.1
-_raycastOffset = Vector3(0, 0.9, 0)
+_raycastOffset = Vector3(0, 0.5, 0)
 _blockDiagonalCornerCutting = false
 metadata/_custom_type_script = "uid://conicv373rw7m"
 
@@ -125,18 +123,6 @@ metadata/_custom_type_script = "uid://t7kecr7hiqah"
 [node name="CSGBox3D" type="CSGBox3D" parent="GameManager/InputManager/MouseMarker"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.6, -0.5)
 material_override = SubResource("StandardMaterial3D_dtg5n")
-
-[node name="CameraController" type="Node" parent="GameManager" node_paths=PackedStringArray("transposer", "MainCamera")]
-script = ExtResource("11_h22wu")
-transposer = NodePath("Transposer")
-MainCamera = NodePath("../../Camera3D")
-moveSpeed = 5.0
-zoomSpeed = 0.75
-rotationSpeed = 5.0
-minDistanceToTarget = 0.0
-metadata/_custom_type_script = "uid://bmp20rrcufi2e"
-
-[node name="Transposer" type="Node3D" parent="GameManager/CameraController"]
 
 [node name="GridObjectManager" type="Node" parent="GameManager" node_paths=PackedStringArray("gridObjectTeams")]
 script = ExtResource("12_ait8s")
@@ -683,3 +669,19 @@ script = ExtResource("34_43h4d")
 transform = Transform3D(0.9291326, -0.36974674, 0, 0.34046704, 0.85555595, 0.39000806, -0.14420421, -0.3623692, 0.9208115, 0, 0, 0)
 
 [node name="SceneHolder" type="Node" parent="."]
+
+[node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 0.19611597, 0.98058075, 0, -0.98058075, 0.19611597, 0, 5, 1)
+script = ExtResource("1_ar6iy")
+follow_mode = 6
+follow_target = NodePath("../GameManager/CameraController/Transposer")
+look_at_mode = 2
+look_at_target = NodePath("../GameManager/CameraController/Transposer")
+tween_resource = SubResource("Resource_q68mp")
+tween_on_load = false
+follow_offset = Vector3(0, 5, 0)
+follow_damping = true
+follow_damping_value = Vector3(0, 0, 0)
+collision_mask = 0
+shape = SubResource("SphereShape3D_dtg5n")

@@ -20,6 +20,8 @@ public partial class GridObjectTeamHolder : Node
 
     [Export] public Godot.Collections.Dictionary<int, ImageTexture> VisibilityTextures =
 	    new Godot.Collections.Dictionary<int, ImageTexture>();
+    private readonly Godot.Collections.Dictionary<int, Image> _visibilityImages =
+	    new Godot.Collections.Dictionary<int, Image>();
     [Export] public Godot.Collections.Array<ImageTexture> VisibilityTexturesForDebug { get; private set; } = new Godot.Collections.Array<ImageTexture>();
 
 
@@ -58,8 +60,10 @@ public partial class GridObjectTeamHolder : Node
         Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
         for (int y = 0; y < mapSize.Y; y++)
         {
-	        VisibilityTextures[y] =  ImageTexture.CreateFromImage(Image.CreateEmpty(mapSize.X,mapSize.Z, false, Image.Format.Rgba8));
-	        VisibilityTextures[y].GetImage().Fill(Colors.Black);
+	        var image = Image.CreateEmpty(mapSize.X, mapSize.Z, false, Image.Format.Rgba8);
+	        image.Fill(Colors.Black);
+	        _visibilityImages[y] = image;
+	        VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
         }
     }
 
@@ -78,10 +82,8 @@ public partial class GridObjectTeamHolder : Node
             if (sight != null)
             {
 	            sight.CalculateSightArea();
-	            IReadOnlyList<GridCell> visibleCells = sight.VisibleCells;
-	            for (var i = 0; i < visibleCells.Count; i++)
+	            foreach (var cell in sight.VisibleCells)
 	            {
-		            var cell = sight.VisibleCells[i];
 		            currentlyVisibleCells.Add(cell);
 	            }
             }
@@ -91,24 +93,9 @@ public partial class GridObjectTeamHolder : Node
             ExploredCells.Add(cell);
         }
 
-        // 3. Determine the state of each (x, z) column based on the new visibility rules.
-        var visibleColumns = new HashSet<Vector2I>();
-        foreach (var cell in currentlyVisibleCells)
-        {
-            visibleColumns.Add(new Vector2I(cell.gridCoordinates.X, cell.gridCoordinates.Z));
-        }
-
-        var exploredColumns = new HashSet<Vector2I>();
-        foreach (var cell in ExploredCells)
-        {
-            exploredColumns.Add(new Vector2I(cell.gridCoordinates.X, cell.gridCoordinates.Z));
-        }
-
-        // 4. Update the state of all cells and visibility textures.
         var allCells = GridSystem.Instance.AllGridCells;
         if (allCells == null || !allCells.Any()) return;
 
-        // Update Textures
         int minX = allCells.Min(c => c.gridCoordinates.X);
         int maxX = allCells.Max(c => c.gridCoordinates.X);
         int minZ = allCells.Min(c => c.gridCoordinates.Z);
@@ -129,60 +116,60 @@ public partial class GridObjectTeamHolder : Node
         foreach (var y in yLevels)
         {
             Image image;
-            if (VisibilityTextures.TryGetValue(y, out var texture))
-            {
-                image = texture.GetImage();
-                if (image.GetWidth() != gridWidth || image.GetHeight() != gridHeight)
-                {
-                    image.Resize(gridWidth, gridHeight);
-                }
-            }
-            else
+            if (!_visibilityImages.TryGetValue(y, out image))
             {
                 image = Image.Create(gridWidth, gridHeight, false, Image.Format.Rgba8);
-                texture = ImageTexture.CreateFromImage(image);
-                VisibilityTextures[y] = texture;
+                _visibilityImages[y] = image;
+                VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
             }
+
+            if (image.GetWidth() != gridWidth || image.GetHeight() != gridHeight)
+            {
+                image.Resize(gridWidth, gridHeight);
+            }
+    
+            var texture = VisibilityTextures[y];
 
             image.Fill(Colors.Black);
             for (int x = 0; x < gridWidth; x++)
             {
                 for (int z = 0; z < gridHeight; z++)
                 {
-                    var columnPos = new Vector2I(x + minX, z + minZ);
-                    Color pixelColor;
+                    var gridCoords = new Vector3I(x + minX, y, z + minZ);
+                    GridCell cell = GridSystem.Instance.GetGridCell(gridCoords);
+                    
+                    Color pixelColor = Colors.Black;
 
-                    if (visibleColumns.Contains(columnPos))
+                    if (cell != GridCell.Null)
                     {
-                        pixelColor = Colors.White;
-                    }
-                    else if (exploredColumns.Contains(columnPos))
-                    {
-                        pixelColor = new Color(1, 1, 1, 0.5f);
-                    }
-                    else
-                    {
-                        pixelColor = Colors.Black;
+                        if (currentlyVisibleCells.Contains(cell))
+                        {
+                            pixelColor = Colors.White;
+                        }
+                        else if (ExploredCells.Contains(cell))
+                        {
+                            pixelColor = Colors.DarkGray;
+                        }
                     }
 
                     if(pixelColor != Colors.Black)
                         image.SetPixel(x, z, pixelColor);
                 }
             }
+            
             texture.Update(image);
+            
             VisibilityTexturesForDebug.Add(texture);
         }
 
         foreach (var cell in allCells)
         {
-            var columnPos = new Vector2I(cell.gridCoordinates.X, cell.gridCoordinates.Z);
             Enums.FogState newState;
-
-            if (visibleColumns.Contains(columnPos))
+            if (currentlyVisibleCells.Contains(cell))
             {
                 newState = Enums.FogState.Visible;
             }
-            else if (exploredColumns.Contains(columnPos))
+            else if (ExploredCells.Contains(cell))
             {
                 newState = Enums.FogState.PreviouslySeen;
             }
@@ -194,31 +181,60 @@ public partial class GridObjectTeamHolder : Node
         }
     }
 
+    private static int _updateCounter = 0;
+
+    public List<GridCell> GetVisibleGridCells()
+    {
+        var visibleCells = new List<GridCell>();
+        var allCells = GridSystem.Instance.AllGridCells;
+
+        if (allCells == null || !allCells.Any())
+        {
+            return visibleCells;
+        }
+
+        int minX = allCells.Min(c => c.gridCoordinates.X);
+        int minZ = allCells.Min(c => c.gridCoordinates.Z);
+
+        foreach (var entry in _visibilityImages)
+        {
+            int y = entry.Key;
+            Image image = entry.Value;
+
+            for (int x = 0; x < image.GetWidth(); x++)
+            {
+                for (int z = 0; z < image.GetHeight(); z++)
+                {
+                    if (image.GetPixel(x, z).IsEqualApprox(Colors.White))
+                    {
+                        var gridCoords = new Vector3I(x + minX, y, z + minZ);
+                        GridCell cell = GridSystem.Instance.GetGridCell(gridCoords);
+                        if (cell != GridCell.Null)
+                        {
+                            visibleCells.Add(cell);
+                        }
+                    }
+                }
+            }
+        }
+	GD.Print("GetVisibleGridCells: " + visibleCells.Count);
+        return visibleCells;
+    }
+
     public void UpdateGridObjects(
         ActionDefinition actionCompleted,
         ActionDefinition currentAction
     )
     {
         GD.Print("Updating grid objects");
-
-        foreach (GridObject gridObject in GridObjects[Enums.GridObjectState.Active])
-        {
-            GridObjectSight sightArea =
-                gridObject.gridObjectNodesDictionary["all"]
-                    .FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
-
-            if (sightArea != null)
-            {
-                sightArea.CalculateSightArea();
-            }
-        }
-
         UpdateVisibility();
-        
     }
 
     public GridObject GetNextGridObject()
     {
+	    if(CurrentGridObject == null) CurrentGridObject = GridObjects[Enums.GridObjectState.Active][0];
+	    
+	    if (CurrentGridObject == null) return null;
         int index =
             GridObjects[Enums.GridObjectState.Active].IndexOf(CurrentGridObject);
 

@@ -256,7 +256,7 @@ public partial class GridSystem : Manager<GridSystem>
                                 if (offset == Vector3.Zero)
                                 {
                                     var hitY = hit["position"].As<Vector3>().Y;
-                                    worldCenter.Y = hitY + halfY; // keep center at mid-height
+                                    worldCenter.Y = hitY; // keep center at mid-height
                                 }
 
                                 hasGround = true;
@@ -481,8 +481,9 @@ public partial class GridSystem : Manager<GridSystem>
 {
     outNeighbors.Clear();
 
-    if (!cell.state.HasFlag(Enums.GridCellState.Ground))
-        return (0, 0);
+       // Treat obstructed cells as non-walkable for graph purposes
+	      if (!cell.state.HasFlag(Enums.GridCellState.Ground) || cell.state.HasFlag(Enums.GridCellState.Obstructed))
+		      return (0, 0);
 
     int tests = 0;
     int blockedHits = 0;
@@ -508,8 +509,8 @@ public partial class GridSystem : Manager<GridSystem>
                 if (neighbor == null)
                     continue;
 
-                if (!neighbor.state.HasFlag(Enums.GridCellState.Ground))
-                    continue;
+                if (!neighbor.state.HasFlag(Enums.GridCellState.Ground) || neighbor.state.HasFlag(Enums.GridCellState.Obstructed))
+	                continue;
 
                 if (isDiagonal && _blockDiagonalCornerCutting)
                 {

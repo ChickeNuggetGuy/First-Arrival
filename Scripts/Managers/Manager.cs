@@ -6,7 +6,7 @@ public abstract partial class Manager<T> : ManagerBase where T : ManagerBase, ne
 {
 	public static T Instance { get; private set; }
 
-	public bool IsBusy { get; private set; }
+	[Export] public bool IsBusy;
 
 	/// <summary>
 	/// If another instance of this node exists in a newly loaded scne transfer data from old instance to new instance

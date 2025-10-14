@@ -135,16 +135,27 @@ public partial class MoveActionDefinition : ActionDefinition
 		  GD.Print("Starting grid cell is null");
 		  return (null, 0);
 	  }
+
+	  // if (targetGridCell.HasGridObject())
+		  return (targetGridCell, 0);
 	  
+	  GridObjectSight sightArea = parentGridObject.gridObjectNodesDictionary["all"].FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
+	  if (sightArea == null) return (targetGridCell, 0);
+	  
+	  if(sightArea.SeenGridObjects.Count > 0)
+	  {
+		  GD.Print("Can seen grid objects");
+		  return (targetGridCell, 0);
+	  }
+
 	  
 	  float distance = startingCell.worldCenter.DistanceTo(targetGridCell.worldCenter);
-    
-	  // Normalize distance to a score. Let's say max distance we care about is 20 tiles.
-	  float maxDistance = 20.0f;
+	  
+	  float maxDistance = 40.0f;
 	  float normalizedScore = (distance / maxDistance) * 70.0f;
     
 	  int score = (int)Mathf.Clamp(normalizedScore, 0, 70);
-	  score += GD.RandRange(0, 15);
+	  score += GD.RandRange(0, 5);
 	  return (targetGridCell, score);
   }
 

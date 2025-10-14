@@ -12,13 +12,15 @@ namespace FirstArrival.Scripts.Managers;
 public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 {
   #region Variables
-  
+
   [Export]
   public int chunkSize { get; set; }
 
   [Export]
   public Vector2 cellSize { get; set; }
 
+  [Export] private int minHeightY =0;
+  [Export] private int maxHeightY = 20;
   [Export]
   private Color color { get; set; }
 
@@ -39,6 +41,15 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   [Export]
   private uint manmadeRaycastMask { get; set; } = 0;
 
+  [ExportGroup("Man-made Blending")]
+  [Export]
+  private int blendRadiusCells { get; set; } = 6;
+
+  // Shape of the blend curve (1.0 = smoothstep). >1 tightens near border,
+  // <1 loosens near border.
+  [Export]
+  private float blendExponent { get; set; } = 1.0f;
+
   private ChunkData[] chunkTypes;
   private bool[,] lockedVertices;
 
@@ -57,57 +68,62 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   protected override async Task _Execute()
   {
 	  GameManager gameManager = GameManager.Instance;
-    // 1) Build/instantiate ALL chunk nodes
-    for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
-    {
-      for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++) // mapSize.Y represents Z dimension
-      {
-        EnsureChunkNodeExists(chunkX, chunkZ);
 
-        var cData = GetChunkData(chunkX, chunkZ);
-        var node = cData.GetChunkNode();
+	  // 1) Build/instantiate ALL chunk nodes
+	  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
+	  {
+		  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
+		  {
+			  EnsureChunkNodeExists(chunkX, chunkZ);
 
-        float chunkWorldSize = chunkSize * cellSize.X;
-        node.Position = new Vector3(
-          chunkX * chunkWorldSize,
-          0f,
-          -(chunkZ * chunkWorldSize) // negative Z is forward (North)
-        );
-      }
-    }
+			  var cData = GetChunkData(chunkX, chunkZ);
+			  var node = cData.GetChunkNode();
 
-    // 2) Wait one physics frame
-    await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			  float chunkWorldSize = chunkSize * cellSize.X;
+			  node.Position = new Vector3(
+				  chunkX * chunkWorldSize,
+				  0f,
+				  -(chunkZ * chunkWorldSize) // negative Z is forward (North)
+			  );
+		  }
+	  }
 
-    // 3) Bake man-made border heights
-    LockManmadeEdges();
+	  // 2) Wait one physics frame
+	  await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
-    // 4) Smooth (ignore locked vertices)
-    ValidateHeightsIgnoringLocked(terrainHeights, 2, 2);
+	  // 3) Blend man-made borders smoothly to 0
+	  BlendHeightsToZeroAroundManmade();
 
-    // 5) Generate meshes for procedural chunks
-    for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
-    {
-      for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
-      {
-        var cData = GetChunkData(chunkX, chunkZ);
-        if (cData.chunkType == ChunkData.ChunkType.ManMade)
-          continue;
+	  // 4) Smooth (ignore locked vertices)
+	  ValidateHeightsIgnoringLocked(terrainHeights, 2, 2);
 
-        cData.chunk.Initialize(
-          chunkX,
-          chunkZ,
-          chunkSize,
-          terrainHeights,
-          cellSize.X,
-          cData
-        );
-        cData.chunk.Generate(color);
-      }
-    }
+	  // 5) Clamp to a minimum Y level (procedural only by default).
+	  // Define 'minHeightY' in your class (e.g., [Export] private float minHeightY)
+	  ClampHeightsToMin(minHeightY, includeManMade: false);
 
-    GD.Print("MeshTerrainGenerator: chunks built.");
-    await Task.CompletedTask;
+	  // 6) Generate meshes for procedural chunks
+	  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
+	  {
+		  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
+		  {
+			  var cData = GetChunkData(chunkX, chunkZ);
+			  if (cData.chunkType == ChunkData.ChunkType.ManMade)
+				  continue;
+
+			  cData.chunk.Initialize(
+				  chunkX,
+				  chunkZ,
+				  chunkSize,
+				  terrainHeights,
+				  cellSize.X,
+				  cData
+			  );
+			  cData.chunk.Generate(color);
+		  }
+	  }
+
+	  GD.Print("MeshTerrainGenerator: chunks built.");
+	  await Task.CompletedTask;
   }
 
   #endregion
@@ -116,10 +132,11 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
   public void GenerateHeightMap()
   {
-	  GameManager gameManager = GameManager.Instance;
+    GameManager gameManager = GameManager.Instance;
+
     // CONSISTENT: [X, Z] where X=East-West vertices, Z=North-South vertices
     int vertsX = (gameManager.mapSize.X * chunkSize) + 1;
-    int vertsZ = (gameManager.mapSize.Y * chunkSize) + 1; // mapSize.Y = chunks in Z direction
+    int vertsZ = (gameManager.mapSize.Y * chunkSize) + 1;
 
     terrainHeights = new Vector3[vertsX, vertsZ];
     lockedVertices = new bool[vertsX, vertsZ];
@@ -128,10 +145,10 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
     {
       NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
       Seed = (int)GD.Randi(),
-      Frequency = 1.0f / 10
+      Frequency = 0.1f, // Higher than default for more common features
     };
     noise.FractalType = FastNoiseLite.FractalTypeEnum.Fbm;
-    noise.FractalOctaves = 4;
+    noise.FractalOctaves = 3;
     noise.FractalLacunarity = 2.0f;
     noise.FractalGain = 0.5f;
 
@@ -155,7 +172,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
         int chunkZ = Mathf.Clamp(
           Mathf.FloorToInt((-worldZ) / chunkWorldSize), // convert world Z back to grid Z
           0,
-          gameManager.mapSize.Y - 1 // mapSize.Y = number of chunks in Z direction
+          gameManager.mapSize.Y - 1
         );
 
         bool isManmade =
@@ -170,9 +187,13 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
         }
         else
         {
-          y = Mathf.Round(
-            (noise.GetNoise2D(x, z) + 1.0f) / cellSize.Y
-          ) * cellSize.Y;
+          float rawNoise = noise.GetNoise2D(x, z); // Range [-1, 1]
+
+          // Scale to desired max height (e.g., 30 units)
+          float scaledNoise = rawNoise * maxHeightY;
+
+          // Snap to grid defined by cellSize.Y
+          y = Mathf.Round(scaledNoise / cellSize.Y) * cellSize.Y;
         }
 
         terrainHeights[x, z] = new Vector3(worldX, y, worldZ);
@@ -180,9 +201,43 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
     }
   }
 
+  private void ClampHeightsToMin(float minY, bool includeManMade = false)
+  {
+	  if (terrainHeights == null)
+		  return;
+
+	  int vertsX = terrainHeights.GetLength(0);
+	  int vertsZ = terrainHeights.GetLength(1);
+
+	  // Keep grid quantization consistent; clamp to the next grid step at or above
+	  // the requested minY.
+	  float step = cellSize.Y;
+	  float minYQuantized = step > 0f ? Mathf.Ceil(minY / step) * step : minY;
+
+	  for (int z = 0; z < vertsZ; z++)
+	  {
+		  for (int x = 0; x < vertsX; x++)
+		  {
+			  if (
+				  !includeManMade &&
+				  lockedVertices != null &&
+				  lockedVertices[x, z]
+			  )
+				  continue;
+
+			  Vector3 v = terrainHeights[x, z];
+			  if (v.Y < minYQuantized)
+			  {
+				  v.Y = minYQuantized;
+				  terrainHeights[x, z] = v;
+			  }
+		  }
+	  }
+  }
+  
   private void BuildChunkTypesFromOverrides()
   {
-	  GameManager gameManager = GameManager.Instance;
+    GameManager gameManager = GameManager.Instance;
     int chunksX = gameManager.mapSize.X; // East-West
     int chunksZ = gameManager.mapSize.Y; // North-South (depth)
 
@@ -264,11 +319,15 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
     }
   }
 
-  public void ValidateHeightsIgnoringLocked(Vector3[,] verts, int validationPasses, float maxDifference)
+  public void ValidateHeightsIgnoringLocked(
+    Vector3[,] verts,
+    int validationPasses,
+    float maxDifference
+  )
   {
     int vertsX = verts.GetLength(0);
     int vertsZ = verts.GetLength(1);
-    
+
     for (int pass = 0; pass < validationPasses; pass++)
     {
       // CONSISTENT: x and z naming for vertices
@@ -428,15 +487,154 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
   #endregion
 
-  #region Man-made Border Baking
+  #region Man-made Blending
 
+  private static float Smooth01(float t)
+  {
+    t = Mathf.Clamp(t, 0f, 1f);
+    return t * t * (3f - 2f * t);
+  }
+
+  // Smoothly blends procedural terrain to 0 around any man-made chunk within
+  // 'blendRadiusCells' (in vertex/cell units). This ensures crossable seams
+  // and removes harsh borders.
+  private void BlendHeightsToZeroAroundManmade()
+  {
+    if (terrainHeights == null || chunkTypes == null || chunkTypes.Length == 0)
+      return;
+
+    GameManager gameManager = GameManager.Instance;
+
+    int vertsX = terrainHeights.GetLength(0);
+    int vertsZ = terrainHeights.GetLength(1);
+
+    // Pre-initialize weights to 1.0 (no change)
+    float[,] weights = new float[vertsX, vertsZ];
+    for (int z = 0; z < vertsZ; z++)
+    {
+      for (int x = 0; x < vertsX; x++)
+        weights[x, z] = 1f;
+    }
+
+    int radius = Mathf.Max(1, blendRadiusCells);
+
+    // Collect all man-made chunk rectangles in vertex index space
+    var manmadeChunks = new List<(int vx0, int vz0, int vx1, int vz1)>();
+    foreach (var c in chunkTypes)
+    {
+      if (c == null || c.chunkType != ChunkData.ChunkType.ManMade)
+        continue;
+
+      int cx = c.chunkCoordinates.X;
+      int cz = c.chunkCoordinates.Y;
+
+      int vx0 = cx * chunkSize;
+      int vz0 = cz * chunkSize;
+      int vx1 = vx0 + chunkSize;
+      int vz1 = vz0 + chunkSize;
+
+      manmadeChunks.Add((vx0, vz0, vx1, vz1));
+    }
+
+    if (manmadeChunks.Count == 0)
+      return;
+
+    // For each man-made chunk, compute a smooth falloff to 0 for nearby vertices
+    foreach (var rect in manmadeChunks)
+    {
+      int vx0 = rect.vx0;
+      int vz0 = rect.vz0;
+      int vx1 = rect.vx1;
+      int vz1 = rect.vz1;
+
+      // Extended bounds to limit iteration
+      int ex0 = Mathf.Clamp(vx0 - radius, 0, vertsX - 1);
+      int ez0 = Mathf.Clamp(vz0 - radius, 0, vertsZ - 1);
+      int ex1 = Mathf.Clamp(vx1 + radius, 0, vertsX - 1);
+      int ez1 = Mathf.Clamp(vz1 + radius, 0, vertsZ - 1);
+
+      for (int z = ez0; z <= ez1; z++)
+      {
+        for (int x = ex0; x <= ex1; x++)
+        {
+          // Distance in vertex-space to the rectangle (0 = on or inside)
+          int dx =
+            (x < vx0) ? (vx0 - x) : (x > vx1) ? (x - vx1) : 0;
+          int dz =
+            (z < vz0) ? (vz0 - z) : (z > vz1) ? (z - vz1) : 0;
+
+          float dist = Mathf.Sqrt(dx * dx + dz * dz);
+
+          if (dist > radius)
+            continue;
+
+          // Map distance to [0..1], apply optional exponent, then smoothstep
+          float t = dist / radius;
+          if (!Mathf.IsEqualApprox(blendExponent, 1.0f))
+            t = Mathf.Pow(t, Mathf.Max(0.0001f, blendExponent));
+          float factor = Smooth01(t);
+
+          // Combine influences from multiple man-made chunks by taking the min
+          if (factor < weights[x, z])
+            weights[x, z] = factor;
+        }
+      }
+    }
+
+    // Apply weights to heights and lock exact border vertices (weight ~ 0)
+    for (int z = 0; z < vertsZ; z++)
+    {
+      for (int x = 0; x < vertsX; x++)
+      {
+        float w = weights[x, z];
+
+        // If already locked (inside man-made), keep it at 0
+        if (lockedVertices[x, z])
+        {
+          // Ensure interior is exactly zero
+          var v0 = terrainHeights[x, z];
+          if (!Mathf.IsZeroApprox(v0.Y))
+          {
+            v0.Y = 0f;
+            terrainHeights[x, z] = v0;
+          }
+          continue;
+        }
+
+        if (w < 1f)
+        {
+          var v = terrainHeights[x, z];
+          float newY = v.Y * w;
+
+          // Keep height quantized to the grid of cellSize.Y
+          newY = Mathf.Round(newY / cellSize.Y) * cellSize.Y;
+          v.Y = newY;
+          terrainHeights[x, z] = v;
+
+          // If weight is effectively 0, lock this vertex to keep the seam firm
+          if (w <= 0.0001f)
+            lockedVertices[x, z] = true;
+        }
+      }
+    }
+
+    GD.Print(
+      $"MeshTerrainGenerator: Applied zero-blend radius {radius} cells " +
+      $"around {manmadeChunks.Count} man-made chunk(s)."
+    );
+  }
+
+  #endregion
+
+  #region Man-made Border Baking (Legacy - not used)
+
+  // Kept for reference; blending replaces the need for edge raycast baking.
   private void LockManmadeEdges()
   {
-	  GameManager gameManager = GameManager.Instance;
+    GameManager gameManager = GameManager.Instance;
     int totalVertsX = gameManager.mapSize.X * chunkSize + 1;
     int totalVertsZ = gameManager.mapSize.Y * chunkSize + 1;
 
-    // CONSISTENT: Use x and z for vertex indices
     for (int z = 0; z < totalVertsZ; z++)
     {
       for (int x = 0; x < totalVertsX; x++)
@@ -455,7 +653,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
         if (isVerticalBoundary)
         {
           int leftX = x - 1;
-          ChunkData leftChunk = GetChunkFromVertexIndex(leftX, z,gameManager);
+          ChunkData leftChunk = GetChunkFromVertexIndex(leftX, z, gameManager);
 
           if (leftChunk != null)
           {
@@ -482,7 +680,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
         if (isHorizontalBoundary)
         {
           int belowZ = z - 1;
-          ChunkData belowChunk = GetChunkFromVertexIndex(x, belowZ, gameManager);
+          ChunkData belowChunk =
+            GetChunkFromVertexIndex(x, belowZ, gameManager);
 
           if (belowChunk != null)
           {
@@ -508,14 +707,22 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
     }
   }
 
-  private bool TryRaycastManmadeHeightAtVertex(int vertexX, int vertexZ, out float height)
+  private bool TryRaycastManmadeHeightAtVertex(
+    int vertexX,
+    int vertexZ,
+    out float height
+  )
   {
     float worldX = vertexX * cellSize.X;
     float worldZ = -(vertexZ * cellSize.X); // negative Z is forward
     return TryRaycastManmadeHeightAtWorld(worldX, worldZ, out height);
   }
 
-  private bool TryRaycastManmadeHeightAtWorld(float worldX, float worldZ, out float height)
+  private bool TryRaycastManmadeHeightAtWorld(
+    float worldX,
+    float worldZ,
+    out float height
+  )
   {
     height = 0f;
 
@@ -542,7 +749,11 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
   #region Sampling helpers
 
-  public ChunkData GetChunkFromVertexIndex(int vertexX, int vertexZ, GameManager gameManager)
+  public ChunkData GetChunkFromVertexIndex(
+    int vertexX,
+    int vertexZ,
+    GameManager gameManager
+  )
   {
     // Map vertex indices to chunk coordinates
     if (vertexX < 0)
@@ -560,46 +771,72 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
     if (chunkX < 0 || chunkX >= gameManager.mapSize.X)
       return null;
-    if (chunkZ < 0 || chunkZ >= gameManager.mapSize.Y) // mapSize.Y = chunks in Z direction
+    if (chunkZ < 0 || chunkZ >= gameManager.mapSize.Y)
       return null;
     return GetChunkData(chunkX, chunkZ);
   }
 
-  public bool IsManMadeChunkAtWorld(float worldX, float worldZ, GameManager gameManager)
+  public bool IsManMadeChunkAtWorld(
+    float worldX,
+    float worldZ,
+    GameManager gameManager
+  )
   {
     if (chunkTypes == null)
       return false;
 
     float chunkWorldSize = chunkSize * cellSize.X;
     int chunkX = Mathf.FloorToInt(worldX / chunkWorldSize);
-    int chunkZ = Mathf.FloorToInt((-worldZ) / chunkWorldSize); // convert world Z to grid Z
+    int chunkZ = Mathf.FloorToInt((-worldZ) / chunkWorldSize);
 
-    if (chunkX < 0 || chunkZ < 0 || chunkX >= gameManager.mapSize.X || chunkZ >= gameManager.mapSize.Y)
+    if (
+      chunkX < 0
+      || chunkZ < 0
+      || chunkX >= gameManager.mapSize.X
+      || chunkZ >= gameManager.mapSize.Y
+    )
       return false;
 
-    return GetChunkData(chunkX, chunkZ).chunkType == ChunkData.ChunkType.ManMade;
+    return GetChunkData(chunkX, chunkZ).chunkType
+      == ChunkData.ChunkType.ManMade;
   }
 
-  public float SampleHeightAtCellCenter(int cellX, int cellZ,GameManager gameManager)
+  public float SampleHeightAtCellCenter(
+    int cellX,
+    int cellZ,
+    GameManager gameManager
+  )
   {
-    return SampleHeightAtCellCenterWithManmade(cellX, cellZ,gameManager);
+    return SampleHeightAtCellCenterWithManmade(cellX, cellZ, gameManager);
   }
 
-  public float SampleHeightAtCellCenterWithManmade(int cellX, int cellZ,GameManager gameManager)
+  public float SampleHeightAtCellCenterWithManmade(
+    int cellX,
+    int cellZ,
+    GameManager gameManager
+  )
   {
     float worldX = cellX * cellSize.X;
     float worldZ = -(cellZ * cellSize.X); // negative Z is forward
-    return SampleHeightAtWorld(worldX, worldZ,gameManager);
+    return SampleHeightAtWorld(worldX, worldZ, gameManager);
   }
 
-  public float SampleHeightAtWorld(float worldX, float worldZ, GameManager gameManager)
+  public float SampleHeightAtWorld(
+    float worldX,
+    float worldZ,
+    GameManager gameManager
+  )
   {
-    return SampleHeightAtWorldWithManmade(worldX, worldZ,gameManager);
+    return SampleHeightAtWorldWithManmade(worldX, worldZ, gameManager);
   }
 
-  public float SampleHeightAtWorldWithManmade(float worldX, float worldZ, GameManager gameManager)
+  public float SampleHeightAtWorldWithManmade(
+    float worldX,
+    float worldZ,
+    GameManager gameManager
+  )
   {
-    if (IsManMadeChunkAtWorld(worldX, worldZ,gameManager))
+    if (IsManMadeChunkAtWorld(worldX, worldZ, gameManager))
     {
       if (TryRaycastManmadeHeightAtWorld(worldX, worldZ, out float h))
         return h;
@@ -623,7 +860,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
       terrainHeights.GetLength(0) - 1
     );
     int iz = Mathf.Clamp(
-      Mathf.RoundToInt((-worldZ) / cellSize.X), // convert world Z to grid Z
+      Mathf.RoundToInt((-worldZ) / cellSize.X),
       0,
       terrainHeights.GetLength(1) - 1
     );
@@ -648,26 +885,27 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
   public Vector3I GetMapCellSize() =>
     new Vector3I(
-	    GameManager.Instance.mapSize.X * chunkSize,      // X dimension (East-West)
-      chunkSize,                   // Y dimension (height)
-      GameManager.Instance.mapSize.Y * chunkSize        // Z dimension (North-South)
+      GameManager.Instance.mapSize.X * chunkSize, // X dimension (East-West)
+      chunkSize, // Y dimension (height)
+      GameManager.Instance.mapSize.Y * chunkSize // Z dimension (North-South)
     );
 
   public bool HasHeightData => terrainHeights != null;
 
   public ChunkData[] GetChunks() => chunkTypes;
-  
-  
+
   #region manager Data
+
   protected override void GetInstanceData(ManagerData data)
   {
-	  GD.Print("No data to transfer");
+    GD.Print("No data to transfer");
   }
 
   public override ManagerData SetInstanceData()
   {
-	  return null;
+    return null;
   }
-	#endregion
+
+  #endregion
   #endregion
 }

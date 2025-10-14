@@ -7,15 +7,15 @@
 [ext_resource type="Script" uid="uid://cbcjgsq6dn6r2" path="res://Scripts/GridObject/GridObjectNodes/GridObjectStat.cs" id="6_b2tu3"]
 [ext_resource type="PackedScene" uid="uid://bg5f5hiyhuujn" path="res://Third-Party Assets/Polygon Prototype/FBX/SM_Buildings_Door_01P.fbx" id="6_eljuu"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_eljuu"]
+size = Vector3(3, 2.9, 0.2)
+
 [sub_resource type="Resource" id="Resource_eljuu"]
 script = ExtResource("3_eljuu")
 GridSizeX = 2
 GridSizeZ = 1
 ShapeGrid = Array[bool]([true, true])
 metadata/_custom_type_script = "uid://cdhdv6w5jignj"
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_eljuu"]
-size = Vector3(3, 2.9, 0.2)
 
 [node name="DoorGridObject" type="Node3D" node_paths=PackedStringArray("pivot", "GridPositionData", "GridObjectNodeHolder") groups=["GridObjects"]]
 process_mode = 3
@@ -25,7 +25,7 @@ costs = Dictionary[int, int]({
 4: 2
 })
 doorSize = Vector3i(2, 3, 1)
-GridPositionData = NodePath("GridPositionData")
+GridPositionData = NodePath("SM_Buildings_WallDoorDouble_3x3_01/GridPositionData")
 Team = 7
 GridObjectNodeHolder = NodePath("GridObjectNodes")
 metadata/_custom_type_script = "uid://cpde2mhmhaopl"
@@ -53,15 +53,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.537727, 0, 0)
 [node name="SM_Buildings_Door_01P2" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P" instance=ExtResource("6_eljuu")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
 
-[node name="GridPositionData" type="Node3D" parent="." node_paths=PackedStringArray("parentGridObject")]
+[node name="Area3D" type="Area3D" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.962273, 0, 0)
+collision_layer = 16
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P/Area3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5500001, 0.099999994)
+shape = SubResource("BoxShape3D_eljuu")
+
+[node name="GridPositionData" type="Node3D" parent="SM_Buildings_WallDoorDouble_3x3_01" node_paths=PackedStringArray("parentGridObject")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0)
 script = ExtResource("4_tu473")
-parentGridObject = NodePath("..")
+parentGridObject = NodePath("../..")
 gridHeight = 4
 gridShape = SubResource("Resource_eljuu")
 metadata/_custom_type_script = "uid://dobkq5jemsyhg"
-
-[node name="Area3D" type="Area3D" parent="."]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5500001, 0.099999994)
-shape = SubResource("BoxShape3D_eljuu")

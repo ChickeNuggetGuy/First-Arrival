@@ -164,51 +164,54 @@ public partial class MeleeAttackActionDefinition
 		GridCell startingGridCell
 	)
 	{
-		
-		GridObjectSight sightArea = parentGridObject.gridObjectNodesDictionary["all"].FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
-		if (sightArea == null) return new List<GridCell>();
-
-		if (
-			!GridSystem.Instance.TryGetGridCellsInRange(
-				startingGridCell,
-				new Vector2I(20, 5),
-				false,
-				out List<GridCell> neighbors
-			)
-		)
+		return parentGridObject.TeamHolder.GetVisibleGridCells().Where(cell =>
 		{
-			return new List<GridCell>();
-		}
-
-		return neighbors.Where(n =>
-		{
-			if(!n.HasGridObject())return false;
-			if(!sightArea.SeenGridObjects.Any(gridObject => n.gridObjects.Contains(gridObject))) return false;
-			return n.gridObjects.Any(gridObject => gridObject.IsActive);
+			if(!cell.HasGridObject())return false;
+			return true;
 		}).ToList();
 	}
 
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
 	{
-		
+		GD.Print("Valid:" + ValidGridCells.Count.ToString());
+		if(!targetGridCell.HasGridObject())
+		{
+			
+			return (targetGridCell, 0);
+		}
 		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
-			if(gridObject == null) return false;
-			if(!gridObject.IsActive) return false;
-			if(gridObject == parentGridObject) return false;
-			if(gridObject.Team == parentGridObject.Team) return false;
+			if(gridObject == null)
+			{
+				GD.Print("GetValidGridCells: Target grid object is null");
+				return false;
+			}
+			if(!gridObject.IsActive)
+			{
+				GD.Print("GetValidGridCells: Target grid object is not active ");
+				return false;
+			}
+			if(gridObject == parentGridObject)
+			{
+				GD.Print("GetValidGridCells: Target grid object is the same as parent");
+				return false;
+			}
+			if(gridObject.Team.HasFlag(parentGridObject.Team))
+			{
+				GD.Print("GetValidGridCells: Target grid object is on same team");
+				return false;
+			}
 			return true;
 		});
 
 		if (targetGridObject == null)
 		{
-			GD.Print("Target grid object is null, failed all conditions");
+			GD.Print("GetValidGridCells: Target grid object is null, failed all conditions");
 			return (targetGridCell, 0);
 		}
-			
 		else
 		{
-			return (targetGridCell, 85);
+			return (targetGridCell, 100);
 		}
 	}
 	

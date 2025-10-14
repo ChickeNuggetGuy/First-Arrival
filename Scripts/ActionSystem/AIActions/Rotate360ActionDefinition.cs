@@ -8,6 +8,7 @@ namespace FirstArrival.Scripts.ActionSystem.AIActions;
 [GlobalClass]
 public partial class Rotate360ActionDefinition : ActionDefinition
 {
+	private int exectutionCount;
 	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell, Dictionary<Enums.Stat, int> costs)
 	{
 		return new Rotate360Action(parent, startGridCell, targetGridCell, this, costs);
@@ -51,7 +52,7 @@ public partial class Rotate360ActionDefinition : ActionDefinition
 			return (targetGridCell, 0);
 		}
 
-		return (targetGridCell, GD.RandRange(50,90));
+		return (targetGridCell, GD.RandRange(50,100));
 	}
 
 	public override bool GetIsUIAction() => false;

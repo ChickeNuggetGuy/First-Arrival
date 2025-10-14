@@ -71,12 +71,13 @@ public partial class TurnManager : Manager<TurnManager>
 
 		try
 		{
-			await CurrentTurn.ExecuteCall();
+			if (CurrentTurn != null) await CurrentTurn.ExecuteCall();
 		}
 		catch (Exception ex)
 		{
 			GD.PushError($"TurnManager: Error during '{CurrentTurn?.ResourceName}' execution: {ex.Message}");
 		}
+		return;
 	}
 
 	public void RequestEndOfTurn()
@@ -125,21 +126,20 @@ public partial class TurnManager : Manager<TurnManager>
 		{
 			return 0;
 		}
-		
-		int tempIndex = _currentTurnIndex;
-		bool foundValidTurn = false;
-		do
-		{
-			 tempIndex = (tempIndex + 1) % turns.Length;
-			 if (turns[tempIndex] != null && (turns[tempIndex].repeatable || turns[tempIndex].timesExectuted == 0))
-			 {
-				 foundValidTurn = true;
-			 }
-			 
 
-		} while ((tempIndex < turns.Length && !turns[tempIndex].repeatable) || foundValidTurn);
-		
-		return foundValidTurn ? tempIndex : 0;
+		for (int i = 1; i <= turns.Length; i++)
+		{
+			int nextIndex = (_currentTurnIndex + i) % turns.Length;
+
+			var turn = turns[nextIndex];
+			if (turn != null && (turn.repeatable || turn.timesExectuted == 0))
+			{
+				return nextIndex;
+			}
+		}
+
+		// Fallback: Start from beginning again.
+		return 0;
 	}
 
 	public override void _Process(double delta)
@@ -150,6 +150,13 @@ public partial class TurnManager : Manager<TurnManager>
 		{
 			_ = _Execute();
 		}
+	}
+
+	public override void _ExitTree()
+	{
+		TurnStarted -= GameManager.Instance.CheckGameState;
+		base._ExitTree();
+		
 	}
 
 

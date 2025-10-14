@@ -90,27 +90,16 @@ public partial class RangedAttackActionDefinition
 			return new List<GridCell>();
 		}
 
-		GridObjectSight sightArea = parentGridObject.gridObjectNodesDictionary["all"].FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
-		if (sightArea == null) return new List<GridCell>();
-		
-		
-		if (
-			!GridSystem.Instance.TryGetGridCellsInRange(
-				startingGridCell,
-				new Vector2I(Item.ItemData.Range, Item.ItemData.Range),
-				false,
-				out List<GridCell> cellsInRange
-			)
-		)
+		List<GridCell> tempCells = parentGridObject.TeamHolder.GetVisibleGridCells().Where(cell =>
 		{
-			return new List<GridCell>();
-		}
-
+			if (!cell.HasGridObject()) return false;
+			return true;
+		}).ToList();
+		
+		
 		// TODO: Add Line of Sight Check
-		return cellsInRange.Where(cell =>
+		return tempCells.Where(cell =>
 		{
-			if(!cell.HasGridObject()) return false;
-			
 			bool anyValid = false;
 			foreach (GridObject gridObject in cell.gridObjects)
 			{
@@ -120,8 +109,6 @@ public partial class RangedAttackActionDefinition
 			}
 			
 			if(!anyValid) return false;
-				
-			if(!sightArea.SeenGridObjects.Any(GridObject => cell.gridObjects.Contains(gridObject))) return false;
 			
 			return cell.gridObjects.Any(gridObject => gridObject.IsActive);
 		}).ToList();

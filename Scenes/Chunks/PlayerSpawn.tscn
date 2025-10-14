@@ -124,4 +124,4 @@ shape = SubResource("BoxShape3D_ev72g")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -1.5999999, 0)
 
 [node name="DoorGridObject" parent="." instance=ExtResource("3_m58r4")]
-transform = Transform3D(-1, -1.509958e-07, 0, -1.509958e-07, 1, 0, 0, 0, -1, 6.9963202, 0.39999932, 5.8651624)
+transform = Transform3D(-1, -1.509958e-07, 0, -1.509958e-07, 1, 0, 0, 0, -1, 6.996, 0.8, 5.9)

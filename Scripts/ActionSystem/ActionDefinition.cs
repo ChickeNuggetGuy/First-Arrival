@@ -145,19 +145,20 @@ public abstract partial class ActionDefinition : Resource
   public (GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs) DetermineBestAIAction()
   {
 	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.GridCell);
-	  if (possibleGridCells == null || !possibleGridCells.Any())
+	  GD.Print($"{GetActionName()}: Possible grid cells: {possibleGridCells.Count}");
+	  if (possibleGridCells == null)
 	  {
 		  return (null, int.MinValue, null);
 	  }
 
-	  // --- Optimization: If there are too many cells, only check a random sample. ---
-	  const int maxCellsToCheck = 50; // This value can be tweaked for performance vs. AI quality.
-	  if (possibleGridCells.Count > maxCellsToCheck)
-	  {
-		  // Simple random sampling. A more sophisticated approach could prioritize cells
-		  // (e.g., closer to enemies), but this is a good starting point for performance.
-		  possibleGridCells = possibleGridCells.OrderBy(c => Guid.NewGuid()).Take(maxCellsToCheck).ToList();
-	  }
+	  // // --- Optimization: If there are too many cells, only check a random sample. ---
+	  // const int maxCellsToCheck = 50; // This value can be tweaked for performance vs. AI quality.
+	  // if (possibleGridCells.Count > maxCellsToCheck)
+	  // {
+		 //  // Simple random sampling. A more sophisticated approach could prioritize cells
+		 //  // (e.g., closer to enemies), but this is a good starting point for performance.
+		 //  possibleGridCells = possibleGridCells.OrderBy(c => Guid.NewGuid()).Take(maxCellsToCheck).ToList();
+	  // }
 
 	  var gridCellScores = new List<(GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs)>();
 

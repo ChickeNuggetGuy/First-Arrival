@@ -157,6 +157,7 @@ vertical_alignment = 1
 [node name="mapSizeX" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+value = 1.0
 
 [node name="Label2" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
 custom_minimum_size = Vector2(20, 0)
@@ -169,6 +170,8 @@ vertical_alignment = 1
 [node name="mapSizeY" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+value = 1.0
+rounded = true
 
 [node name="VBoxContainer3" type="VBoxContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 100)
@@ -194,6 +197,8 @@ vertical_alignment = 1
 [node name="Player Unit Counts" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+value = 1.0
+rounded = true
 
 [node name="Label2" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
 custom_minimum_size = Vector2(20, 0)
@@ -206,6 +211,8 @@ vertical_alignment = 1
 [node name="Enemy Unit Counts" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+value = 1.0
+rounded = true
 
 [node name="StartGameButton" type="Button" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer"]
 custom_minimum_size = Vector2(0, 50)

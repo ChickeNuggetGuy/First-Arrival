@@ -11,6 +11,6 @@ public partial class PlayerEquipItemsTurnSegment : TurnSegment
 
 	protected override async Task _Execute()
 	{
-		throw new NotImplementedException();
+		return;
 	}
 }

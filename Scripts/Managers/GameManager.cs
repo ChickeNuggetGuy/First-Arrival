@@ -54,6 +54,24 @@ public partial class GameManager : Manager<GameManager>
 		}
 	}
 
+	public bool TryChangeScene(gameScene sceneName,bool saveOldScene = false)
+	{
+		if (!scenePaths.ContainsKey(sceneName)) return false;
+
+		if (saveOldScene)
+		{
+			sceneHolder = GetTree().CurrentScene;
+		}
+		if (GetTree().ChangeSceneToFile(scenePaths[sceneName]) != Error.Ok)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+	
 	public bool TryChangeScene(gameScene sceneName, Callable callback, bool saveOldScene = false)
 	{
 		if (!scenePaths.ContainsKey(sceneName)) return false;
@@ -95,12 +113,14 @@ public partial class GameManager : Manager<GameManager>
 	private void EndGame()
 	{
 		GD.Print("EndGame");
+		GD.Print(TryChangeScene(gameScene.MainMenu));
 	}
 	
 	protected override void GetInstanceData(ManagerData data)
 	{
 		mapSize = (Vector2I)data.managerData["mapSize"];
 		unitCounts = (Vector2I)data.managerData["unitCounts"];
+		scenePaths = (Dictionary<gameScene, string>)data.managerData["scenePaths"];
 	}
 
 	public override ManagerData SetInstanceData()
@@ -108,6 +128,7 @@ public partial class GameManager : Manager<GameManager>
 		ManagerData data = new ManagerData();
 		data.managerData.Add("mapSize", mapSize);
 		data.managerData.Add("unitCounts", unitCounts);
+		data.managerData.Add("scenePaths", scenePaths as Dictionary<gameScene, string>);
 		return data;
 	}
 }

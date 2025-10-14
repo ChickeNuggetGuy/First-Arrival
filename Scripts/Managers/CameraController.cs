@@ -129,6 +129,11 @@ public partial class CameraController : Manager<CameraController>
     
     public override void _UnhandledInput(InputEvent @event)
     {
+	    if (@event is InputEventKey { Pressed: true, Keycode: Key.F })
+	    { 
+		    QuickSwitchTarget(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject);   
+	    }
+	    
         if (@event is not InputEventMouseButton mb || !mb.Pressed)
             return;
 
@@ -164,7 +169,6 @@ public partial class CameraController : Manager<CameraController>
         }
         else
         {
-            // Fixed zooming logic with distance limits
             if (_pcam != null)
             {
                 var currentOffset = _pcam.FollowOffset;
@@ -247,16 +251,6 @@ public partial class CameraController : Manager<CameraController>
         }
 
         return Task.CompletedTask;
-    }
-    
-    void PrintNodeTree(Node node, int depth = 0)
-    {
-        string indent = new string(' ', depth * 2);
-        GD.Print(indent, node.Name);
-        foreach (Node child in node.GetChildren())
-        {
-            PrintNodeTree(child, depth + 1);
-        }
     }
     
     #region manager Data

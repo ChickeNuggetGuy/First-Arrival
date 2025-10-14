@@ -39,6 +39,7 @@ namespace FirstArrival.Scripts.AI
 
                 for (int i = 0; i < _maxActionAttempts; i++)
                 {
+	                GD.Print($"Attempt {i + 1} of {_maxActionAttempts}");
                     // Step 1: Find all possible actions and their best targets/scores/costs for the current state.
                     var allPossibleActions = new List<(GridCell target, int score, ActionDefinition actionDefinition, Dictionary<Enums.Stat, int> costs)>();
 
@@ -61,6 +62,7 @@ namespace FirstArrival.Scripts.AI
                                     actionDefInstance.parentGridObject = activeGridObject;
 
                                     var result = actionDefInstance.DetermineBestAIAction();
+                                    GD.Print($"Best AI Action was:{actionDefInstance.GetActionName()} : {result}");
                                     if (result.gridCell != null)
                                     {
                                         allPossibleActions.Add((result.gridCell, result.score, actionDefInstance, result.costs));
@@ -121,10 +123,12 @@ namespace FirstArrival.Scripts.AI
         public async Task ExecuteAiAction(GridObject parent, GridCell target, int score, ActionDefinition actionDefinition)
         {
             GD.Print($"Attempting to take action: {actionDefinition.GetActionName()} for {parent.Name}");
-            
-            
-            await ActionManager.Instance.TryTakeAction(actionDefinition, parent, parent.GridPositionData.GridCell, target);
-            
+
+            var actionCompletedSignal = ActionManager.Instance.ToSignal(ActionManager.Instance, ActionManager.SignalName.ActionCompleted);
+            if (await ActionManager.Instance.TryTakeAction(actionDefinition, parent, parent.GridPositionData.GridCell, target))
+            {
+                await actionCompletedSignal;
+            }
         }
     }
 }

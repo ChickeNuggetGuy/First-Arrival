@@ -17,7 +17,8 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export]public Enums.UnitTeam Team {get; private set;}
 
 	[Export] protected Node GridObjectNodeHolder;
-
+	
+	public GridObjectTeamHolder TeamHolder { get; protected set; }
 	public System.Collections.Generic.Dictionary<string, List<GridObjectNode>> gridObjectNodesDictionary = new System.Collections.Generic.Dictionary<string, List<GridObjectNode>>();
 	
 	[Export(PropertyHint.ResourceType, "ActionDefinition")]
@@ -63,7 +64,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 
 	public virtual async Task Initialize(Enums.UnitTeam team, GridCell gridCell)
 	{
-		
+		TeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(team);
 		GD.Print($"GridObject: {Name} :Initialize");
 		Team = team;
 

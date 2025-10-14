@@ -5,12 +5,11 @@
 [ext_resource type="Script" uid="uid://cjjspey10irdo" path="res://Scripts/TurnSystem/TurnSegments/EndTurnSegment.cs" id="2_qycj8"]
 [ext_resource type="Script" uid="uid://fyedku3cmcx1" path="res://Scripts/TurnSystem/TurnSegments/AIActionSegment.cs" id="3_b1qxc"]
 
-[sub_resource type="Resource" id="Resource_lsvtv"]
+[sub_resource type="Resource" id="Resource_l5t4u"]
 script = ExtResource("2_l5t4u")
 metadata/_custom_type_script = "uid://hn2sdgvlyvdp"
 
-[sub_resource type="Resource" id="Resource_5w0fq"]
-resource_name = "AISegementAction"
+[sub_resource type="Resource" id="Resource_b1qxc"]
 script = ExtResource("3_b1qxc")
 _maxActionAttempts = 3
 metadata/_custom_type_script = "uid://fyedku3cmcx1"
@@ -20,7 +19,8 @@ script = ExtResource("2_qycj8")
 metadata/_custom_type_script = "uid://cjjspey10irdo"
 
 [resource]
+resource_name = "EnemyTurn"
 script = ExtResource("1_trxta")
 team = 2
-turnSegments = Array[Resource]([SubResource("Resource_lsvtv"), SubResource("Resource_5w0fq"), SubResource("Resource_qycj8")])
+turnSegments = Array[Resource]([SubResource("Resource_l5t4u"), SubResource("Resource_b1qxc"), SubResource("Resource_qycj8")])
 metadata/_custom_type_script = "uid://c545g83g71bd6"

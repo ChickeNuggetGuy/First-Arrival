@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://dwy3kjqle61gf"]
+[gd_scene load_steps=23 format=3 uid="uid://dwy3kjqle61gf"]
 
 [ext_resource type="Script" uid="uid://bqrvnoliwqt26" path="res://Scripts/GridObject/GridObject.cs" id="1_qk68r"]
 [ext_resource type="Script" uid="uid://dobkq5jemsyhg" path="res://Scripts/GridObject/GridObjectNodes/GridPositionData.cs" id="2_k67iv"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="6_3ea33"]
 [ext_resource type="Script" uid="uid://cbcjgsq6dn6r2" path="res://Scripts/GridObject/GridObjectNodes/GridObjectStat.cs" id="6_ppost"]
 [ext_resource type="Script" uid="uid://cldl8nbojdxth" path="res://Scripts/ActionSystem/InteractAction/interactActionDefinition.cs" id="7_3ea33"]
+[ext_resource type="Script" uid="uid://d4ia84wq3vrtm" path="res://Scripts/ActionSystem/AIActions/Rotate360ActionDefinition.cs" id="8_e636m"]
 [ext_resource type="Script" uid="uid://4pky58ofae6c" path="res://Scripts/GridObject/GridObjectNodes/GridObjectSight.cs" id="9_e33bx"]
 [ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="11_r2bin"]
 
@@ -36,6 +37,10 @@ script = ExtResource("6_3ea33")
 script = ExtResource("7_3ea33")
 metadata/_custom_type_script = "uid://cldl8nbojdxth"
 
+[sub_resource type="Resource" id="Resource_oew58"]
+script = ExtResource("8_e636m")
+metadata/_custom_type_script = "uid://d4ia84wq3vrtm"
+
 [sub_resource type="Resource" id="Resource_r2bin"]
 script = ExtResource("11_r2bin")
 ShapeGrid = Array[bool]([true])
@@ -48,7 +53,7 @@ size = Vector3(1, 2, 1)
 script = ExtResource("1_qk68r")
 GridPositionData = NodePath("GridPositionData")
 GridObjectNodeHolder = NodePath("GridObjectComponents")
-ActionDefinitions = Array[Object]([SubResource("Resource_jq84y"), SubResource("Resource_7mmco"), SubResource("Resource_3ea33"), SubResource("Resource_e636m"), SubResource("Resource_a1mpc"), SubResource("Resource_lwuqk")])
+ActionDefinitions = Array[Object]([SubResource("Resource_jq84y"), SubResource("Resource_7mmco"), SubResource("Resource_3ea33"), SubResource("Resource_e636m"), SubResource("Resource_a1mpc"), SubResource("Resource_lwuqk"), SubResource("Resource_oew58")])
 statHolder = NodePath("GridObjectComponents/GridObjectStats")
 inventoryTypes = Array[int]([2, 5, 6])
 gridObjectSettings = 1

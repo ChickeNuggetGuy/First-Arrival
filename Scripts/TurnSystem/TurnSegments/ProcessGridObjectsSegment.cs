@@ -15,12 +15,14 @@ public partial class ProcessGridObjectsSegment: TurnSegment
 	GridObjectTeamHolder teamHolder;
 	protected override async Task _Setup()
 	{
+		GD.Print("Finding Team Holder");
 		teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(parentTurn.team);
 		return;
 	}
 
 	protected override async Task _Execute()
 	{
+		GD.Print("Execute ProcessGridObjectsSegment");
 		List<GridObject> gridObjects = teamHolder.GridObjects[Enums.GridObjectState.Active];
 		if (gridObjects.Count == 0) return;
 		
@@ -38,5 +40,6 @@ public partial class ProcessGridObjectsSegment: TurnSegment
 				stat.OnTurnEnded();
 			}
 		}
+		GD.Print("Execute ProcessGridObjectsSegment Done");
 	}
 }

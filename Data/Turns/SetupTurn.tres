@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://c545g83g71bd6" path="res://Scripts/TurnSystem/Turn.cs" id="1_vpems"]
 
 [resource]
+resource_name = "SetupTurn"
 script = ExtResource("1_vpems")
 turnSegments = null
 metadata/_custom_type_script = "uid://c545g83g71bd6"
