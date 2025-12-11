@@ -42,9 +42,11 @@ public partial class MoveAction : Action, ICompositeAction
 		ParentAction = this;
 		if (path == null || path.Count == 0)
 			return;
-
+		
+		if (!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
+		
 		var moveStepActionDefinition =
-			parentGridObject.ActionDefinitions.FirstOrDefault(
+			gridObjectActions.ActionDefinitions.FirstOrDefault(
 				a => a is MoveStepActionDefinition
 			) as MoveStepActionDefinition;
 

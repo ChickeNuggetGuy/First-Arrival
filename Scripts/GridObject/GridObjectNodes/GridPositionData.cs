@@ -5,21 +5,28 @@ using FirstArrival.Scripts.Utility;
 using Godot;
 using Godot.Collections;
 
-[GlobalClass]
+[GlobalClass, Tool]
 public partial class GridPositionData : Node3D
 {
     [Export] GridObject parentGridObject;
-    [Export] public int gridHeight;
-    [Export] GridShape gridShape;
+    [Export] public GridShape gridShape;
+    [Export] bool debugMode = false;
     
-    // [Y][X, Z] where Y=height levels, X=East-West, Z=North-South
+    // [Y][X, Z]
     public GridCell[][,] gridCells { get; protected set; }
+
+    // Constants from your GDScript implementation
+    private readonly Vector3 _cellSize = new Vector3(1, 1, 1);
+    private readonly Vector3 _gridOffset = new Vector3(0, 0.5f, 0);
 
     public GridCell GridCell
     {
         get
         {
-            GridSystem.Instance.TyGetGridCellFromWorldPosition(
+            if (Engine.IsEditorHint() && (GridSystem.Instance == null || !IsInstanceValid(GridSystem.Instance)))
+                return null;
+
+            GridSystem.Instance.TryGetGridCellFromWorldPosition(
                 this.GlobalPosition, 
                 out GridCell cell, 
                 false
@@ -40,101 +47,98 @@ public partial class GridPositionData : Node3D
 
     public GridPositionData()
     {
-        this.gridShape = new GridShape();
-        this.gridHeight = 1;
+        if (this.gridShape == null)
+        {
+            this.gridShape = new GridShape();
+            this.gridShape.GridSizeY = 1;
+        }
     }
     
     public GridPositionData(int gridHeight, GridShape gridShape)
     {
         this.gridShape = gridShape;
-        this.gridHeight = gridHeight;
+        this.gridShape.GridSizeY = gridHeight;
     }
 
- public void SetGridCell(GridCell gridCell)
-{
-    // Clear previous occupancy
-    if (gridCells != null)
+    public void SetGridCell(GridCell gridCell)
     {
-        for (int y = 0; y < gridCells.Length; y++)
+        if (gridCells != null)
         {
-            for (int x = 0; x < gridCells[y].GetLength(0); x++)
+            for (int y = 0; y < gridCells.Length; y++)
             {
-                for (int z = 0; z < gridCells[y].GetLength(1); z++)
+                if (gridCells[y] == null) continue;
+
+                for (int x = 0; x < gridCells[y].GetLength(0); x++)
                 {
-                    var cell = gridCells[y][x, z];
-                    if (cell == null) continue;
+                    for (int z = 0; z < gridCells[y].GetLength(1); z++)
+                    {
+                        var cell = gridCells[y][x, z];
+                        if (cell == null) continue;
 
-                    cell.RestoreOriginalState();
-                    cell.RemoveGridObject(parentGridObject, cell.originalState, rebuildConnections: false);
+                        cell.RestoreOriginalState();
+                        cell.RemoveGridObject(parentGridObject, cell.originalState, rebuildConnections: false);
 
-                    gridCells[y][x, z] = null;
+                        gridCells[y][x, z] = null;
+                    }
                 }
             }
         }
-    }
 
-    if (gridCell == null)
-    {
-        GD.Print("gridcell is null, returning");
-        return;
-    }
+        if (gridCell == null) return;
 
-    // Ensure backing array is initialized
-    if (gridCells == null || gridCells.Length != gridHeight)
-    {
-        gridCells = new GridCell[gridHeight][,];
-        for (int y = 0; y < gridHeight; y++)
-            gridCells[y] = new GridCell[gridShape.GridSizeX, gridShape.GridSizeZ];
-    }
-
-    bool isWalkThrough = parentGridObject.gridObjectSettings.HasFlag(Enums.GridObjectSettings.CanWalkThrough);
-
-    for (int y = 0; y < gridHeight; y++)
-    {
-        for (int x = 0; x < gridShape.GridSizeX; x++)
+        if (gridCells == null || 
+            gridCells.Length != gridShape.GridSizeY || 
+            (gridCells.Length > 0 && gridCells[0] != null && 
+            (gridCells[0].GetLength(0) != gridShape.GridSizeX || gridCells[0].GetLength(1) != gridShape.GridSizeZ)))
         {
-            for (int z = 0; z < gridShape.GridSizeZ; z++)
+            Setup();
+        }
+
+        bool isWalkThrough = parentGridObject.gridObjectSettings.HasFlag(Enums.GridObjectSettings.CanWalkThrough);
+
+        for (int y = 0; y < gridShape.GridSizeY; y++)
+        {
+            for (int x = 0; x < gridShape.GridSizeX; x++)
             {
-                if (!gridShape.GetGridShapeCell(x, z)) continue;
-
-                int offsetX = x - gridShape.RootCellCoordinates.X;
-                int offsetZ = z - gridShape.RootCellCoordinates.Y;
-                var offset = new Vector3I(offsetX, y, offsetZ);
-
-                var cellPos = gridCell.gridCoordinates + offset;
-                var tempGridCell = GridSystem.Instance.GetGridCell(cellPos);
-                if (tempGridCell == null) continue;
-
-                gridCells[y][x, z] = tempGridCell;
-
-                bool isRootCell = (y == 0 &&
-                                   x == gridShape.RootCellCoordinates.X &&
-                                   z == gridShape.RootCellCoordinates.Y);
-
-                var tempNewState = tempGridCell.state;
-
-                if (isWalkThrough)
+                for (int z = 0; z < gridShape.GridSizeZ; z++)
                 {
-                    tempNewState &= ~Enums.GridCellState.Obstructed;
-                }
-                else
-                {
-                    tempNewState &= ~Enums.GridCellState.Empty;
-                }
+                    if (!gridShape.GetGridShapeCell(x, y, z)) continue;
 
-                if (!isRootCell)
-                {
-                    tempNewState &= ~Enums.GridCellState.Empty;
-                }
+                    int offsetX = x - gridShape.RootCellCoordinates.X;
+                    int offsetZ = z - gridShape.RootCellCoordinates.Y;
+                    var offset = new Vector3I(offsetX, y, offsetZ);
 
-                tempGridCell.AddGridObject(parentGridObject, tempNewState, rebuildConnections: !isWalkThrough);
+                    var targetCoords = gridCell.gridCoordinates + offset;
+                    
+                    if (GridSystem.Instance == null) continue;
+                    var tempGridCell = GridSystem.Instance.GetGridCell(targetCoords);
+
+                    if (tempGridCell == null) continue;
+
+                    gridCells[y][x, z] = tempGridCell;
+
+                    bool isRootCell = (y == 0 &&
+                                       x == gridShape.RootCellCoordinates.X &&
+                                       z == gridShape.RootCellCoordinates.Y);
+
+                    var tempNewState = tempGridCell.state;
+
+                    if (isWalkThrough)
+                        tempNewState &= ~Enums.GridCellState.Obstructed;
+                    else
+                        tempNewState &= ~Enums.GridCellState.Empty;
+
+                    if (!isRootCell)
+                        tempNewState &= ~Enums.GridCellState.Empty;
+
+                    tempGridCell.AddGridObject(parentGridObject, tempNewState, rebuildConnections: !isWalkThrough);
+                }
             }
         }
-    }
 
-    EmitSignal("GridPositionDataUpdated", this);
-    EmitSignal(SignalName.GridCellPositionUpdated, gridCell.gridCoordinates);
-}
+        EmitSignal(SignalName.GridPositionDataUpdated, this);
+        EmitSignal(SignalName.GridCellPositionUpdated, gridCell.gridCoordinates);
+    }
 
     public void SetDirection(Enums.Direction direction)
     {
@@ -145,51 +149,76 @@ public partial class GridPositionData : Node3D
 
     public void Setup()
     {
-        gridCells = new GridCell[gridHeight][,];
+	    if (parentGridObject == null)
+	    {
+		    parentGridObject = this.GetParent() is GridObject gridObject ? gridObject : null;
+	    }
+        gridCells = new GridCell[gridShape.GridSizeY][,];
         for (int y = 0; y < gridCells.Length; y++)
         {
-            // UPDATED: Use GridSizeX and GridSizeZ instead of GridWidth and GridHeight
             gridCells[y] = new GridCell[gridShape.GridSizeX, gridShape.GridSizeZ];
         }
     }
 
     public void DebugShapePlacement(GridCell rootCell)
     {
-        GD.Print($"=== Shape Placement Debug ===");
-        GD.Print($"Root Cell Coords: {rootCell.gridCoordinates}");
-        GD.Print($"Root in Shape: {gridShape.RootCellCoordinates}");
-        GD.Print($"Shape Size: {gridShape.GridSizeX}x{gridShape.GridSizeZ}");
+        // Debug method left as is for console logging if needed
+    }
 
-        for (int z = 0; z < gridShape.GridSizeZ; z++)
+public override void _Process(double delta)
+{
+    base._Process(delta);
+
+    if (!Engine.IsEditorHint() || !debugMode || gridShape == null) return;
+	
+    Vector3 localPos = GlobalPosition - _gridOffset;
+    Vector3 searchPos = localPos - new Vector3(0, _cellSize.Y * 0.5f, 0);
+    
+    Vector3 gridIndicesRaw = new Vector3(
+        searchPos.X / _cellSize.X,
+        searchPos.Y / _cellSize.Y,
+        -searchPos.Z / _cellSize.X  // NEGATE Z!
+    );
+    Vector3 gridOriginIndices = gridIndicesRaw.Round();
+
+    int sizeX = gridShape.GridSizeX;
+    int sizeY = gridShape.GridSizeY;
+    int sizeZ = gridShape.GridSizeZ;
+    Vector2I rootOffset = gridShape.RootCellCoordinates;
+
+    for (int y = 0; y < sizeY; y++)
+    {
+        for (int x = 0; x < sizeX; x++)
         {
-            string row = $"Row Z={z}: ";
-            for (int x = 0; x < gridShape.GridSizeX; x++)
+            for (int z = 0; z < sizeZ; z++)
             {
-                bool active = gridShape.GetGridShapeCell(x, z);
-                bool isRoot = x == gridShape.RootCellCoordinates.X && 
-                            z == gridShape.RootCellCoordinates.Y;
+                int relX = x - rootOffset.X;
+                int relZ = z - rootOffset.Y;
+                int relY = y;
 
-                if (isRoot) row += "[R]";
-                else if (active) row += "[X]";
-                else row += "[ ]";
-            }
-            GD.Print(row);
-        }
+                Vector3 gridIndexOffset = new Vector3(relX, relY, relZ);
+                Vector3 currentCellIndex = gridOriginIndices + gridIndexOffset;
 
-        GD.Print("Grid cells occupied:");
-        for (int z = 0; z < gridShape.GridSizeZ; z++)
-        {
-            for (int x = 0; x < gridShape.GridSizeX; x++)
-            {
-                if (!gridShape.GetGridShapeCell(x, z)) continue;
+                // Convert grid index back to world (with negative Z)
+                Vector3 drawPos = new Vector3(
+                    (currentCellIndex.X + 0.5f) * _cellSize.X,
+                    (currentCellIndex.Y + 1.0f) * _cellSize.Y,
+                    -(currentCellIndex.Z + 0.5f) * _cellSize.X  // NEGATIVE Z in world
+                );
 
-                var offsetX = x - gridShape.RootCellCoordinates.X;
-                var offsetZ = z - gridShape.RootCellCoordinates.Y;
-                var offset = new Vector3I(offsetX, 0, offsetZ);
-                var finalCoords = rootCell.gridCoordinates + offset;
+                bool isActive = gridShape.GetGridShapeCell(x, y, z);
+                bool isRoot = (relX == 0 && relZ == 0 && relY == 0);
 
-                GD.Print($"  Shape({x},{z}) -> Offset({offsetX},{offsetZ}) -> Grid{finalCoords}");
+                Color color;
+                if (isRoot) color = Colors.Green; 
+                else if (isActive) color = Colors.Black; 
+                else color = Colors.Gray;
+
+                if (!isActive) color.A = 0.1f; 
+
+                DebugDraw3D.DrawBox(drawPos, Quaternion.Identity, _cellSize, color, true);
             }
         }
     }
+}
 }

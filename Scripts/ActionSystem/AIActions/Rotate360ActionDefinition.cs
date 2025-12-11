@@ -17,7 +17,14 @@ public partial class Rotate360ActionDefinition : ActionDefinition
 	protected override bool OnValidateAndBuildCosts(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell,
 		Dictionary<Enums.Stat, int> costs, out string reason)
 	{
-		if (!gridObject.ActionDefinitions.Any(ad => ad is RotateActionDefinition))
+
+		if (!gridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))
+		{
+			reason = "No grid object Action node found";
+			return false;
+		}
+		
+		if (!gridObjectActionsNode.ActionDefinitions.Any(ad => ad is RotateActionDefinition))
 		{
 			reason = "RotateActionDefinition not found on GridObject";
 			return false;

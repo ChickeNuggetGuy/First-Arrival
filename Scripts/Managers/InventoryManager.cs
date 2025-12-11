@@ -23,23 +23,46 @@ public partial class InventoryManager : Manager<InventoryManager>
 	[Export]public PackedScene BlankSlotPrefab{ get; protected set;}
 	
 	[Export]public Item[] startingItems = new Item[0];
+	public override string GetManagerName() => "InventoryManager";
+
 	protected override async Task _Setup()
 	{
-		// startingItems = new Item[GD.RandRange(0, 10)];
-		//
-		// for (int i = 0; i < startingItems.Length; i++)
-		// {
-		// 	startingItems[i] = GetRandomItem();
-		// }
-		return;
+		// Load data immediately so it's ready for GridSystem in the Execute phase
+		InventoryGrid[] grids = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/InventoryGrids/", "InventoryGrid").Cast<InventoryGrid>().ToArray();
+
+		inventoryGrids.Clear();
+		foreach (InventoryGrid inventoryGrid in grids)
+		{
+			if(inventoryGrid != null)
+				inventoryGrids.Add(inventoryGrid.InventoryType, inventoryGrid);
+		}
+    
+		ItemData[] items = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/Items/", "ItemData").Cast<ItemData>().ToArray();
+
+		itemDatas.Clear();
+		foreach (ItemData item in items)
+		{
+			if(item != null)
+				itemDatas.Add(item);
+		}
+		
+		// Keep your starting items logic if needed
+		await Task.CompletedTask;
+	}
+
+	protected override async Task _Execute()
+	{
+		// Just allow the task to complete, as setup is done
+		await Task.CompletedTask;
 	}
 
 	public void TeamHolderOnSelectedGridObjectChanged(GridObject gridObject)
 	{
+		if (!gridObject.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory)) return;
 		//Refresh all Grid objects inventories
 		foreach (var runtimeInventoryGridUI in runtimeInventoryGridUIs)
 		{
-			if(gridObject.TryGetInventory(runtimeInventoryGridUI.Key, out var inventoryGrid))
+			if(gridObjectInventory.TryGetInventory(runtimeInventoryGridUI.Key, out var inventoryGrid))
 				runtimeInventoryGridUI.Value.SetupInventoryUI(inventoryGrid);
 		}
 		
@@ -51,23 +74,6 @@ public partial class InventoryManager : Manager<InventoryManager>
 		else
 		{
 			runtimeInventoryGridUIs[Enums.InventoryType.Ground].SetupInventoryUI(gridObject.GridPositionData.GridCell.InventoryGrid);
-		}
-	}
-
-	protected override async Task _Execute()
-	{
-		InventoryGrid[] grids = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/InventoryGrids/","InventoryGrid").Cast<InventoryGrid>().ToArray();
-
-		foreach (InventoryGrid inventoryGrid in grids)
-		{
-			inventoryGrids.Add(inventoryGrid.InventoryType, inventoryGrid);
-		}
-		
-		ItemData[] items = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/Items/","ItemData").Cast<ItemData>().ToArray();
-
-		foreach (ItemData item in items)
-		{
-			itemDatas.Add(item);
 		}
 	}
 
@@ -98,12 +104,12 @@ public partial class InventoryManager : Manager<InventoryManager>
 	}
 	
 	#region manager Data
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

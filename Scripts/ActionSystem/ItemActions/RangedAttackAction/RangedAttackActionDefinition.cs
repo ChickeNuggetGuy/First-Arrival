@@ -124,6 +124,7 @@ public partial class RangedAttackActionDefinition
 			return (null, 0);
 		}
 		
+		
 		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
 			if(gridObject == null) return false;
@@ -137,6 +138,11 @@ public partial class RangedAttackActionDefinition
 		{
 			GD.Print("Target grid object is null, failed all conditions");
 		}
+		
+		if(!targetGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) 
+			return (targetGridCell, 0);;
+
+
 		// if (targetGridCell.gridObjects.Contains( parentGridObject))
 		// {
 		// 	GD.Print("RANGED ATTACK: Target grid object is parent");
@@ -157,7 +163,7 @@ public partial class RangedAttackActionDefinition
 
 		score += 80; // Base score for attacking an enemy
 		// Add more score based on enemy health (e.g., higher score for lower health)
-		if (targetGridObject.TryGetStat(Enums.Stat.Health, out var healthStat))
+		if (statHolder.TryGetStat(Enums.Stat.Health, out var healthStat))
 		{
 			score += (100 - Mathf.RoundToInt(healthStat.CurrentValue)); // Higher score for lower health
 		}

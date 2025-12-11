@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://gr7hq12fakuk"]
+[gd_scene format=3 uid="uid://gr7hq12fakuk"]
 
 [ext_resource type="Script" uid="uid://cpde2mhmhaopl" path="res://Scripts/GridObject/DoorGridObject.cs" id="1_eljuu"]
 [ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="3_eljuu"]
@@ -7,34 +7,45 @@
 [ext_resource type="Script" uid="uid://cbcjgsq6dn6r2" path="res://Scripts/GridObject/GridObjectNodes/GridObjectStat.cs" id="6_b2tu3"]
 [ext_resource type="PackedScene" uid="uid://bg5f5hiyhuujn" path="res://Third-Party Assets/Polygon Prototype/FBX/SM_Buildings_Door_01P.fbx" id="6_eljuu"]
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_f6r51"]
+size = Vector3(4, 4, 1)
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_eljuu"]
 size = Vector3(3, 2.9, 0.2)
 
 [sub_resource type="Resource" id="Resource_eljuu"]
 script = ExtResource("3_eljuu")
+GridSizeX = 4
+GridSizeY = 4
+GridSizeZ = 1
+ShapeGrid = Array[bool]([true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true])
+
+[sub_resource type="Resource" id="Resource_f6r51"]
+script = ExtResource("3_eljuu")
 GridSizeX = 2
 GridSizeZ = 1
-ShapeGrid = Array[bool]([true, true])
-metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+ShapeGrid = Array[bool]([true, true, true, true, true, true])
 
-[node name="DoorGridObject" type="Node3D" node_paths=PackedStringArray("pivot", "GridPositionData", "GridObjectNodeHolder") groups=["GridObjects"]]
+[node name="DoorGridObject" type="Node3D" unique_id=886168493 node_paths=PackedStringArray("pivot", "doorData", "GridPositionData", "GridObjectNodeHolder", "collisionShape") groups=["GridObjects"]]
 process_mode = 3
 script = ExtResource("1_eljuu")
 pivot = NodePath("SM_Buildings_WallDoorDouble_3x3_01/pivot")
+doorData = NodePath("DoorCellData")
 costs = Dictionary[int, int]({
 4: 2
 })
-doorSize = Vector3i(2, 3, 1)
-GridPositionData = NodePath("SM_Buildings_WallDoorDouble_3x3_01/GridPositionData")
+GridPositionData = NodePath("GridPositionData")
 Team = 7
 GridObjectNodeHolder = NodePath("GridObjectNodes")
+collisionShape = NodePath("GridObjectNodes/Area3D")
+ActionDefinitions = null
 metadata/_custom_type_script = "uid://cpde2mhmhaopl"
 
-[node name="GridObjectNodes" type="Node" parent="."]
+[node name="GridObjectNodes" type="Node" parent="." unique_id=615406745]
 
-[node name="Stats" type="Node" parent="GridObjectNodes"]
+[node name="Stats" type="Node" parent="GridObjectNodes" unique_id=153380887]
 
-[node name="Health" type="Node" parent="GridObjectNodes/Stats"]
+[node name="Health" type="Node" parent="GridObjectNodes/Stats" unique_id=979195047]
 script = ExtResource("6_b2tu3")
 Stat = 1
 CurrentValue = 300.0
@@ -42,29 +53,43 @@ maxValue = 300
 signalOnMinValue = true
 metadata/_custom_type_script = "uid://cbcjgsq6dn6r2"
 
-[node name="SM_Buildings_WallDoorDouble_3x3_01" parent="." instance=ExtResource("5_eljuu")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0)
+[node name="Area3D" type="Area3D" parent="GridObjectNodes" unique_id=1476231884 groups=["GridObjects"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.5, 0.5)
 
-[node name="pivot" type="Node3D" parent="SM_Buildings_WallDoorDouble_3x3_01"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GridObjectNodes/Area3D" unique_id=1319416623 groups=["GridObjects"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, 0)
+shape = SubResource("BoxShape3D_f6r51")
+
+[node name="SM_Buildings_WallDoorDouble_3x3_01" parent="." unique_id=83882402 instance=ExtResource("5_eljuu")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.5, 0.5)
+
+[node name="pivot" type="Node3D" parent="SM_Buildings_WallDoorDouble_3x3_01" unique_id=357834040]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.537727, 0, 0)
 
-[node name="SM_Buildings_Door_01P" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot" instance=ExtResource("6_eljuu")]
+[node name="SM_Buildings_Door_01P" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot" unique_id=1945446866 instance=ExtResource("6_eljuu")]
 
-[node name="SM_Buildings_Door_01P2" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P" instance=ExtResource("6_eljuu")]
+[node name="SM_Buildings_Door_01P2" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P" unique_id=1695500719 instance=ExtResource("6_eljuu")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 0)
 
-[node name="Area3D" type="Area3D" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P"]
+[node name="Area3D" type="Area3D" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P" unique_id=1717308799]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.962273, 0, 0)
 collision_layer = 16
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P/Area3D"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SM_Buildings_WallDoorDouble_3x3_01/pivot/SM_Buildings_Door_01P/Area3D" unique_id=1293538527]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5500001, 0.099999994)
 shape = SubResource("BoxShape3D_eljuu")
 
-[node name="GridPositionData" type="Node3D" parent="SM_Buildings_WallDoorDouble_3x3_01" node_paths=PackedStringArray("parentGridObject")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0)
+[node name="GridPositionData" type="Node3D" parent="." unique_id=2037786371]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9000001, 0.3, 0.8)
+top_level = true
 script = ExtResource("4_tu473")
-parentGridObject = NodePath("../..")
-gridHeight = 4
 gridShape = SubResource("Resource_eljuu")
+debugMode = true
+metadata/_custom_type_script = "uid://dobkq5jemsyhg"
+
+[node name="DoorCellData" type="Node3D" parent="." unique_id=1132748128]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.100000024, 0.8)
+script = ExtResource("4_tu473")
+gridShape = SubResource("Resource_f6r51")
+debugMode = true
 metadata/_custom_type_script = "uid://dobkq5jemsyhg"

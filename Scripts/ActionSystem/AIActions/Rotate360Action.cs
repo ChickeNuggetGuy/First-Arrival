@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
+using Godot;
 
 namespace FirstArrival.Scripts.ActionSystem.AIActions;
 
@@ -17,8 +18,10 @@ public class Rotate360Action : Action, ICompositeAction
 	protected override async Task Setup()
 	{
 		ParentAction = this;
-
-		var rotateActionDefinition = parentGridObject.ActionDefinitions.FirstOrDefault(a => a is RotateActionDefinition) as RotateActionDefinition;
+		
+		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))return;
+		
+		var rotateActionDefinition = gridObjectActionsNode.ActionDefinitions.FirstOrDefault(a => a is RotateActionDefinition) as RotateActionDefinition;
 		if (rotateActionDefinition == null)
 		{
 			return;
@@ -61,6 +64,13 @@ public class Rotate360Action : Action, ICompositeAction
 
 	protected override Task ActionComplete()
 	{
+		var seenGridObects = parentGridObject.TeamHolder.GetVisibleGridCells().All(cell =>
+		{
+			if(!cell.HasGridObject()) return false;
+			if(!cell.gridObjects.Any(gridObject => gridObject.Team != parentGridObject.Team))return false;
+			return true;
+		});
+		GD.Print($"Did unit see any GridObjects: {seenGridObects}!");
 		return Task.CompletedTask;
 	}
 }

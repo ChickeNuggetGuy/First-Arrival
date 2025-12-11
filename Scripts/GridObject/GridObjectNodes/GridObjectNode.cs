@@ -11,6 +11,6 @@ public abstract partial class GridObjectNode : Node
 		this.parentGridObject = parentGridObject;
 		Setup();
 	}
-
+	
 	protected abstract void Setup();
 }

@@ -2,7 +2,7 @@ using Godot;
 using System;
 using FirstArrival.Scripts.Utility;
 
-[GlobalClass]
+[GlobalClass,Tool]
 public partial class GridObjectStat : GridObjectNode
 {
 	[Export] public Enums.Stat Stat { get; private set; }
@@ -25,11 +25,40 @@ public partial class GridObjectStat : GridObjectNode
 	[Export] private bool signalOnMaxValue = false;
 
 	[Export] public Enums.StatTurnBehavior turnBehavior = Enums.StatTurnBehavior.None;
-	[Export] private float incrementValue = 0;
-	[Export] private float decrementValue = 0;
+	 public float incrementValue = 0;
+	 public float decrementValue = 0;
 	[Signal] public delegate void CurrentValueChangedEventHandler(int value, GridObject gridObject);
 	[Signal] public delegate void CurrentValueMinEventHandler(int value, GridObject gridObject);
 	[Signal] public delegate void CurrentValueMaxEventHandler(int value, GridObject gridObject);
+
+	
+	public override Godot.Collections.Array<Godot.Collections.Dictionary> _GetPropertyList()
+	{
+		Godot.Collections.Array<Godot.Collections.Dictionary> properties = [];
+
+		if (turnBehavior.HasFlag(Enums.StatTurnBehavior.Decrement))
+		{
+			properties.Add(new Godot.Collections.Dictionary()
+			{
+				{ "name", $"decrementValue" },
+				{ "type", (int)Variant.Type.Float },
+				{ "hint_string", "Decrement" },
+				
+			});
+		}
+		
+		if (turnBehavior.HasFlag(Enums.StatTurnBehavior.Increment))
+		{
+			properties.Add(new Godot.Collections.Dictionary()
+			{
+				{ "name", $"incrementValue" },
+				{ "type", (int)Variant.Type.Float },
+				{ "hint_string", "Increment" },
+			});
+		}
+
+		return properties;
+	}
 
 	protected override void Setup()
 	{

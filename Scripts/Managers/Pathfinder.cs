@@ -591,7 +591,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 				smoothPath.Add(arcPos);
 
 				// Convert world position to grid coordinates
-				var getGridCellResult = gridSystem.TyGetGridCellFromWorldPosition(arcPos, out GridCell cell, true);
+				var getGridCellResult = gridSystem.TryGetGridCellFromWorldPosition(arcPos, out GridCell cell, true);
 				
 				if (!getGridCellResult)
 				{
@@ -662,6 +662,8 @@ public partial class Pathfinder : Manager<Pathfinder>
 		return GridSystem.Instance;
 	}
 
+	public override string GetManagerName() =>"Pathfinder";
+
 	protected override Task _Setup()
 	{
 		return Task.CompletedTask;
@@ -673,12 +675,12 @@ public partial class Pathfinder : Manager<Pathfinder>
 	}
 	
 	#region manager Data
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

@@ -59,10 +59,11 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
         startingGridCell,
         targetGridCell
       );
-
+    
+    if (!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode)) return Task.CompletedTask;
     if (currentDirection != targetDirection)
     {
-      var rotateActionDefinition = parentGridObject.ActionDefinitions
+      var rotateActionDefinition = gridObjectActionsNode.ActionDefinitions
         .FirstOrDefault(node => node is RotateActionDefinition)
         as RotateActionDefinition;
 

@@ -1,9 +1,11 @@
-[gd_scene load_steps=9 format=3 uid="uid://b1snx3p0mm70d"]
+[gd_scene format=3 uid="uid://b1snx3p0mm70d"]
 
 [ext_resource type="Script" uid="uid://dsh7jd6jrap2e" path="res://Scripts/UI/UIWindows/MainMenuUI.cs" id="1_ppfqp"]
 [ext_resource type="Script" uid="uid://bks7gpsfalv1w" path="res://Scripts/UI/UIWindows/GameSetupUI.cs" id="2_f3rjn"]
+[ext_resource type="Script" uid="uid://cw8v24j03uqg2" path="res://Scripts/Managers/UIManager.cs" id="2_wvc00"]
 [ext_resource type="Script" uid="uid://byqfcs7esjitb" path="res://Scripts/UI/UIAnimations/TranslateUIAnimation.cs" id="3_yh15e"]
 [ext_resource type="Script" uid="uid://dr5vsk7v685hc" path="res://Scripts/Managers/GameManager.cs" id="4_b3n33"]
+[ext_resource type="Script" uid="uid://8e6lc7f6rb65" path="res://Scripts/UI/UIWindows/GameSaveUI.cs" id="4_pc4yg"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_ppfqp"]
 font_size = 60
@@ -21,13 +23,32 @@ metadata/_custom_type_script = "uid://byqfcs7esjitb"
 [sub_resource type="LabelSettings" id="LabelSettings_f3rjn"]
 font_size = 30
 
-[node name="MainMenu" type="Node3D"]
+[node name="MainMenu" type="Node3D" unique_id=1988629780 groups=["Persist"]]
 
-[node name="Main Menu UI" type="Control" parent="." node_paths=PackedStringArray("newGameButton", "quickPlayButton", "quitButton", "gameSettingsMenu", "Visual")]
+[node name="Managers" type="Node" parent="." unique_id=1624183336]
+
+[node name="GameManager" type="Node" parent="Managers" unique_id=955095802 node_paths=PackedStringArray("managers") groups=["Persist"]]
+script = ExtResource("4_b3n33")
+managers = []
+scenePaths = Dictionary[int, String]({
+0: "res://Scenes/main Menu.tscn",
+1: "res://Scenes/BattleScene.tscn"
+})
+metadata/_custom_type_script = "uid://dr5vsk7v685hc"
+
+[node name="UIManager" type="Node" parent="Managers/GameManager" unique_id=1530952581 node_paths=PackedStringArray("uiHolder")]
+script = ExtResource("2_wvc00")
+uiHolder = NodePath("Node")
+metadata/_custom_type_script = "uid://cw8v24j03uqg2"
+
+[node name="Node" type="Control" parent="Managers/GameManager/UIManager" unique_id=866621511]
 layout_mode = 3
 anchors_preset = 0
-offset_right = 1920.0
-offset_bottom = 1080.0
+
+[node name="Main Menu UI" type="Control" parent="Managers/GameManager/UIManager/Node" unique_id=1599162426 node_paths=PackedStringArray("newGameButton", "quickPlayButton", "quitButton", "gameSettingsMenu", "Visual")]
+anchors_preset = 0
+offset_right = 1157.3334
+offset_bottom = 651.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("1_ppfqp")
@@ -36,17 +57,16 @@ quickPlayButton = NodePath("Panel/VBoxContainer/QuickPlayButton")
 quitButton = NodePath("Panel/VBoxContainer/QuitButton")
 gameSettingsMenu = NodePath("Panel/GameSetupUI")
 Visual = NodePath("Panel")
-startHidden = true
 metadata/_custom_type_script = "uid://dsh7jd6jrap2e"
 
-[node name="Panel" type="Panel" parent="Main Menu UI"]
+[node name="Panel" type="Panel" parent="Managers/GameManager/UIManager/Node/Main Menu UI" unique_id=288569446]
 layout_mode = 1
 anchors_preset = 9
 anchor_bottom = 1.0
 offset_right = 400.0
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Main Menu UI/Panel"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel" unique_id=444222343]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -55,38 +75,44 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="Main Menu UI/Panel/VBoxContainer"]
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=2096741348]
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 text = "Grid Game"
 label_settings = SubResource("LabelSettings_ppfqp")
 horizontal_alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="Main Menu UI/Panel/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=1015503041]
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="NewGameButton" type="Button" parent="Main Menu UI/Panel/VBoxContainer"]
+[node name="NewGameButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=263710036]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "New Game"
 
-[node name="QuickPlayButton" type="Button" parent="Main Menu UI/Panel/VBoxContainer"]
+[node name="Load Game" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=747262825]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+text = "Load Game"
+
+[node name="QuickPlayButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=472208565]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "QuickPlay"
 
-[node name="CreditsButton" type="Button" parent="Main Menu UI/Panel/VBoxContainer"]
+[node name="CreditsButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=1972266005]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Creditss"
 
-[node name="QuitButton" type="Button" parent="Main Menu UI/Panel/VBoxContainer"]
+[node name="QuitButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/VBoxContainer" unique_id=257504427]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Quit Game "
 
-[node name="GameSetupUI" type="Control" parent="Main Menu UI/Panel" node_paths=PackedStringArray("mapSizeX", "mapSizeY", "PlayerUnitCounts", "EnemyUnitCounts", "startGameButton", "Visual", "toggleButton")]
+[node name="GameSetupUI" type="Control" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel" unique_id=2013068547 node_paths=PackedStringArray("mapSizeX", "mapSizeY", "PlayerUnitCounts", "EnemyUnitCounts", "startGameButton", "Visual", "toggleButton")]
+visible = false
 layout_mode = 1
 anchors_preset = 11
 anchor_left = 1.0
@@ -110,7 +136,7 @@ showAnimation = SubResource("Resource_b3n33")
 hideAnimation = SubResource("Resource_pc4yg")
 metadata/_custom_type_script = "uid://bks7gpsfalv1w"
 
-[node name="Panel" type="Panel" parent="Main Menu UI/Panel/GameSetupUI"]
+[node name="Panel" type="Panel" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI" unique_id=1753173152]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -118,7 +144,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel" unique_id=1515651650]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -127,26 +153,26 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 2
 
-[node name="Label" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer"]
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer" unique_id=13653371]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Game Settings"
 label_settings = SubResource("LabelSettings_f3rjn")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer" unique_id=704034029]
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_horizontal = 3
 alignment = 1
 
-[node name="Label" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer"]
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer" unique_id=1607465684]
 layout_mode = 2
 text = "map Size"
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer" unique_id=353101593]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer" unique_id=1082250425]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
 size_flags_vertical = 1
@@ -154,12 +180,12 @@ text = "X"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="mapSizeX" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
+[node name="mapSizeX" type="SpinBox" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer" unique_id=1804362033]
 layout_mode = 2
 size_flags_horizontal = 3
 value = 1.0
 
-[node name="Label2" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
+[node name="Label2" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer" unique_id=1060635901]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
 size_flags_vertical = 1
@@ -167,26 +193,26 @@ text = "Y"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="mapSizeY" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer"]
+[node name="mapSizeY" type="SpinBox" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer/HBoxContainer" unique_id=614665289]
 layout_mode = 2
 size_flags_horizontal = 3
 value = 1.0
 rounded = true
 
-[node name="VBoxContainer3" type="VBoxContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer"]
+[node name="VBoxContainer3" type="VBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer" unique_id=1033341237]
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_horizontal = 3
 alignment = 1
 
-[node name="Label" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3"]
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3" unique_id=992961324]
 layout_mode = 2
 text = "unit Counts "
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3"]
+[node name="HBoxContainer" type="HBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3" unique_id=78480342]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer" unique_id=447134633]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
 size_flags_vertical = 1
@@ -194,13 +220,13 @@ text = "player"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Player Unit Counts" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
+[node name="Player Unit Counts" type="SpinBox" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer" unique_id=298692859]
 layout_mode = 2
 size_flags_horizontal = 3
 value = 1.0
 rounded = true
 
-[node name="Label2" type="Label" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
+[node name="Label2" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer" unique_id=69762415]
 custom_minimum_size = Vector2(20, 0)
 layout_mode = 2
 size_flags_vertical = 1
@@ -208,18 +234,18 @@ text = "Enemy"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Enemy Unit Counts" type="SpinBox" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer"]
+[node name="Enemy Unit Counts" type="SpinBox" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer/VBoxContainer3/HBoxContainer" unique_id=1297041352]
 layout_mode = 2
 size_flags_horizontal = 3
 value = 1.0
 rounded = true
 
-[node name="StartGameButton" type="Button" parent="Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer"]
+[node name="StartGameButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/VBoxContainer" unique_id=410461656]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 text = "Start Game"
 
-[node name="AspectRatioContainer" type="AspectRatioContainer" parent="Main Menu UI/Panel/GameSetupUI/Panel"]
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel" unique_id=489076340]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -228,17 +254,93 @@ offset_left = -40.0
 offset_bottom = 40.0
 grow_horizontal = 0
 
-[node name="Button" type="Button" parent="Main Menu UI/Panel/GameSetupUI/Panel/AspectRatioContainer"]
+[node name="Button" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/GameSetupUI/Panel/AspectRatioContainer" unique_id=1740774074]
 layout_mode = 2
 text = "X"
 
-[node name="Managers" type="Node" parent="."]
+[node name="UIWindow" type="Control" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel" unique_id=479456695 node_paths=PackedStringArray("_itemList", "_saveNameEdit", "_saveButton", "_loadButton", "_deleteButton", "Visual")]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = 1.0
+offset_top = -20.0
+offset_right = 83.0
+offset_bottom = 20.0
+grow_horizontal = 0
+grow_vertical = 2
+script = ExtResource("4_pc4yg")
+_itemList = NodePath("Panel/VBoxContainer/ItemList")
+_saveNameEdit = NodePath("Panel/VBoxContainer/TextEdit")
+_saveButton = NodePath("Panel/VBoxContainer/HBoxContainer/SaveButton")
+_loadButton = NodePath("Panel/VBoxContainer/HBoxContainer/LoadButton")
+_deleteButton = NodePath("Panel/VBoxContainer/HBoxContainer/DeleteButton")
+Visual = NodePath("Panel")
+metadata/_custom_type_script = "uid://bc6x81kp7kdgk"
 
-[node name="GameManager" type="Node" parent="Managers" node_paths=PackedStringArray("managers")]
-script = ExtResource("4_b3n33")
-managers = []
-scenePaths = Dictionary[int, String]({
-0: "res://Scenes/main Menu.tscn",
-1: "res://Scenes/BattleScene.tscn"
-})
-metadata/_custom_type_script = "uid://dr5vsk7v685hc"
+[node name="Panel" type="Panel" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow" unique_id=1325885714]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -214.5
+offset_right = 244.0
+offset_bottom = 214.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel" unique_id=1822468151]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=1189107065]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+text = "Load Games
+"
+
+[node name="HSeparator" type="HSeparator" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=1604314231]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="TextEdit" type="TextEdit" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=247857122]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=139478891]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="ItemList" type="ItemList" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=1389718970]
+layout_mode = 2
+size_flags_vertical = 3
+auto_width = true
+
+[node name="HSeparator3" type="HSeparator" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=874773923]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer" unique_id=1851192507]
+custom_minimum_size = Vector2(0, 75)
+layout_mode = 2
+
+[node name="SaveButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer/HBoxContainer" unique_id=552150095]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save"
+
+[node name="LoadButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer/HBoxContainer" unique_id=467694240]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Load"
+
+[node name="DeleteButton" type="Button" parent="Managers/GameManager/UIManager/Node/Main Menu UI/Panel/UIWindow/Panel/VBoxContainer/HBoxContainer" unique_id=789246294]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Delete"

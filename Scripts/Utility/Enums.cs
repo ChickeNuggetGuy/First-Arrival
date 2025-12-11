@@ -69,7 +69,8 @@ public class Enums
 		Health,
 		Stamina,
 		Bravery,
-		TimeUnits
+		TimeUnits,
+		RangedAccuracy
 	}
 
 	public enum StatTurnBehavior

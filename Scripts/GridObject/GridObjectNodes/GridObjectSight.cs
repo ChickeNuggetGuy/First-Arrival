@@ -17,7 +17,7 @@ public partial class GridObjectSight : GridObjectNode
 
   private readonly List<GridCell> _visibleCells = new();
   public IReadOnlyList<GridCell> VisibleCells => _visibleCells.AsReadOnly();
-
+  
   protected override void Setup()
   {
     CalculateSightArea();

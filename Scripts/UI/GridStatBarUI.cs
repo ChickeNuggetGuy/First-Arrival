@@ -56,8 +56,8 @@ public partial class GridStatBarUI : UIElement
 			_stat.CurrentValueChanged -= StatOnCurrentValueChanged;
 			_stat = null;
 		}
-	
-		GridObjectStat gridObjectStat = gridObject.Stats.FirstOrDefault(s => s.Stat == stat);
+		if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
+		GridObjectStat gridObjectStat = statHolder.Stats.FirstOrDefault(s => s.Stat == stat);
 		if (gridObjectStat == null) return;
 
 		_stat = gridObjectStat;

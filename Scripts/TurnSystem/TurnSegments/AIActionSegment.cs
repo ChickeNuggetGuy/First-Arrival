@@ -31,12 +31,15 @@ namespace FirstArrival.Scripts.AI
         {
             GD.Print("Executing AIActionSegment");
             GridObject[] activeGridObjects = teamHolder.GridObjects[Enums.GridObjectState.Active].Where(gridObject =>
-                gridObject.ActionDefinitions != null && gridObject.ActionDefinitions.Length > 0).ToArray();
+                gridObject.TryGetGridObjectNode<GridObjectActions>(out var actions) != false && actions.ActionDefinitions.Length > 0).ToArray();
 
             foreach (GridObject activeGridObject in activeGridObjects)
             {
                 GD.Print($"Processing actions for {activeGridObject.Name}");
-
+                
+                if(!activeGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
+                if(!activeGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) continue;
+                if (!activeGridObject.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory)) continue;
                 for (int i = 0; i < _maxActionAttempts; i++)
                 {
 	                GD.Print($"Attempt {i + 1} of {_maxActionAttempts}");
@@ -45,8 +48,8 @@ namespace FirstArrival.Scripts.AI
 
                     // Scan item actions
                     var inventoriesToScan = new List<InventoryGrid>();
-                    if (activeGridObject.TryGetInventory(Enums.InventoryType.RightHand, out var rightHand)) inventoriesToScan.Add(rightHand);
-                    if (activeGridObject.TryGetInventory(Enums.InventoryType.LeftHand, out var leftHand)) inventoriesToScan.Add(leftHand);
+                    if (gridObjectInventory.TryGetInventory(Enums.InventoryType.RightHand, out var rightHand)) inventoriesToScan.Add(rightHand);
+                    if (gridObjectInventory.TryGetInventory(Enums.InventoryType.LeftHand, out var leftHand)) inventoriesToScan.Add(leftHand);
 
                     foreach (var inventory in inventoriesToScan)
                     {
@@ -73,7 +76,7 @@ namespace FirstArrival.Scripts.AI
                     }
 
                     // Scan non-item actions
-                    foreach (var action in activeGridObject.ActionDefinitions)
+                    foreach (var action in gridObjectActions.ActionDefinitions)
                     {
                         if (action is not IItemActionDefinition)
                         {
@@ -103,7 +106,7 @@ namespace FirstArrival.Scripts.AI
                     }
 
                     // Step 3: Execute the best action if affordable.
-                    if (activeGridObject.CanAffordStatCost(bestAction.costs))
+                    if (statHolder.CanAffordStatCost(bestAction.costs))
                     {
                         GD.Print($"Executing action for {activeGridObject.Name}: {bestAction.actionDefinition.GetActionName()} with score {bestAction.score}");
                         await ExecuteAiAction(activeGridObject, bestAction.target, bestAction.score, bestAction.actionDefinition);

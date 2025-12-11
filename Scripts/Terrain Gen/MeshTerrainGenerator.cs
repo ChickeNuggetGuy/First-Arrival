@@ -23,8 +23,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   [Export] private int maxHeightY = 20;
   [Export]
   private Color color { get; set; }
-
-  // Height field: [X, Z] where X=East-West, Z=North-South
+  
   public Vector3[,] terrainHeights { get; set; }
 
   [ExportGroup("Chunk Overrides")]
@@ -56,6 +55,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   #endregion
 
   #region Setup and Execution
+
+  public override string GetManagerName() =>"TerrainGenerator";
 
   protected override async Task _Setup()
   {
@@ -153,17 +154,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
     noise.FractalGain = 0.5f;
 
     float chunkWorldSize = chunkSize * cellSize.X;
-
-    // CONSISTENT: Loop over X (East-West) and Z (North-South)
+	
     for (int x = 0; x < vertsX; x++)
     {
       for (int z = 0; z < vertsZ; z++)
       {
-        // World coordinates
         float worldX = x * cellSize.X;
         float worldZ = -(z * cellSize.X); // negative Z is forward (North)
-
-        // Determine which chunk this vertex belongs to
+        
         int chunkX = Mathf.Clamp(
           Mathf.FloorToInt(worldX / chunkWorldSize),
           0,
@@ -188,7 +186,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
         else
         {
           float rawNoise = noise.GetNoise2D(x, z); // Range [-1, 1]
-
+          
+          if (rawNoise < 0.0f) rawNoise = 0.0f;
           // Scale to desired max height (e.g., 30 units)
           float scaledNoise = rawNoise * maxHeightY;
 
@@ -896,12 +895,12 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
   #region manager Data
 
-  protected override void GetInstanceData(ManagerData data)
+  public override void Load(Godot.Collections.Dictionary<string,Variant> data)
   {
     GD.Print("No data to transfer");
   }
 
-  public override ManagerData SetInstanceData()
+  public override Godot.Collections.Dictionary<string,Variant> Save()
   {
     return null;
   }

@@ -128,6 +128,8 @@ public partial class MoveActionDefinition : ActionDefinition
 		  GD.Print("Parent grid object is null");
 		  return (null, 0);
 	  }
+	  
+	  if (!parentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sightArea)) return (null, 0);
 
 	  GridCell startingCell = parentGridObject.GridPositionData.GridCell;
 	  if (startingCell == null)
@@ -136,15 +138,16 @@ public partial class MoveActionDefinition : ActionDefinition
 		  return (null, 0);
 	  }
 
-	  // if (targetGridCell.HasGridObject())
+	  if (targetGridCell.HasGridObject())
 		  return (targetGridCell, 0);
+
+	
 	  
-	  GridObjectSight sightArea = parentGridObject.gridObjectNodesDictionary["all"].FirstOrDefault(node => node is GridObjectSight) as GridObjectSight;
 	  if (sightArea == null) return (targetGridCell, 0);
 	  
 	  if(sightArea.SeenGridObjects.Count > 0)
 	  {
-		  GD.Print("Can seen grid objects");
+		  GD.Print("Can see grid objects");
 		  return (targetGridCell, 0);
 	  }
 

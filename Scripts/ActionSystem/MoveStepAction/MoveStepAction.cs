@@ -36,11 +36,13 @@ public class MoveStepAction : Action, ICompositeAction
         targetGridCell
       );
 
+    if (!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
+
     if (currentDirection != targetDirection)
     {
       // Not facing the correct direction, rotate first
       var rotateActionDefinition =
-        parentGridObject.ActionDefinitions.FirstOrDefault(
+	      gridObjectActions.ActionDefinitions.FirstOrDefault(
           node => node is RotateActionDefinition
         ) as RotateActionDefinition;
 

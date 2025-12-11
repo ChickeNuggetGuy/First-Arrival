@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="Turn" load_steps=8 format=3 uid="uid://dydb2scxl4eyb"]
+[gd_resource type="Resource" script_class="Turn" format=3 uid="uid://dydb2scxl4eyb"]
 
 [ext_resource type="Script" uid="uid://c545g83g71bd6" path="res://Scripts/TurnSystem/Turn.cs" id="1_trxta"]
 [ext_resource type="Script" uid="uid://hn2sdgvlyvdp" path="res://Scripts/TurnSystem/TurnSegments/ProcessGridObjectsSegment.cs" id="2_l5t4u"]

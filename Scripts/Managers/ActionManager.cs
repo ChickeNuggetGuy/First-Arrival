@@ -16,6 +16,11 @@ public partial class ActionManager : Manager<ActionManager>
 
 	[Signal]
 	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
+	
+	
+	public override string GetManagerName() =>  "ActionManager";
+	
+	
 	protected override async Task _Setup()
 	{
 		await Task.CompletedTask;
@@ -64,8 +69,8 @@ public partial class ActionManager : Manager<ActionManager>
 					return;
 				}
 			}
-
-			ActionDefinition[] actions = selectedGridObject.ActionDefinitions
+			if(!selectedGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))return;
+			ActionDefinition[] actions = gridObjectActionsNode.ActionDefinitions
 				.Where(action => action.GetIsAlwaysActive())
 				.ToArray();
 
@@ -152,12 +157,19 @@ public partial class ActionManager : Manager<ActionManager>
 			GD.Print("TryTakeAction: action is null");
 			return false;
 		}
-
+	
 		if (gridObject == null)
 		{
 			GD.Print("TryTakeAction: gridObject is null");
 			return false;
 		}
+		
+		if (startingGridCell == null)
+		{
+			GD.Print("TryTakeAction: startingGridCell is null");
+			return false;
+		}
+
 
 		if (targetGridCell == null)
 		{
@@ -259,8 +271,8 @@ public partial class ActionManager : Manager<ActionManager>
 			{
 				if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
 				{
-					SetSelectedAction(GridObjectManager.Instance
-						.CurrentPlayerGridObject
+					if(!GridObjectManager.Instance.CurrentPlayerGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))
+					SetSelectedAction(gridObjectActionsNode
 						.ActionDefinitions
 						.First());
 				}
@@ -269,12 +281,12 @@ public partial class ActionManager : Manager<ActionManager>
 	}
 
 	#region manager Data
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

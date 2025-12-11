@@ -7,6 +7,7 @@ using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 using Godot;
+using Godot.Collections;
 
 [GlobalClass]
 public partial class GridObject : Node3D, IContextUser<GridObject>
@@ -17,44 +18,12 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export]public Enums.UnitTeam Team {get; private set;}
 
 	[Export] protected Node GridObjectNodeHolder;
-	
+	[Export] public CollisionObject3D collisionShape;
+	[Export] public Node3D objectCenter;
 	public GridObjectTeamHolder TeamHolder { get; protected set; }
-	public System.Collections.Generic.Dictionary<string, List<GridObjectNode>> gridObjectNodesDictionary = new System.Collections.Generic.Dictionary<string, List<GridObjectNode>>();
-	
-	[Export(PropertyHint.ResourceType, "ActionDefinition")]
-	public ActionDefinition[] ActionDefinitions { get; protected set; }
-	
-	[Export,ExportGroup("Stats")] protected Node statHolder;
-	public List<GridObjectStat> Stats
-	{
-		get
-		{
-			if (gridObjectNodesDictionary == null) return null;
-			if (gridObjectNodesDictionary.Count == 0) return null;
-			if (!gridObjectNodesDictionary.ContainsKey("stats")) return null;
-			return gridObjectNodesDictionary["stats"].Cast<GridObjectStat>().ToList();
-		}
-		private set{}
-	}
-	
-	public List<GridObjectSight> Sights
-	{
-		get
-		{
-			if (gridObjectNodesDictionary == null) return null;
-			if (gridObjectNodesDictionary.Count == 0) return null;
-			if (!gridObjectNodesDictionary.ContainsKey("sights")) return null;
-			return gridObjectNodesDictionary["sights"].Cast<GridObjectSight>().ToList();
-		}
-		private set{}
-	}
-	
-	[Export, ExportGroup("Inventory")]
-	protected Godot.Collections.Array<Enums.InventoryType> inventoryTypes = new Godot.Collections.Array<Enums.InventoryType>();
+	[Export]public Array<GridObjectNode> gridObjectNodes = new Array<GridObjectNode>();
 
-	private System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids =
-		new System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid>();
-
+	
 	[Export]public Enums.GridObjectSettings gridObjectSettings = Enums.GridObjectSettings.None;
 
 	public bool IsInitialized { get; protected set; }= false;
@@ -65,160 +34,74 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public virtual async Task Initialize(Enums.UnitTeam team, GridCell gridCell)
 	{
 		TeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(team);
-		GD.Print($"GridObject: {Name} :Initialize");
+		GD.Print($"GridObject: {Name} :Initializing");
 		Team = team;
 
 		if (gridCell == null)
 		{
-			GridSystem.Instance.TyGetGridCellFromWorldPosition(GridPositionData.GlobalPosition, out gridCell, true);
+			GridSystem.Instance.TryGetGridCellFromWorldPosition(GridPositionData.GlobalPosition, out gridCell, true);
 		}
-		
+
 		InitializeGridObjectNodes();
 		GridPositionData.Setup();
 		GridPositionData.SetGridCell(gridCell);
 
 		await Task.Yield();
-		InitializeRuntimeInventories();
-		InitializeActionDefinitions();
 		GridPositionData.SetDirection(Enums.Direction.North);
 		IsInitialized = true;
+		GD.Print($"GridObject: {Name} :Initialized");
 	}
 
-	private void InitializeActionDefinitions()
-	{
-		if (ActionDefinitions == null) return;
 
-		foreach (var actionDefinition in ActionDefinitions)
-		{
-			if (actionDefinition == null)
-			{
-				GD.Print("actionDefinition is null");
-				continue;
-			}
-			actionDefinition.parentGridObject = this;
-		}
-	}
 	private void InitializeGridObjectNodes()
 	{
-		if (GridObjectNodeHolder == null) return;
-
-		System.Collections.Generic.Dictionary<string, List<GridObjectNode>> gridObjectNodesDict =
-			new System.Collections.Generic.Dictionary<string, List<GridObjectNode>>()
-			{
-				{ "all", new List<GridObjectNode>() },
-				{ "stats", new List<GridObjectNode>() },
-				{ "sights", new List<GridObjectNode>() },
-				{ "actionDefinitions", new List<GridObjectNode>() }
-			};
-
-		if (!this.TryGetAllComponentsInChildrenRecursive<GridObjectNode>(out List<GridObjectNode> gridObjectNodes))
-			return;
-
-		foreach (var node in gridObjectNodes)
+		Array<GridObjectNode> gridObjectNodesArray = new Array<GridObjectNode>() { };
+		if (GridObjectNodeHolder == null)
 		{
-			gridObjectNodesDict["all"].Add(node);
-			node.SetupCall(this);
-			if (node == null) continue;
-			else if (node is GridObjectStat stat)
+			Node gridObjectNode = new Node();
+			gridObjectNode.Name = "Grid Object Node Holder";
+			AddChild(gridObjectNode);
+		}
+		else
+		{
+			if (!GridObjectNodeHolder.TryGetAllComponentsInChildren<GridObjectNode>(
+				    out List<GridObjectNode> gridObjectNodes))
 			{
-				gridObjectNodesDict["stats"].Add(stat);
-			}
-			else if (node is GridObjectSight sight)
-			{
-				gridObjectNodesDict["sights"].Add(sight);
+				GD.Print("Error: GridObjectNodeHolder doesn't contain any GridObjectNode");
 			}
 			else
 			{
-				GD.Print($"GridObjectNode of type {node.GetType()} found was not properly sorted!");
+				foreach (var node in gridObjectNodes)
+				{
+					if (node == null) continue;
+					gridObjectNodesArray.Add(node);
+					node.SetupCall(this);
+
+				}
 			}
 		}
 
-		gridObjectNodesDictionary =  gridObjectNodesDict;
+		this.gridObjectNodes =  gridObjectNodesArray;
 	}
 
-	private void InitializeRuntimeInventories()
+	public System.Collections.Generic.Dictionary<String, Callable> GetContextActions()
 	{
-		InventoryManager inventoryManager = InventoryManager.Instance;
-		if (inventoryManager == null) return;
-		foreach (Enums.InventoryType inventoryType in inventoryTypes)
-		{
-			InventoryGrid inventory = inventoryManager.GetInventoryGrid(inventoryType);
-			if (inventory == null) continue;
-			inventoryGrids.Add(inventoryType, inventory);
+		System.Collections.Generic.Dictionary<String, Callable> actions = new();
 
-			if (inventoryType == Enums.InventoryType.LeftHand)
+		foreach (var gridObjectNode in gridObjectNodes)
+		{
+			if (gridObjectNode == null) continue;
+
+			if (gridObjectNode is IContextUser<GridObjectNode> contextUser)
 			{
-				inventory.TryAddItem(InventoryManager.Instance.GetRandomItem(),1);
-			}
-		}	
-	}
-	
-	public bool TryGetStat(Enums.Stat statToFind, out GridObjectStat stat)
-	{
-		stat = null;
-		if(!gridObjectNodesDictionary.ContainsKey("stats")) return false;
-		if (gridObjectNodesDictionary["stats"] == null) return false;
-
-		stat = (GridObjectStat)gridObjectNodesDictionary["stats"].FirstOrDefault(gridObjectNode =>
-		    {
-				if(gridObjectNode is  not GridObjectStat statObj)return false;
-				if(statObj.Stat == statToFind) return true;
-				return false;
-		    });
-		
-		if (stat == null) return false;
-		else return true;
-	}
-	
-	public bool CanAffordStatCost(System.Collections.Generic.Dictionary<Enums.Stat, int> costs)
-	{
-		foreach (var stat in costs)
-		{
-			GridObjectStat statObj = Stats.FirstOrDefault(statObj => statObj.Stat == stat.Key);
-			
-			if (statObj == null) return false;
-			
-			if (stat.Value  > statObj.CurrentValue ) return false;
-		}
-		return true;
-	}
-
-	public bool TryGetInventory(Enums.InventoryType inventoryType, out InventoryGrid inventory)
-	{
-		inventory = null;
-		if (inventoryGrids == null) return false;
-		if (!inventoryGrids.ContainsKey(inventoryType)) return false;
-		
-		inventory = inventoryGrids[inventoryType];
-		return true;
-		
-	}
-
-
-	public Dictionary<String,Callable> GetContextActions()
-	{
-		Dictionary<String,Callable> actions = new();
-		
-		foreach (var action in ActionDefinitions)
-		{
-			actions.Add(action.GetActionName() ,Callable.From(() => ActionManager.Instance.SetSelectedAction(action)));
-		}
-		foreach (var inventoryPair in inventoryGrids)
-		{
-			if (inventoryPair.Value == null) continue;
-			if(!inventoryPair.Value.InventorySettings.HasFlag(Enums.InventorySettings.IsEquipmentinventory)) continue;
-			
-			if(inventoryPair.Value.ItemCount < 1) continue;
-			
-			List<Item> items = inventoryPair.Value.UniqueItems.Select(i =>i.item).ToList();
-
-			foreach (var item in items)
-			{
-				Dictionary<String, Callable> itemCallables = new Dictionary<string, Callable>();
-				foreach (var c in itemCallables)
-					actions.Add(c.Key, c.Value);
+				var nodeActions = contextUser.GetContextActions();
+				foreach (var nodeAction in nodeActions)
+				{
+					actions.Add(nodeAction.Key, nodeAction.Value);
+				}
 			}
 		}
+		
 		return actions;
 	}
 
@@ -231,9 +114,9 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public bool TryGetGridObjectNode<T>(out T node) where T : GridObjectNode
 	{
 		node = null;
-		if(gridObjectNodesDictionary == null) return false;
+		if(gridObjectNodes == null) return false;
 		
-		node = gridObjectNodesDictionary["all"].FirstOrDefault(n => n is T) as T;
+		node = gridObjectNodes.FirstOrDefault(n => n is T) as T;
 		return node != null;
 	}
 }

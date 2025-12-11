@@ -12,12 +12,12 @@ config_version=5
 
 config/name="First Arrival"
 run/main_scene="uid://b1snx3p0mm70d"
-config/features=PackedStringArray("4.5", "C#", "Forward Plus")
+config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
-PhantomCameraManager="*res://addons/phantom_camera/scripts/managers/phantom_camera_manager.gd"
+PhantomCameraManager="*uid://duq6jhf6unyis"
 
 [debug_draw_3d]
 
@@ -44,13 +44,15 @@ folder_colors={
 "res://Scenes/UI/": "teal",
 "res://Scripts/": "red",
 "res://Shaders/": "blue",
-"res://Third-Party Assets/": "gray"
+"res://Third-Party Assets/": "gray",
+"res://addons/": "gray"
 }
 
 [global_group]
 
 GridObjects=""
 GridCellOverride=""
+Persist=""
 
 [input]
 

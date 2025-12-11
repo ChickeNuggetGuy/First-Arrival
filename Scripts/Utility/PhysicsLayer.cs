@@ -6,7 +6,7 @@ public class PhysicsLayer
 {
 	public const int DEFAULT = 1 << 0;    // Layer 1
 	public const int TERRAIN = 1 << 1;    // Layer 2
-	public const int PLAYER = 1 << 2;     // Layer 3
+	public const int GRIDOBJECT = 1 << 2;     // Layer 3
 	public const int ENEMY = 1 << 3;      // Layer 4
 	public const int OBSTACLE = 1 << 4;   // Layer 5
 	

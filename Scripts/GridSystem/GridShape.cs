@@ -5,9 +5,9 @@ using Godot.Collections;
 [GlobalClass, Tool]
 public partial class GridShape : Resource
 {
-    // Use X and Z to match grid coordinates
-    private int _gridSizeX = 3;  // East-West extent
-    private int _gridSizeZ = 3;  // North-South extent (depth)
+    private int _gridSizeX = 3; 
+    private int _gridSizeY = 3; 
+    private int _gridSizeZ = 3; 
 
     [Export]
     public int GridSizeX
@@ -15,18 +15,25 @@ public partial class GridShape : Resource
         get => _gridSizeX;
         set
         {
-            if (_gridSizeX == value || value <= 0)
-                return;
-
+            if (_gridSizeX == value || value <= 0) return;
             int oldSize = _gridSizeX;
             _gridSizeX = value;
-
-            RebuildShapeGrid(oldSize, _gridSizeZ);
-            if (Engine.IsEditorHint())
-            {
-                NotifyPropertyListChanged();
-                EmitChanged();
-            }
+            RebuildShapeGrid(oldSize, _gridSizeY, _gridSizeZ);
+            NotifyChange();
+        }
+    }
+    
+    [Export]
+    public int GridSizeY
+    {
+        get => _gridSizeY;
+        set
+        {
+            if (_gridSizeY == value || value <= 0) return;
+            int oldSize = _gridSizeY;
+            _gridSizeY = value;
+            RebuildShapeGrid(_gridSizeX, oldSize, _gridSizeZ);
+            NotifyChange();
         }
     }
 
@@ -36,69 +43,57 @@ public partial class GridShape : Resource
         get => _gridSizeZ;
         set
         {
-            if (_gridSizeZ == value || value <= 0)
-                return;
-
+            if (_gridSizeZ == value || value <= 0) return;
             int oldSize = _gridSizeZ;
             _gridSizeZ = value;
-
-            RebuildShapeGrid(_gridSizeX, oldSize);
-            if (Engine.IsEditorHint())
-            {
-                NotifyPropertyListChanged();
-                EmitChanged();
-            }
+            RebuildShapeGrid(_gridSizeX, _gridSizeY, oldSize);
+            NotifyChange();
         }
     }
 
-    // Root coordinates now clearly X and Z
-    [Export] public Vector2I RootCellCoordinates { get; set; } // X, Z
+    [Export] public Vector2I RootCellCoordinates { get; set; }
 
     [Export]
-    public Array<bool> ShapeGrid { get; private set; }
+    public Array<bool> ShapeGrid { get; set; }
 
     public GridShape()
     {
-        int newSize = _gridSizeX * _gridSizeZ;
+        // Ensure we initialize with a safe default
+        int newSize = _gridSizeX * _gridSizeY * _gridSizeZ;
         ShapeGrid = new Array<bool>();
         ShapeGrid.Resize(newSize);
         ShapeGrid.Fill(false);
     }
 
-    // Now takes x and z instead of x and y
-    public void SetGridShapeCell(int x, int z, bool value)
+    // UPDATED: Now takes X, Y, and Z
+    public void SetGridShapeCell(int x, int y, int z, bool value)
     {
-        if (x < 0 || x >= _gridSizeX || z < 0 || z >= _gridSizeZ)
-            return;
+        if (!IsValidCoordinate(x, y, z)) return;
 
-        int index = z * _gridSizeX + x;
+        // Flat index: x + (z * width) + (y * width * depth)
+        int index = x + (z * _gridSizeX) + (y * _gridSizeX * _gridSizeZ);
+
         if (index < ShapeGrid.Count)
         {
-            if (ShapeGrid[index] == value)
-                return;
-
+            if (ShapeGrid[index] == value) return;
             ShapeGrid[index] = value;
-            if (Engine.IsEditorHint())
-                EmitChanged();
+            
+            if (Engine.IsEditorHint()) EmitChanged();
         }
     }
 
-    public bool GetGridShapeCell(int x, int z)
+    // UPDATED: Now takes X, Y, and Z
+    public bool GetGridShapeCell(int x, int y, int z)
     {
-        if (ShapeGrid == null)
-            return false;
+        if (ShapeGrid == null || !IsValidCoordinate(x, y, z)) return false;
 
-        if (x < 0 || x >= _gridSizeX || z < 0 || z >= _gridSizeZ)
-            return false;
-
-        int index = z * _gridSizeX + x;
+        int index = x + (z * _gridSizeX) + (y * _gridSizeX * _gridSizeZ);
         return index < ShapeGrid.Count ? ShapeGrid[index] : false;
     }
 
     public void SetAllCells(bool value)
     {
-        if (ShapeGrid == null || ShapeGrid.Count == 0)
-            return;
+        if (ShapeGrid == null || ShapeGrid.Count == 0) return;
 
         bool anyChange = false;
         for (int i = 0; i < ShapeGrid.Count; i++)
@@ -110,38 +105,57 @@ public partial class GridShape : Resource
             }
         }
 
-        if (anyChange && Engine.IsEditorHint())
+        if (anyChange && Engine.IsEditorHint()) EmitChanged();
+    }
+
+    private bool IsValidCoordinate(int x, int y, int z)
+    {
+        return x >= 0 && x < _gridSizeX &&
+               y >= 0 && y < _gridSizeY &&
+               z >= 0 && _gridSizeZ > 0 && z < _gridSizeZ;
+    }
+
+    private void NotifyChange()
+    {
+        if (Engine.IsEditorHint())
+        {
+            NotifyPropertyListChanged();
             EmitChanged();
+        }
     }
 
-    public void OnGridSizeChanged(int oldSizeX, int oldSizeZ)
+    private void RebuildShapeGrid(int oldX, int oldY, int oldZ, bool force = false)
     {
-        RebuildShapeGrid(oldSizeX, oldSizeZ);
-    }
-
-    private void RebuildShapeGrid(int oldX, int oldZ, bool force = false)
-    {
-        int newSize = _gridSizeX * _gridSizeZ;
+        int newSize = _gridSizeX * _gridSizeZ * _gridSizeY;
         var newGrid = new Array<bool>();
         newGrid.Resize(newSize);
         newGrid.Fill(false);
 
-        if (!force && ShapeGrid != null && ShapeGrid.Count > 0 && oldX > 0 && oldZ > 0)
+        if (!force && ShapeGrid != null && ShapeGrid.Count > 0 && oldX > 0 && oldY > 0 && oldZ > 0)
         {
             int minX = Math.Min(oldX, _gridSizeX);
+            int minY = Math.Min(oldY, _gridSizeY);
             int minZ = Math.Min(oldZ, _gridSizeZ);
-            for (int z = 0; z < minZ; z++)
+
+            for (int y = 0; y < minY; y++)
             {
-                for (int x = 0; x < minX; x++)
+                for (int z = 0; z < minZ; z++)
                 {
-                    int oldIdx = z * oldX + x;
-                    int newIdx = z * _gridSizeX + x;
-                    if (oldIdx < ShapeGrid.Count)
-                        newGrid[newIdx] = ShapeGrid[oldIdx];
+                    for (int x = 0; x < minX; x++)
+                    {
+                        // Calculate OLD index
+                        int oldIdx = x + (z * oldX) + (y * oldX * oldZ);
+                        // Calculate NEW index
+                        int newIdx = x + (z * _gridSizeX) + (y * _gridSizeX * _gridSizeZ);
+
+                        if (oldIdx < ShapeGrid.Count && newIdx < newSize)
+                        {
+                            newGrid[newIdx] = ShapeGrid[oldIdx];
+                        }
+                    }
                 }
             }
         }
-
         ShapeGrid = newGrid;
     }
 }

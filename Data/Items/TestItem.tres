@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ItemData" load_steps=11 format=3 uid="uid://c5ykfuhyygnx5"]
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://c5ykfuhyygnx5"]
 
 [ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="1_3n6qk"]
 [ext_resource type="Texture2D" uid="uid://dgsw1kfhvr4yk" path="res://icon.svg" id="1_8fx0k"]
@@ -23,9 +23,10 @@ script = ExtResource("3_q3em7")
 
 [sub_resource type="Resource" id="Resource_6rvun"]
 script = ExtResource("5_q3em7")
-GridWidth = 2
-GridHeight = 2
-ShapeGrid = Array[bool]([false, false, false, false])
+GridSizeX = 2
+GridSizeY = 1
+GridSizeZ = 2
+ShapeGrid = Array[bool]([true, true, true, true])
 metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]
@@ -35,6 +36,6 @@ ItemIcon = ExtResource("1_8fx0k")
 ItemShape = SubResource("Resource_6rvun")
 ActionDefinitions = Array[Object]([SubResource("Resource_3n6qk"), SubResource("Resource_14h5b"), SubResource("Resource_hs4ol")])
 ItemSettings = 15
-Damage = 200
+Damage = 20
 Range = 200
 metadata/_custom_type_script = "uid://da4j8smky5g6x"

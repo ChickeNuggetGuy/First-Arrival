@@ -142,6 +142,26 @@ public static class NodeExtensions
 
 		return retList.Count > 0;
 	}
+	
+	public static bool TryGetAllComponentsInChildren<T>(
+		this Node node,
+		out List<T> retList,
+		string attachedScriptPropertyName = null
+	) where T : class
+	{
+		retList = new List<T>();
+
+		foreach (Node child in node.GetChildren())
+		{
+			// Check if the child itself is of type T.
+			if (child is T component)
+			{
+				retList.Add(component);
+			}
+		}
+
+		return retList.Count > 0;
+	}
 
 	public static T GetOrCreateNodeAndAddAsChild<T>(this Node parent, string path) where T : Node, new()
 	{

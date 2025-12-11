@@ -25,6 +25,12 @@ public partial class interactActionDefinition : ActionDefinition
 				return false;
 			}
 		}
+
+		if (!gridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions))
+		{
+			reason = "Grid object Actions not found";
+			return false;
+		}
 		
 		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
@@ -49,7 +55,7 @@ public partial class interactActionDefinition : ActionDefinition
 			reason = "Target grid object is not interactable";
 			return false;
 		}
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell,false,false, out var neighbors))
+		if (!GridSystem.Instance.TryGetGridCellsNeighbors(interactable.GetInteractableCells(),false,false, out var neighbors))
 		{
 			reason = "Could not find neighbors for target gridcell";
 			return false;
@@ -93,7 +99,7 @@ public partial class interactActionDefinition : ActionDefinition
 			).First();
 
 			var moveAction =
-				gridObject.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
+				gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
 					as MoveActionDefinition;
 
 			if (moveAction == null)

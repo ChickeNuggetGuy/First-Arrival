@@ -55,6 +55,12 @@ public abstract partial class ActionDefinition : Resource
       return false;
     }
 
+    if (!gridObject.TryGetGridObjectNode<GridObjectStatHolder>( out var statholder))
+    {
+	    reason = "GridObject stat holder is null";
+	    costs = CreateFailCosts();
+	    return false;
+    }
     if (startingGridCell == null || targetGridCell == null)
     {
       reason = "Starting or target grid cell is null";
@@ -79,7 +85,7 @@ public abstract partial class ActionDefinition : Resource
     }
 
     // Final affordability check is always last
-    if (!gridObject.CanAffordStatCost(costs))
+    if (!statholder.CanAffordStatCost(costs))
     {
       reason = "Can't afford stat costs";
       return false;
@@ -247,9 +253,14 @@ public abstract partial class ActionDefinition : Resource
   )
   {
     reason = "";
-
+    if (!gridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions))
+    {
+	    reason = "Grid object action not found";
+	    return false;
+    }
+    
     bool hasRotate =
-      gridObject.ActionDefinitions?.Any(a => a is RotateActionDefinition) ?? false;
+	    gridObjectActions.ActionDefinitions?.Any(a => a is RotateActionDefinition) ?? false;
     if (!hasRotate)
     {
       reason = "Rotate action not found";

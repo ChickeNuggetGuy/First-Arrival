@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Turn" format=3 uid="uid://tbsvcgnevki7"]
+
+[ext_resource type="Script" uid="uid://c545g83g71bd6" path="res://Scripts/TurnSystem/Turn.cs" id="1_t86fl"]
+[ext_resource type="Script" uid="uid://cscpl67cgip6u" path="res://Scripts/TurnSystem/TurnSegments/SelectGridObjectTurnSegment.cs" id="2_r2xrp"]
+[ext_resource type="Script" uid="uid://hn2sdgvlyvdp" path="res://Scripts/TurnSystem/TurnSegments/ProcessGridObjectsSegment.cs" id="3_3qqde"]
+
+[sub_resource type="Resource" id="Resource_t86fl"]
+script = ExtResource("3_3qqde")
+metadata/_custom_type_script = "uid://hn2sdgvlyvdp"
+
+[sub_resource type="Resource" id="Resource_vccwo"]
+script = ExtResource("2_r2xrp")
+metadata/_custom_type_script = "uid://cscpl67cgip6u"
+
+[resource]
+resource_name = "PlayerTurn"
+script = ExtResource("1_t86fl")
+team = 1
+turnSegments = Array[Object]([SubResource("Resource_t86fl"), SubResource("Resource_vccwo")])
+metadata/_custom_type_script = "uid://c545g83g71bd6"

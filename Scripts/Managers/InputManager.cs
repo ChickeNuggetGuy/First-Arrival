@@ -18,6 +18,9 @@ public partial class InputManager : Manager<InputManager>
 	public bool MouseOverUI
 	{
 		get => IsMouseOverUI(); private set{}}
+
+	public override string GetManagerName() => "InputManager";
+
 	protected override Task _Setup()
 	{
 		gridSystem = GridSystem.Instance;
@@ -49,49 +52,64 @@ public partial class InputManager : Manager<InputManager>
 	private void WorldMouseMarker()
 	{
 		if (MouseOverUI) return;
-		Node node =	GetObjectAtMousePosition(out Vector3 hitPosition) as Node;
-		
+
+		Node node = GetObjectAtMousePosition(out Vector3 hitPosition) as Node;
+
 		if (node == null) return;
-		
-		if (node is GridObject gridObject)
+
+		GridObject gridObject = null;
+		int maxParentChecks = 3;
+		int parentLevel = 0;
+
+		// Traverse up to 3 parents to find a GridObject
+		Node currentNode = node;
+		if (node.IsInGroup("GridObjects"))
+		{
+			while (currentNode != null && parentLevel <= maxParentChecks)
+			{
+				if (currentNode is GridObject go)
+				{
+					gridObject = go;
+					break;
+				}
+
+				currentNode = currentNode.GetParent();
+				parentLevel++;
+			}
+		}
+
+		if (gridObject != null)
 		{
 			var cell = gridObject.GridPositionData?.GridCell;
-			
+
 			if (cell != null)
 			{
 				currentGridCell = cell;
 				if (mouseMarker != null)
-					mouseMarker.GlobalPosition = cell.gridCoordinates * new Vector3I(1,1,-1);
+					mouseMarker.GlobalPosition = cell.gridCoordinates * new Vector3I(1, 1, -1);
 				return;
 			}
 			else
 			{
-
-				GD.PrintErr(
-					$"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell."
-				);
+				GD.PrintErr($"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell.");
 			}
-			// Fall through to position-based lookup.
 		}
 
+		// Fall back to position-based lookup
 		if (gridSystem != null
-		    && gridSystem.TyGetGridCellFromWorldPosition(
-			    hitPosition,
-			    out GridCell gridCell,
-			    true
-		    )
+		    && gridSystem.TryGetGridCellFromWorldPosition(hitPosition, out GridCell gridCell, true)
 		    && gridCell != null)
 		{
 			if (gridCell.state.HasFlag(Enums.GridCellState.Air))
 			{
-				gridCell = gridSystem.GetGridCell(gridCell.gridCoordinates - new Vector3I(0,1,0));
+				gridCell = gridSystem.GetGridCell(gridCell.gridCoordinates - new Vector3I(0, 1, 0));
 			}
-			
-			if(gridCell != null)
+
+			if (gridCell != null)
 			{
 				currentGridCell = gridCell;
 				if (mouseMarker != null)
-					mouseMarker.GlobalPosition = gridCell.gridCoordinates * new Vector3I(1,1,-1);
+					mouseMarker.GlobalPosition = gridCell.gridCoordinates * new Vector3I(1, 1, -1);
 			}
 		}
 		else
@@ -100,8 +118,6 @@ public partial class InputManager : Manager<InputManager>
 			if (mouseMarker != null)
 				mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
 		}
-
-
 	}
 	
 	public GodotObject GetObjectAtMousePosition(out Vector3 worldPosition)
@@ -124,7 +140,7 @@ public partial class InputManager : Manager<InputManager>
 			var query = PhysicsRayQueryParameters3D.Create(from, to);
 			query.CollideWithAreas = true;
 			query.CollideWithBodies = true;
-			query.CollisionMask = PhysicsLayer.TERRAIN | PhysicsLayer.PLAYER;
+			query.CollisionMask = PhysicsLayer.TERRAIN | PhysicsLayer.GRIDOBJECT;
 
 			var result = space.IntersectRay(query);
 
@@ -168,12 +184,12 @@ public partial class InputManager : Manager<InputManager>
 	}
 	
 	#region manager Data
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

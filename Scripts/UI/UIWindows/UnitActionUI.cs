@@ -51,7 +51,9 @@ public partial class UnitActionUI : UIWindow
 		if (gridObject == null) return;
 		if (_actionButtonContainer == null) return;
 		
-		ActionDefinition[] gridObjectActions = gridObject.ActionDefinitions;
+		if(!gridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode)) return;
+		
+		ActionDefinition[] gridObjectActions = gridObjectActionsNode.ActionDefinitions;
 		if(gridObjectActions ==  null || gridObjectActions.Length < 1) return;
 		
 		

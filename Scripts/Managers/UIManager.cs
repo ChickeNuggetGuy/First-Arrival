@@ -9,6 +9,8 @@ public partial class UIManager : Manager<UIManager>
 {
 	List<UIWindow> _windows =  new List<UIWindow>();
 	[Export] private Control uiHolder;
+	public override string GetManagerName() => "UIManager";
+
 	protected override async Task _Setup()
 	{
 		foreach (var child in uiHolder.GetChildren())
@@ -29,12 +31,12 @@ public partial class UIManager : Manager<UIManager>
 	}
 	
 	#region manager Data
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

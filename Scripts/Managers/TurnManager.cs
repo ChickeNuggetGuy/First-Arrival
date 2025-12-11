@@ -31,6 +31,8 @@ public partial class TurnManager : Manager<TurnManager>
 	[Signal]
 	public delegate void TurnStartedEventHandler(Turn currentTurn);
 
+	public override string GetManagerName()=> "TurnManager";
+
 	protected override async Task _Setup()
 	{
 		if (turns == null || turns.Length == 0)
@@ -162,12 +164,12 @@ public partial class TurnManager : Manager<TurnManager>
 
 	#region Manager Data
 
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

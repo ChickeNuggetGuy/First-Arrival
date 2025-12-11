@@ -80,12 +80,14 @@ public abstract partial class Action
   public async Task ActionCompleteCall()
   {
     await ActionComplete();
-
+	
+    if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
+    
     if (!costsDeducted && ShouldDeductCosts())
     {
       foreach (var pair in costs)
       {
-        if (!parentGridObject.TryGetStat(pair.Key, out var stat))
+        if (!statHolder.TryGetStat(pair.Key, out var stat))
         {
           GD.Print($"Stat {pair.Key} not found");
           continue;

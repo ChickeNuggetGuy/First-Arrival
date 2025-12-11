@@ -221,6 +221,8 @@ public partial class CameraController : Manager<CameraController>
     #endregion
     #endregion
 
+    public override string GetManagerName() => "CameraManager";
+
     protected override Task _Setup()
     {
         GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
@@ -254,12 +256,12 @@ public partial class CameraController : Manager<CameraController>
     }
     
     #region manager Data
-    protected override void GetInstanceData(ManagerData data)
+    public override void Load(Godot.Collections.Dictionary<string,Variant> data)
     {
 	    GD.Print("No data to transfer");
     }
 
-    public override ManagerData SetInstanceData()
+    public override Godot.Collections.Dictionary<string,Variant> Save()
     {
 	    return null;
     }

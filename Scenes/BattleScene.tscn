@@ -1,4 +1,4 @@
-[gd_scene load_steps=43 format=3 uid="uid://ci5t5ugjnmjr"]
+[gd_scene format=3 uid="uid://ci5t5ugjnmjr"]
 
 [ext_resource type="Script" uid="uid://csjccrhj5wnx7" path="res://addons/phantom_camera/scripts/phantom_camera/phantom_camera_3d.gd" id="1_ar6iy"]
 [ext_resource type="Script" uid="uid://8umksf8e80fw" path="res://addons/phantom_camera/scripts/resources/tween_resource.gd" id="2_x3tt7"]
@@ -31,7 +31,7 @@
 [ext_resource type="Script" uid="uid://bk1nahap6yn15" path="res://Scripts/UI/UIWindows/TurnUI.cs" id="29_q6fnw"]
 [ext_resource type="Script" uid="uid://cl2f3rnpmng0i" path="res://Scripts/Managers/ActionManager.cs" id="30_o4c5p"]
 [ext_resource type="Script" uid="uid://bmbv6cyk3moxw" path="res://Scripts/Managers/TurnManager.cs" id="31_evef4"]
-[ext_resource type="Resource" uid="uid://tbsvcgnevki7" path="res://Scenes/PlayerTurn.tres" id="32_5pes1"]
+[ext_resource type="Resource" uid="uid://tbsvcgnevki7" path="res://Data/Turns/PlayerTurn.tres" id="32_5pes1"]
 [ext_resource type="Resource" uid="uid://dydb2scxl4eyb" path="res://Data/Turns/EnemyTurn.tres" id="33_mha8k"]
 [ext_resource type="Script" uid="uid://bd046eokvcnu2" path="res://addons/phantom_camera/scripts/phantom_camera_host/phantom_camera_host.gd" id="34_43h4d"]
 
@@ -67,14 +67,14 @@ script = ExtResource("2_x3tt7")
 [sub_resource type="SphereShape3D" id="SphereShape3D_dtg5n"]
 radius = 10.0
 
-[node name="BattleScene" type="Node3D"]
+[node name="BattleScene" type="Node3D" unique_id=554728595]
 
-[node name="GameManager" type="Node" parent="." node_paths=PackedStringArray("managers")]
+[node name="GameManager" type="Node" parent="." unique_id=1777208635 node_paths=PackedStringArray("managers")]
 script = ExtResource("3_segcg")
-managers = []
+managers = [NodePath("CameraController"), NodePath("MeshTerrainGenerator"), NodePath("InventoryManager"), NodePath("GridSystem"), NodePath("InputManager"), NodePath("GridObjectManager"), NodePath("Pathfinder"), NodePath("UIManager"), NodePath("ActionManager"), NodePath("TurnManager")]
 metadata/_custom_type_script = "uid://dr5vsk7v685hc"
 
-[node name="CameraController" type="Node" parent="GameManager" node_paths=PackedStringArray("transposer", "MainCamera")]
+[node name="CameraController" type="Node" parent="GameManager" unique_id=1155095072 node_paths=PackedStringArray("transposer", "MainCamera") groups=["Persist"]]
 script = ExtResource("11_h22wu")
 transposer = NodePath("Transposer")
 MainCamera = NodePath("../../Camera3D")
@@ -84,9 +84,9 @@ rotationSpeed = 5.0
 minDistanceToTarget = 0.0
 metadata/_custom_type_script = "uid://bmp20rrcufi2e"
 
-[node name="Transposer" type="Node3D" parent="GameManager/CameraController"]
+[node name="Transposer" type="Node3D" parent="GameManager/CameraController" unique_id=1339448610]
 
-[node name="MeshTerrainGenerator" type="Node" parent="GameManager"]
+[node name="MeshTerrainGenerator" type="Node" parent="GameManager" unique_id=1844495373 groups=["Persist"]]
 script = ExtResource("4_0ia2v")
 chunkSize = 16
 cellSize = Vector2(1, 1)
@@ -96,35 +96,36 @@ chunkOverrides = [SubResource("Resource_c1ier")]
 manmadeRaycastMask = 2
 metadata/_custom_type_script = "uid://dsci870xrigt6"
 
-[node name="InventoryManager" type="Node" parent="GameManager" node_paths=PackedStringArray("mouseHeldInventoryUI")]
+[node name="InventoryManager" type="Node" parent="GameManager" unique_id=115242712 node_paths=PackedStringArray("mouseHeldInventoryUI") groups=["Persist"]]
 script = ExtResource("6_5hyi2")
 mouseHeldInventoryUI = NodePath("../UIManager/CanvasLayer/Control/MouseHeldInventoryUI")
 InventorySlotPrefab = ExtResource("7_6jix8")
 BlankSlotPrefab = ExtResource("8_kf0x2")
 metadata/_custom_type_script = "uid://h1v27m0p54g"
 
-[node name="GridSystem" type="Node" parent="GameManager"]
+[node name="GridSystem" type="Node" parent="GameManager" unique_id=781950403 groups=["Persist"]]
 script = ExtResource("9_nn4bo")
 _connectionObstacleMask = 16
 _cellSize = Vector2(1, 1)
 _raycastCheck = true
 _raycastDistance = 1.1
 _raycastOffset = Vector3(0, 0.5, 0)
-_blockDiagonalCornerCutting = false
+_connectionBoxWidthFactor = 0.30000000000000004
+DebugMode = true
 metadata/_custom_type_script = "uid://conicv373rw7m"
 
-[node name="InputManager" type="Node" parent="GameManager" node_paths=PackedStringArray("mouseMarker")]
+[node name="InputManager" type="Node" parent="GameManager" unique_id=2076017006 node_paths=PackedStringArray("mouseMarker") groups=["Persist"]]
 script = ExtResource("10_qrbtu")
 mouseMarker = NodePath("MouseMarker")
 metadata/_custom_type_script = "uid://t7kecr7hiqah"
 
-[node name="MouseMarker" type="Node3D" parent="GameManager/InputManager"]
+[node name="MouseMarker" type="Node3D" parent="GameManager/InputManager" unique_id=321991388]
 
-[node name="CSGBox3D" type="CSGBox3D" parent="GameManager/InputManager/MouseMarker"]
+[node name="CSGBox3D" type="CSGBox3D" parent="GameManager/InputManager/MouseMarker" unique_id=1224611787]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.6, -0.5)
 material_override = SubResource("StandardMaterial3D_dtg5n")
 
-[node name="GridObjectManager" type="Node" parent="GameManager" node_paths=PackedStringArray("gridObjectTeams")]
+[node name="GridObjectManager" type="Node" parent="GameManager" unique_id=464719860 node_paths=PackedStringArray("gridObjectTeams") groups=["Persist"]]
 script = ExtResource("12_ait8s")
 spawnCounts = Dictionary[int, int]({
 1: 3,
@@ -137,30 +138,30 @@ gridObjectTeams = {
 gridObjectScene = ExtResource("13_3ldww")
 metadata/_custom_type_script = "uid://bi115b7eyqu8y"
 
-[node name="PlayerTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
+[node name="PlayerTeamHolder" type="Node" parent="GameManager/GridObjectManager" unique_id=1260827624]
 script = ExtResource("14_g23mv")
 Team = 1
 EnemyTeams = 2
 metadata/_custom_type_script = "uid://dm3rb1e6uleo1"
 
-[node name="EnemyTeamHolder" type="Node" parent="GameManager/GridObjectManager"]
+[node name="EnemyTeamHolder" type="Node" parent="GameManager/GridObjectManager" unique_id=1943704232]
 script = ExtResource("14_g23mv")
 Team = 2
 EnemyTeams = 5
 metadata/_custom_type_script = "uid://dm3rb1e6uleo1"
 
-[node name="Pathfinder" type="Node" parent="GameManager"]
+[node name="Pathfinder" type="Node" parent="GameManager" unique_id=2015488319 groups=["Persist"]]
 script = ExtResource("15_sw7ns")
 metadata/_custom_type_script = "uid://dnnq5vqxylmsk"
 
-[node name="UIManager" type="Node" parent="GameManager" node_paths=PackedStringArray("uiHolder")]
+[node name="UIManager" type="Node" parent="GameManager" unique_id=1454011973 node_paths=PackedStringArray("uiHolder") groups=["Persist"]]
 script = ExtResource("16_r84ld")
 uiHolder = NodePath("CanvasLayer/Control")
 metadata/_custom_type_script = "uid://cw8v24j03uqg2"
 
-[node name="CanvasLayer" type="CanvasLayer" parent="GameManager/UIManager"]
+[node name="CanvasLayer" type="CanvasLayer" parent="GameManager/UIManager" unique_id=1201265018]
 
-[node name="Control" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer"]
+[node name="Control" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer" unique_id=539278591]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -172,7 +173,7 @@ mouse_filter = 2
 theme_override_constants/margin_top = 50
 theme_override_constants/margin_bottom = 25
 
-[node name="QuickSelectPanel" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("quickSelectHolder", "Visual", "toggleButton")]
+[node name="QuickSelectPanel" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=817870479 node_paths=PackedStringArray("quickSelectHolder", "Visual", "toggleButton")]
 custom_minimum_size = Vector2(200, 300)
 layout_mode = 2
 size_flags_horizontal = 0
@@ -188,7 +189,7 @@ showAnimation = SubResource("Resource_u5v48")
 hideAnimation = SubResource("Resource_s1acj")
 metadata/_custom_type_script = "uid://lh8kdv34nvel"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel" unique_id=1888156076]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -196,18 +197,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel" unique_id=388577084]
 layout_mode = 0
 offset_right = 200.0
 offset_bottom = 350.0
 size_flags_horizontal = 3
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel/ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel/ScrollContainer" unique_id=1622664537]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="Button" type="Button" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel"]
+[node name="Button" type="Button" parent="GameManager/UIManager/CanvasLayer/Control/QuickSelectPanel/Panel" unique_id=1677308787]
 custom_minimum_size = Vector2(25, 40)
 layout_mode = 1
 anchors_preset = -1
@@ -222,7 +223,7 @@ grow_horizontal = 0
 grow_vertical = 2
 text = ">"
 
-[node name="Unit Action Panel" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("_actionButtonContainer", "_statBarContainer", "Visual")]
+[node name="Unit Action Panel" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=895593081 node_paths=PackedStringArray("_actionButtonContainer", "_statBarContainer", "Visual")]
 custom_minimum_size = Vector2(375, 200)
 layout_mode = 2
 size_flags_horizontal = 0
@@ -234,7 +235,7 @@ _statBarContainer = NodePath("Panel/VerticalSplit/Right Half/HBoxContainer")
 Visual = NodePath("Panel")
 metadata/_custom_type_script = "uid://g45a50cfefjk"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel" unique_id=1027883772]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -242,7 +243,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VerticalSplit" type="HBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel"]
+[node name="VerticalSplit" type="HBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel" unique_id=158657137]
 layout_mode = 1
 anchors_preset = -1
 anchor_right = 1.0
@@ -252,22 +253,22 @@ offset_bottom = 3.5
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Left Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit"]
+[node name="Left Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit" unique_id=1513446845]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 
-[node name="Top Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half"]
+[node name="Top Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half" unique_id=655280744]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Unit Name" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/Top Half"]
+[node name="Unit Name" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/Top Half" unique_id=336451306]
 layout_mode = 2
 size_flags_vertical = 6
 text = "Player Playerson"
 label_settings = SubResource("LabelSettings_c1ier")
 
-[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half"]
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half" unique_id=1716158045]
 custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
 size_flags_vertical = 3
@@ -275,31 +276,31 @@ theme_override_constants/margin_left = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 10
 
-[node name="VBoxContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/MarginContainer"]
+[node name="VBoxContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/MarginContainer" unique_id=799224052]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Unit Image" type="TextureRect" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/MarginContainer/VBoxContainer"]
+[node name="Unit Image" type="TextureRect" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Left Half/MarginContainer/VBoxContainer" unique_id=395703950]
 layout_mode = 2
 texture = ExtResource("22_q7uf6")
 
-[node name="Right Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit"]
+[node name="Right Half" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit" unique_id=350250378]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="ActionHolder" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half"]
+[node name="ActionHolder" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half" unique_id=750971729]
 custom_minimum_size = Vector2(0, 55)
 layout_mode = 2
 size_flags_vertical = 3
 columns = 3
 
-[node name="HBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half"]
+[node name="HBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half" unique_id=1824250132]
 custom_minimum_size = Vector2(0, 140)
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 5
 
-[node name="StatBar" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+[node name="StatBar" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" unique_id=693203224 node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 script = ExtResource("23_mvkch")
@@ -308,7 +309,7 @@ stat = 1
 team = 1
 metadata/_custom_type_script = "uid://342n07onmffs"
 
-[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar"]
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar" unique_id=1834037236]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -316,7 +317,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="StatBar5" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+[node name="StatBar5" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" unique_id=554060820 node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 script = ExtResource("23_mvkch")
@@ -325,7 +326,7 @@ stat = 4
 team = 1
 metadata/_custom_type_script = "uid://342n07onmffs"
 
-[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar5"]
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar5" unique_id=24157743]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -333,7 +334,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="StatBar2" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+[node name="StatBar2" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" unique_id=1448069896 node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 script = ExtResource("23_mvkch")
@@ -342,7 +343,7 @@ stat = 2
 team = 1
 metadata/_custom_type_script = "uid://342n07onmffs"
 
-[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar2"]
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar2" unique_id=453230856]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -350,7 +351,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="StatBar4" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" node_paths=PackedStringArray("statBar")]
+[node name="StatBar4" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer" unique_id=434160851 node_paths=PackedStringArray("statBar")]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 script = ExtResource("23_mvkch")
@@ -359,7 +360,7 @@ stat = 3
 team = 1
 metadata/_custom_type_script = "uid://342n07onmffs"
 
-[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar4"]
+[node name="ProgressBar" type="ProgressBar" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/VerticalSplit/Right Half/HBoxContainer/StatBar4" unique_id=1164237415]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -367,7 +368,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel" unique_id=1771521122]
 custom_minimum_size = Vector2(200, 100)
 layout_mode = 1
 anchors_preset = -1
@@ -380,7 +381,7 @@ offset_right = 200.0
 grow_horizontal = 0
 grow_vertical = 2
 
-[node name="HBoxContainer" type="HBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel"]
+[node name="HBoxContainer" type="HBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel" unique_id=1486560429]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -388,7 +389,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="LeftHandInventory" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+[node name="LeftHandInventory" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer" unique_id=1165164859 node_paths=PackedStringArray("slotHolder", "Visual")]
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("24_p2k61")
@@ -398,7 +399,7 @@ Visual = NodePath("AspectRatioContainer")
 uiName = "LeftHand"
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
 
-[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory"]
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory" unique_id=1192787079]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -406,10 +407,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory/AspectRatioContainer"]
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/LeftHandInventory/AspectRatioContainer" unique_id=85082844]
 layout_mode = 2
 
-[node name="RightHandInventory" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+[node name="RightHandInventory" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer" unique_id=1789290833 node_paths=PackedStringArray("slotHolder", "Visual")]
 layout_mode = 2
 size_flags_horizontal = 3
 script = ExtResource("24_p2k61")
@@ -419,7 +420,7 @@ Visual = NodePath("AspectRatioContainer")
 uiName = "LeftHand"
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
 
-[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory"]
+[node name="AspectRatioContainer" type="AspectRatioContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory" unique_id=349699708]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -427,12 +428,14 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory/AspectRatioContainer"]
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/Unit Action Panel/Panel/Panel/HBoxContainer/RightHandInventory/AspectRatioContainer" unique_id=1502424079]
 layout_mode = 2
 
-[node name="InventoryWindow" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("Visual")]
+[node name="InventoryWindow" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=550408009 node_paths=PackedStringArray("Visual")]
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 mouse_filter = 2
 script = ExtResource("25_2hhhs")
 Visual = NodePath("MarginContainer")
@@ -441,24 +444,30 @@ toggleKey = 73
 startHidden = true
 metadata/_custom_type_script = "uid://bc6x81kp7kdgk"
 
-[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow"]
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow" unique_id=704934656]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -250.0
+offset_right = 450.0
+offset_bottom = 250.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/margin_left = 350
 theme_override_constants/margin_bottom = 100
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer" unique_id=1709084118]
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
 
-[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel"]
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel" unique_id=696898150]
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 1.0
@@ -470,7 +479,7 @@ mouse_filter = 2
 theme_override_constants/margin_top = 15
 theme_override_constants/margin_right = 15
 
-[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer" unique_id=1619372416 node_paths=PackedStringArray("slotHolder", "Visual")]
 custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
 mouse_filter = 2
@@ -480,7 +489,7 @@ slotHolder = NodePath("Panel/GridContainer")
 Visual = NodePath("Panel")
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI" unique_id=1419940779]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -489,7 +498,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI/Panel"]
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/MarginContainer/InventoryGridUI/Panel" unique_id=965578226]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -498,7 +507,7 @@ grow_horizontal = 2
 grow_vertical = 2
 columns = 3
 
-[node name="GroundInventoryContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel"]
+[node name="GroundInventoryContainer" type="MarginContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel" unique_id=22461802]
 layout_mode = 1
 anchors_preset = -1
 anchor_top = 1.0
@@ -513,7 +522,7 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 15
 
-[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer" node_paths=PackedStringArray("slotHolder", "Visual")]
+[node name="InventoryGridUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer" unique_id=724059089 node_paths=PackedStringArray("slotHolder", "Visual")]
 custom_minimum_size = Vector2(150, 150)
 layout_mode = 2
 mouse_filter = 2
@@ -523,7 +532,7 @@ slotHolder = NodePath("Panel/GridContainer")
 Visual = NodePath("Panel")
 metadata/_custom_type_script = "uid://ckjuiwq2v6s4o"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI" unique_id=1649357544]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -532,7 +541,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI/Panel"]
+[node name="GridContainer" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/InventoryWindow/MarginContainer/Panel/GroundInventoryContainer/InventoryGridUI/Panel" unique_id=1282524963]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -541,7 +550,7 @@ grow_horizontal = 2
 grow_vertical = 2
 columns = 3
 
-[node name="MouseHeldInventoryUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("slotHolder", "Visual")]
+[node name="MouseHeldInventoryUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=1703604909 node_paths=PackedStringArray("slotHolder", "Visual")]
 custom_minimum_size = Vector2(50, 50)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -555,13 +564,13 @@ uiName = "Mouse Held"
 startHidden = true
 metadata/_custom_type_script = "uid://yaqinydnxa3a"
 
-[node name="Control" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/MouseHeldInventoryUI"]
+[node name="Control" type="GridContainer" parent="GameManager/UIManager/CanvasLayer/Control/MouseHeldInventoryUI" unique_id=1805701395]
 layout_mode = 0
 offset_right = 40.0
 offset_bottom = 40.0
 mouse_filter = 2
 
-[node name="ContextMenuUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("contextButtonHolder", "Visual")]
+[node name="ContextMenuUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=892121843 node_paths=PackedStringArray("contextButtonHolder", "Visual")]
 custom_minimum_size = Vector2(75, 25)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -574,7 +583,7 @@ uiName = "Context Menu"
 startHidden = true
 metadata/_custom_type_script = "uid://bv7f34s83qmss"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/ContextMenuUI"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/ContextMenuUI" unique_id=1586196422]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -582,7 +591,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/ContextMenuUI/Panel"]
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/ContextMenuUI/Panel" unique_id=1798909389]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -590,15 +599,17 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="CurrentTurnUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" node_paths=PackedStringArray("endTurnButton", "Visual")]
+[node name="CurrentTurnUI" type="Control" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=898384667 node_paths=PackedStringArray("endTurnButton", "Visual")]
 layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 0
 mouse_filter = 2
 script = ExtResource("29_q6fnw")
 endTurnButton = NodePath("Panel/VBoxContainer/Button")
 Visual = NodePath("Panel")
 metadata/_custom_type_script = "uid://bk1nahap6yn15"
 
-[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI"]
+[node name="Panel" type="Panel" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI" unique_id=1484923807]
 custom_minimum_size = Vector2(125, 75)
 layout_mode = 1
 anchors_preset = 1
@@ -610,7 +621,7 @@ offset_right = -27.0
 offset_bottom = 100.0
 grow_horizontal = 0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel"]
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel" unique_id=640124851]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -618,25 +629,25 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Label" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel/VBoxContainer"]
+[node name="Label" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel/VBoxContainer" unique_id=1750793909]
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 text = "Current Turn: Player "
 label_settings = SubResource("LabelSettings_rv6c1")
 vertical_alignment = 1
 
-[node name="Button" type="Button" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel/VBoxContainer"]
+[node name="Button" type="Button" parent="GameManager/UIManager/CanvasLayer/Control/CurrentTurnUI/Panel/VBoxContainer" unique_id=1320105656]
 layout_mode = 2
 size_flags_vertical = 3
 text = "End Turn"
 
-[node name="TextureRect" type="TextureRect" parent="GameManager/UIManager/CanvasLayer/Control"]
+[node name="TextureRect" type="TextureRect" parent="GameManager/UIManager/CanvasLayer/Control" unique_id=685809312]
 custom_minimum_size = Vector2(75, 75)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 0
 
-[node name="Label" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/TextureRect"]
+[node name="Label" type="Label" parent="GameManager/UIManager/CanvasLayer/Control/TextureRect" unique_id=2136346540]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -646,31 +657,30 @@ offset_top = -23.0
 offset_bottom = 23.0
 grow_horizontal = 2
 grow_vertical = 0
-pivot_offset = Vector2(0, -23)
 
-[node name="ActionManager" type="Node" parent="GameManager"]
+[node name="ActionManager" type="Node" parent="GameManager" unique_id=1306430025 groups=["Persist"]]
 script = ExtResource("30_o4c5p")
 metadata/_custom_type_script = "uid://cl2f3rnpmng0i"
 
-[node name="TurnManager" type="Node" parent="GameManager"]
+[node name="TurnManager" type="Node" parent="GameManager" unique_id=801487647 groups=["Persist"]]
 script = ExtResource("31_evef4")
 turns = [ExtResource("32_5pes1"), ExtResource("33_mha8k")]
 metadata/_custom_type_script = "uid://bmbv6cyk3moxw"
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1345126148]
 transform = Transform3D(1, 0, 0, 0, 0.19611597, 0.98058075, 0, -0.98058075, 0.19611597, 0, 5, 1)
 
-[node name="PhantomCameraHost" type="Node" parent="Camera3D"]
+[node name="PhantomCameraHost" type="Node" parent="Camera3D" unique_id=1714853783]
 process_priority = 300
 process_physics_priority = 300
 script = ExtResource("34_43h4d")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=981348940]
 transform = Transform3D(0.9291326, -0.36974674, 0, 0.34046704, 0.85555595, 0.39000806, -0.14420421, -0.3623692, 0.9208115, 0, 0, 0)
 
-[node name="SceneHolder" type="Node" parent="."]
+[node name="SceneHolder" type="Node" parent="." unique_id=385759436]
 
-[node name="PhantomCamera3D" type="Node3D" parent="." node_paths=PackedStringArray("follow_target", "look_at_target")]
+[node name="PhantomCamera3D" type="Node3D" parent="." unique_id=111607631 node_paths=PackedStringArray("follow_target", "look_at_target")]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 0.19611597, 0.98058075, 0, -0.98058075, 0.19611597, 0, 5, 1)
 script = ExtResource("1_ar6iy")

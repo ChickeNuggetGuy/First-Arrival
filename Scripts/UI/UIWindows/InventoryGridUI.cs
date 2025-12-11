@@ -23,12 +23,17 @@ public partial class InventoryGridUI : UIWindow
 			GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
 
 
-		if (gridObject == null) return Task.CompletedTask;
+		if (gridObject == null)
+		{
+			GD.Print("Error: GridObject is null!");
+			return Task.CompletedTask;
+		}
+
+		if (!gridObject.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory)) return Task.CompletedTask;
 		if (inventoryType == Enums.InventoryType.Ground)
 		{
 			if (InventoryGrid == null)
 			{
-
 				GridCell currentGridCell = gridObject.GridPositionData.GridCell;
 				if (currentGridCell == null || currentGridCell.InventoryGrid == null) return Task.CompletedTask;
 				InventoryGrid = currentGridCell.InventoryGrid;
@@ -36,11 +41,13 @@ public partial class InventoryGridUI : UIWindow
 		}
 		else
 		{
-
-
 			if (InventoryGrid == null)
 			{
-				if (!gridObject.TryGetInventory(inventoryType, out var inventory)) return Task.CompletedTask;
+				if (!gridObjectInventory.TryGetInventory(inventoryType, out var inventory))
+				{
+					GD.Print("Error: gridObjectInventory is null!");
+					return Task.CompletedTask;
+				}
 				GD.Print(inventory.InventoryType + " Name");
 
 				InventoryGrid = inventory;
@@ -119,7 +126,7 @@ public partial class InventoryGridUI : UIWindow
             for (int x = 0; x < InventoryGrid.GridShape.GridSizeX; x++)
             {
                 ItemSlotUI newSlot;
-                if (InventoryGrid.GridShape.GetGridShapeCell(x, y))
+                if (InventoryGrid.GridShape.GetGridShapeCell(x,0, y))
                 {
                     // Use the prefab for a real slot
                     newSlot = (ItemSlotUI)InventoryManager.Instance.InventorySlotPrefab.Instantiate<Control>();
@@ -217,7 +224,6 @@ public partial class InventoryGridUI : UIWindow
     /// </summary>
     private void OnInventoryChanged()
     {
-	    GD.Print("Inventory has changed. UI needs to update!");
 	    UpdateSlotsUI();
     }
 

@@ -40,6 +40,8 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		}
 	}
 
+	public override string GetManagerName() => "GridObjectManager";
+
 	protected override Task _Setup()
 	{
 		foreach (Node child in GetChildren())
@@ -61,26 +63,34 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 
 	protected override  async Task _Execute()
 	{
-		foreach (KeyValuePair<Enums.UnitTeam, int> kvp in spawnCounts)
+		try
 		{
-			for(int i = 0; i <kvp.Value; i++)
-				await TrySpawnGridObject(gridObjectScene, kvp.Key);
-			
-			if(gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active].Count > 0)
+			foreach (KeyValuePair<Enums.UnitTeam, int> kvp in spawnCounts)
 			{
-				GetGridObjectTeamHolder(kvp.Key)
-					.SetSelectedGridObject(gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active][0]);
+				for(int i = 0; i <kvp.Value; i++)
+					await TrySpawnGridObject(gridObjectScene, kvp.Key);
+			
+				if(gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active].Count > 0)
+				{
+					GetGridObjectTeamHolder(kvp.Key)
+						.SetSelectedGridObject(gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active][0]);
+				}
 			}
-		}
 
 		
-		    GridObjectTeamHolder teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
-		if (teamHolder == null) return;
-		teamHolder.UpdateVisibility();
-		teamHolder.GetNextGridObject();
-		teamHolder.SelectedGridObjectChanged += InventoryManager.Instance.TeamHolderOnSelectedGridObjectChanged;
+			GridObjectTeamHolder teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+			if (teamHolder == null) return;
+			teamHolder.UpdateVisibility();
+			teamHolder.GetNextGridObject();
+			teamHolder.SelectedGridObjectChanged += InventoryManager.Instance.TeamHolderOnSelectedGridObjectChanged;
 
-
+		}
+		catch (Exception e)
+		{
+			Console.WriteLine(e);
+			throw;
+		}
+		await Task.CompletedTask;
 	}
 
 		private async Task TrySpawnGridObject(PackedScene gridObjectScene, Enums.UnitTeam team)
@@ -138,12 +148,12 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	public Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> GetGridObjectTeamHolders() => gridObjectTeams;
 	
 	#region manager Data
-	protected override void GetInstanceData(ManagerData data)
+	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
 		GD.Print("No data to transfer");
 	}
 
-	public override ManagerData SetInstanceData()
+	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
 		return null;
 	}

@@ -46,14 +46,20 @@ public partial class MeleeAttackActionDefinition
 			return false;
 		}
 
+
+		if (!gridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions))
+		{
+			reason = "No grid object Action found";
+			return false;
+		}
+
 		if (!targetGridCell.HasGridObject())
 		{
-			{
-				reason = "No grid object found";
-				return false;
-			}
+
+			reason = "No grid object found";
+			return false;
 		}
-		
+
 		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
 		{
 			if(gridObject == null) return false;
@@ -112,7 +118,7 @@ public partial class MeleeAttackActionDefinition
 			).First();
 
 			var moveAction =
-				gridObject.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
+				gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
 					as MoveActionDefinition;
 
 			if (moveAction == null)

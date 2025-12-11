@@ -48,7 +48,7 @@ public partial class MainMenuUI : UIWindow
 		GameManager.Instance.mapSize = new Vector2I(GD.RandRange(2,3), GD.RandRange(2,3));
 		GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), GD.RandRange(2,6));
 		
-		GameManager.Instance.TryChangeScene(GameManager.gameScene.BattleScene, false);
+		GameManager.Instance.TryChangeScene(GameManager.gameScene.BattleScene, null, false);
 	}
 
 	private void Test()

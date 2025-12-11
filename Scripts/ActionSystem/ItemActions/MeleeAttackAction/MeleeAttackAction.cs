@@ -30,6 +30,8 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			GD.PrintErr("MeleeAttackAction.Setup: Could not find neighbors for target gridcell");
 			return;
 		}
+		
+		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectNodes)) return;
 
 		// Are we already adjacent?
 		bool isAdjacent = neighbors.Any(c => c.gridCoordinates == startingGridCell.gridCoordinates);
@@ -51,7 +53,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)).First();
 
 		MoveActionDefinition moveActionDefinition =
-			parentGridObject.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
+			gridObjectNodes.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
 		
 		if (moveActionDefinition == null)
 		{
@@ -81,8 +83,11 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			GD.Print("Target grid object is null, failed all conditions");
 			return;
 		}
+		
+		if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
 
-		if (!targetGridObject.TryGetStat(Enums.Stat.Health, out var health))
+
+		if (!statHolder.TryGetStat(Enums.Stat.Health, out var health))
 		{
 			GD.Print("Target Grid Object does not have Health stat");
 			return;
