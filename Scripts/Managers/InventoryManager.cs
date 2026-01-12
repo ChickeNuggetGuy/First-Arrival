@@ -25,7 +25,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 	[Export]public Item[] startingItems = new Item[0];
 	public override string GetManagerName() => "InventoryManager";
 
-	protected override async Task _Setup()
+	protected override async Task _Setup(bool loadingData)
 	{
 		// Load data immediately so it's ready for GridSystem in the Execute phase
 		InventoryGrid[] grids = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/InventoryGrids/", "InventoryGrid").Cast<InventoryGrid>().ToArray();
@@ -50,7 +50,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 		await Task.CompletedTask;
 	}
 
-	protected override async Task _Execute()
+	protected override async Task _Execute(bool loadingData)
 	{
 		// Just allow the task to complete, as setup is done
 		await Task.CompletedTask;
@@ -73,7 +73,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 		}
 		else
 		{
-			runtimeInventoryGridUIs[Enums.InventoryType.Ground].SetupInventoryUI(gridObject.GridPositionData.GridCell.InventoryGrid);
+			runtimeInventoryGridUIs[Enums.InventoryType.Ground].SetupInventoryUI(gridObject.GridPositionData.AnchorCell.InventoryGrid);
 		}
 	}
 
@@ -106,7 +106,8 @@ public partial class InventoryManager : Manager<InventoryManager>
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		GD.Print("No data to transfer");
+		base.Load(data);
+		if(!HasLoadedData) return;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -114,4 +115,9 @@ public partial class InventoryManager : Manager<InventoryManager>
 		return null;
 	}
 	#endregion
+	
+	public override void Deinitialize()
+	{
+		return;
+	}
 }

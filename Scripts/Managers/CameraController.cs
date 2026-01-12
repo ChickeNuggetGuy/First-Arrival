@@ -34,7 +34,7 @@ public partial class CameraController : Manager<CameraController>
 
     #region Functions
 
-    public override void _ExitTree()
+    public override void Deinitialize()
     {
         GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
         
@@ -123,12 +123,14 @@ public partial class CameraController : Manager<CameraController>
     
     public override void _PhysicsProcess(double delta)
     {
+	    if(UIManager.Instance.BlockingInput) return;
         TransposerMovement((float)delta);
         HandleCameraRotation((float)delta);
     }
     
     public override void _UnhandledInput(InputEvent @event)
     {
+	    if(UIManager.Instance.BlockingInput) return;
 	    if (@event is InputEventKey { Pressed: true, Keycode: Key.F })
 	    { 
 		    QuickSwitchTarget(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject);   
@@ -223,7 +225,7 @@ public partial class CameraController : Manager<CameraController>
 
     public override string GetManagerName() => "CameraManager";
 
-    protected override Task _Setup()
+    protected override Task _Setup(bool loadingData)
     {
         GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
         
@@ -232,7 +234,7 @@ public partial class CameraController : Manager<CameraController>
         return Task.CompletedTask;
     }
 
-    protected override Task _Execute()
+    protected override Task _Execute(bool loadingData)
     {
         GD.Print("MainCamera:", MainCamera?.Name ?? "NULL");
 
@@ -258,7 +260,8 @@ public partial class CameraController : Manager<CameraController>
     #region manager Data
     public override void Load(Godot.Collections.Dictionary<string,Variant> data)
     {
-	    GD.Print("No data to transfer");
+	    base.Load(data);
+	    if(!HasLoadedData) return;
     }
 
     public override Godot.Collections.Dictionary<string,Variant> Save()

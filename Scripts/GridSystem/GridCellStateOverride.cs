@@ -18,58 +18,164 @@ public partial class GridCellStateOverride : GridObject
 	[ExportGroup("Cell Spawn Override"),Export]protected  bool useUnitTeamSpawnOverride = false;
 	[Export]protected Enums.UnitTeam unitTeamSpawn;
 	[Export]protected Enums.GridCellState teamSpawnStateOverrideFilter;
+	
 
-	public override void _Ready()
+	public override void _EnterTree()
 	{
-		base._Ready();
+		base._EnterTree();
+		AddToGroup("GridObjects");
+		AddToGroup("GridCellOverride");
 	}
 
 	public void InitializeGridCellOverride()
 	{
-		if (this.GridPositionData == null) return;
-
-		List<GridCell> gridCells = GridSystem.Instance.GetCellsFromGridShape(this.GridPositionData);
-		if (gridCells.Count < 1)
+		if (this.GridPositionData == null)
 		{
+			if (GridObjectNodeHolder == null)
+			{
+				GridPositionData = GetNodeOrNull<GridPositionData>("GridPositionData");
+			}
+			else
+			{
+				GridPositionData = GridObjectNodeHolder.GetNodeOrNull<GridPositionData>("GridPositionData");
+			}
+		}
+
+		if (this.GridPositionData == null)
+		{
+			GD.PrintErr($"GridCellStateOverride {Name} failed: GridPositionData is null. Ensure it is positioned correctly over a valid cell.");
 			return;
+		}
+		
+		GridCell rootCell = this.GridPositionData.AnchorCell;
+		if (rootCell == null)
+		{
+			if (GridSystem.Instance.TryGetGridCellFromWorldPosition(this.GridPositionData.GlobalPosition, out GridCell nearest, true))
+			{
+				rootCell = nearest;
+				GD.Print($"GridCellStateOverride {Name}: Snapped to nearest cell {rootCell.gridCoordinates}");
+			}
+		}
+
+		if (rootCell == null)
+		{
+			GD.PrintErr($"GridCellStateOverride {Name}: Could not determine root GridCell.");
+			return;
+		}
+		
+		if (!rootCell.state.HasFlag(Enums.GridCellState.Ground))
+		{
+			for (int i = 1; i <= 10; i++)
+			{
+				GridCell below = GridSystem.Instance.GetGridCell(rootCell.gridCoordinates + new Vector3I(0, -i, 0));
+				if (below != null && below.state.HasFlag(Enums.GridCellState.Ground))
+				{ 
+					rootCell = below;
+					break;
+				}
+			}
 		}
 
 		if (!useGridCellStateOverride && !usefogStateOverride && !useUnitTeamSpawnOverride) return;
+		
+		List<GridCell> gridCells = new List<GridCell>();
+		GridShape shape = this.GridPositionData.gridShape;
+		Vector3I rootCoords = rootCell.gridCoordinates;
+		Enums.Direction direction = this.GridPositionData.Direction;
+
+		if (shape != null)
+		{
+			for (int y = 0; y < shape.GridSizeY; y++)
+			{
+				for (int x = 0; x < shape.GridSizeX; x++)
+				{
+					for (int z = 0; z < shape.GridSizeZ; z++)
+					{
+						if (!shape.GetGridShapeCell(x, y, z))
+							continue;
+
+						int relX = x - shape.RootCellCoordinates.X;
+						int relZ = z - shape.RootCellCoordinates.Y;
+						int offsetY = y;
+
+						int rotatedX = relX;
+						int rotatedZ = relZ;
+
+						switch (direction)
+						{
+							case Enums.Direction.North:
+								rotatedX = relX;
+								rotatedZ = relZ;
+								break;
+							case Enums.Direction.East:
+								rotatedX = -relZ;
+								rotatedZ = relX;
+								break;
+							case Enums.Direction.South:
+								rotatedX = -relX;
+								rotatedZ = -relZ;
+								break;
+							case Enums.Direction.West:
+								rotatedX = relZ;
+								rotatedZ = -relX;
+								break;
+						}
+
+						Vector3I targetCoords = rootCoords + new Vector3I(rotatedX, offsetY, rotatedZ);
+						GridCell cell = GridSystem.Instance.GetGridCell(targetCoords);
+
+						if (cell != null)
+						{
+							gridCells.Add(cell);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			// Fallback if no shape, just use root
+			gridCells.Add(rootCell);
+		}
+
+		GD.Print($"GridCellStateOverride {Name} applying to {gridCells.Count} cells.");
 
 		foreach (GridCell gridCell in gridCells)
 		{
-			// 1. Grid Cell State Override
+			//Grid Cell State Override
 			if (useGridCellStateOverride)
 			{
-				// Logic: If filter is None, apply to all. OR if filter matches.
 				bool passFilter = cellStateOverrideFilter == Enums.GridCellState.None || 
 				                  gridCell.state.HasFlag(cellStateOverrideFilter);
 
 				if (passFilter)
-					gridCell.SetState(cellStateOverride);
+				{
+					gridCell.SetState(gridCell.state | cellStateOverride);
+				}
 			}
 
-			// 2. Fog State Override
+			// Fog State Override
 			if (usefogStateOverride)
 			{
-				// FIX: Use fogStateOverrideFilter, not cellStateOverrideFilter
 				bool passFilter = fogStateOverrideFilter == Enums.GridCellState.None || 
 				                  gridCell.state.HasFlag(fogStateOverrideFilter);
             
 				if (passFilter)
+				{
 					gridCell.SetFogState(fogState);
+				}
 			}
 
-			// 3. Unit Team Spawn Override
+			//Unit Team Spawn Override
 			if (useUnitTeamSpawnOverride)
 			{
-				// FIX: Use teamSpawnStateOverrideFilter, not cellStateOverrideFilter
 				bool passFilter = teamSpawnStateOverrideFilter == Enums.GridCellState.None || 
 				                  gridCell.state.HasFlag(teamSpawnStateOverrideFilter);
 
 				if (passFilter)
-					GD.Print($"Team Spawn set to {unitTeamSpawn}");
+				{
 					gridCell.SetUnitSpawnState(unitTeamSpawn);
+				}
 			}
 		}
 	}

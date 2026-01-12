@@ -21,8 +21,8 @@ public partial class GridObjectStat : GridObjectNode
 		}
 	}
 
-	[Export] private bool signalOnMinValue = false;
-	[Export] private bool signalOnMaxValue = false;
+	[Export] protected bool signalOnMinValue = false;
+	[Export] protected bool signalOnMaxValue = false;
 
 	[Export] public Enums.StatTurnBehavior turnBehavior = Enums.StatTurnBehavior.None;
 	 public float incrementValue = 0;
@@ -154,5 +154,27 @@ public partial class GridObjectStat : GridObjectNode
 			default:
 				throw new ArgumentOutOfRangeException();
 		}
+	}
+	
+	public override Godot.Collections.Dictionary<string, Variant> Save()
+	{
+		var retVal =  new Godot.Collections.Dictionary<string, Variant>();
+		
+		retVal["min"] = MinMaxValue.min;
+		retVal["max"] = MinMaxValue.max;
+		retVal["current"] = CurrentValue;
+		retVal["signalOnMin"] = signalOnMinValue;
+		retVal["signalOnMax"] = signalOnMaxValue;
+		
+		return retVal;
+	}
+
+	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	{
+		minValue = (int)data["min"];
+		maxValue = (int)data["max"];
+		CurrentValue =  (float)data["current"];
+		signalOnMinValue = (bool)data["signalOnMin"];
+		signalOnMaxValue = (bool)data["signalOnMax"];
 	}
 }

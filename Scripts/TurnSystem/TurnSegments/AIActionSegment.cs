@@ -128,7 +128,7 @@ namespace FirstArrival.Scripts.AI
             GD.Print($"Attempting to take action: {actionDefinition.GetActionName()} for {parent.Name}");
 
             var actionCompletedSignal = ActionManager.Instance.ToSignal(ActionManager.Instance, ActionManager.SignalName.ActionCompleted);
-            if (await ActionManager.Instance.TryTakeAction(actionDefinition, parent, parent.GridPositionData.GridCell, target))
+            if (await ActionManager.Instance.TryTakeAction(actionDefinition, parent, parent.GridPositionData.AnchorCell, target))
             {
                 await actionCompletedSignal;
             }

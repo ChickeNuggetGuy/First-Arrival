@@ -18,6 +18,14 @@ public partial class GridCell
     public Vector3I gridCoordinates { get; protected set; }
     public Vector3 worldCenter { get; protected set; }
 
+    public Vector3 worldPosition
+    {
+	    get
+	    {
+		    return worldCenter; 
+	    }
+    }
+
     // Removed local connections list - now queried from GridSystem
     public List<Vector3I> Connections => GridSystem.Instance?.GetConnections(gridCoordinates);
 

@@ -25,18 +25,25 @@ public partial class SelectGridObjectTurnSegment : TurnSegment
 	protected override async Task _Execute()
 	{
 		GridObjectTeamHolder teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(parentTurn.team);
+		var activeObjects = teamHolder.GridObjects[Enums.GridObjectState.Active];
+
+		if (activeObjects.Count == 0) 
+		{
+			GD.PushWarning("SelectGridObjectSegment: No active objects to select.");
+			return;
+		}
 
 		GridObject gridObjectToSelect = null;
 		switch (selectType)
 		{
 			case SelectGridObjectType.First:
-				gridObjectToSelect = teamHolder.GridObjects[Enums.GridObjectState.Active][0];
+				gridObjectToSelect = activeObjects[0];
 				break;
 			case SelectGridObjectType.Last:
-				gridObjectToSelect = teamHolder.GridObjects[Enums.GridObjectState.Active][-1];
+				gridObjectToSelect = activeObjects[activeObjects.Count - 1];
 				break;
 			case SelectGridObjectType.Random:
-				gridObjectToSelect = teamHolder.GridObjects[Enums.GridObjectState.Active][GD.RandRange(0, teamHolder.GridObjects[Enums.GridObjectState.Active].Count)];
+				gridObjectToSelect = activeObjects[GD.RandRange(0, activeObjects.Count - 1)];
 				break;
 		}
 		teamHolder.SetSelectedGridObject(gridObjectToSelect);

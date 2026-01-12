@@ -56,4 +56,43 @@ public partial class GridObjectStatHolder : GridObjectNode
 		}
 		return true;
 	}
+	
+	public override Godot.Collections.Dictionary<string, Variant> Save()
+	{
+		var retVal =  new Godot.Collections.Dictionary<string, Variant>();
+
+		foreach (var stat in Stats)
+		{
+			retVal.Add(stat.Stat.ToString(), stat.Save());
+		}
+		
+		return retVal;
+	}
+
+	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	{
+		// Re-setup stats collection first
+		_stats.Clear();
+		foreach (var child in this.GetChildren())
+		{
+			if (child is GridObjectStat stat)
+			{
+				_stats.Add(stat.Stat, stat);
+			}
+		}
+    
+		// Then load individual stat data
+		foreach (var statDataEntry in data)
+		{
+			string statName = statDataEntry.Key;
+			if (Enum.TryParse<Enums.Stat>(statName, out Enums.Stat statEnum))
+			{
+				if (_stats.ContainsKey(statEnum))
+				{
+					var statData = (Godot.Collections.Dictionary<string, Variant>)statDataEntry.Value;
+					_stats[statEnum].Load(statData);
+				}
+			}
+		}
+	}
 }

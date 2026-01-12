@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://cerg0y4b073cp"]
+
+[ext_resource type="Shader" uid="uid://djvsed4kr1ojx" path="res://Shaders/globe_hex.gdshader" id="1_yyy0a"]
+
+[sub_resource type="Texture2DArray" id="Texture2DArray_yyy0a"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_yyy0a")
+shader_parameter/layer_textures = SubResource("Texture2DArray_yyy0a")
+shader_parameter/total_hex_count = 0.0
+shader_parameter/index_map_size = Vector2(0, 0)
+shader_parameter/border_color = Color(1, 0, 0, 1)
+shader_parameter/border_thickness = 0.02

@@ -44,7 +44,7 @@ public partial class GridObjectSight : GridObjectNode
       return;
     }
 
-    GridCell startCell = parentGridObject.GridPositionData.GridCell;
+    GridCell startCell = parentGridObject.GridPositionData.AnchorCell;
     if (startCell == GridCell.Null)
       return;
 
@@ -113,5 +113,19 @@ public partial class GridObjectSight : GridObjectNode
     {
         _previouslySeenGridObjects.Remove(obj);
     }
+  }
+
+  public override Godot.Collections.Dictionary<string, Variant> Save()
+  {
+	  return new Godot.Collections.Dictionary<string, Variant>();
+  }
+
+  public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+  {
+	  // After all nodes are loaded, recalculate sight
+	  if (parentGridObject != null && parentGridObject.IsInitialized)
+	  {
+		  CalculateSightArea();
+	  }
   }
 }

@@ -136,4 +136,9 @@ public class Enums
 		Enabled,
 		Disabled
 	}
+	
+	
+	public enum HexGridType {Land, Water}
+	
+	public enum MissionType {None, Eliminate, Survive, Objective, Timed}
 }

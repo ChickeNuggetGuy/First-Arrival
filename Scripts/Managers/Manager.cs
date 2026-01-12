@@ -26,26 +26,26 @@ public abstract partial class Manager<T> : ManagerBase where T : ManagerBase,  n
 				if (overridePreviousInstance)
 				{
 					Manager<T> Oldinstance = Instance as Manager<T>;
-					//This is a new instance!
 					Instance = this as T;
+					return;
 				}
-				else 
-				{
-					this.QueueFree();
-				}
-		
-			
+				this.QueueFree();
 			}
+			return;
 		}
-		else
-		{
-			Instance = this as T;
-		}
+		Instance = this as T;
+
 	}
 	
 	public void SetIsBusy(bool isBusy)
 	{
 		IsBusy = isBusy;
 		GD.Print($"{Name}: SetIsBusy: {isBusy} ");
+	}
+	
+	public override void _ExitTree()
+	{
+		if (Instance == this)
+			Instance = null;
 	}
 }

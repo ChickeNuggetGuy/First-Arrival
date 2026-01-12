@@ -35,8 +35,7 @@ public abstract partial class ActionDefinition : Resource
     GridCell targetGridCell,
     Dictionary<Enums.Stat, int> costs
   );
-
-  // Template method that centralizes common flow and affordability check.
+  
   public bool CanTakeAction(
     GridObject gridObject,
     GridCell startingGridCell,
@@ -46,8 +45,9 @@ public abstract partial class ActionDefinition : Resource
   )
   {
     costs = CreateCostContainer();
-
-    // Common null checks
+	
+    
+    parentGridObject = gridObject;
     if (gridObject == null)
     {
       reason = "GridObject is null";
@@ -150,7 +150,7 @@ public abstract partial class ActionDefinition : Resource
 
   public (GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs) DetermineBestAIAction()
   {
-	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.GridCell);
+	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.AnchorCell);
 	  GD.Print($"{GetActionName()}: Possible grid cells: {possibleGridCells.Count}");
 	  if (possibleGridCells == null)
 	  {
@@ -170,7 +170,7 @@ public abstract partial class ActionDefinition : Resource
 
 	  foreach (var possibleGridCell in possibleGridCells)
 	  {
-		  if (!CanTakeAction(parentGridObject, parentGridObject.GridPositionData.GridCell, possibleGridCell, out var costs, out _))
+		  if (!CanTakeAction(parentGridObject, parentGridObject.GridPositionData.AnchorCell, possibleGridCell, out var costs, out _))
 		  {
 			  continue;
 		  }

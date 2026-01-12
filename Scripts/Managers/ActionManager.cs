@@ -21,12 +21,12 @@ public partial class ActionManager : Manager<ActionManager>
 	public override string GetManagerName() =>  "ActionManager";
 	
 	
-	protected override async Task _Setup()
+	protected override async Task _Setup(bool loadingData)
 	{
 		await Task.CompletedTask;
 	}
 
-	protected override async Task _Execute()
+	protected override async Task _Execute(bool loadingData)
 	{
 		await Task.CompletedTask;
 	}
@@ -63,7 +63,7 @@ public partial class ActionManager : Manager<ActionManager>
 					_ = RunTryTakeActionAsync(
 						SelectedAction,
 						selectedGridObject,
-						selectedGridObject.GridPositionData.GridCell,
+						selectedGridObject.GridPositionData.AnchorCell,
 						currentGridCell
 					);
 					return;
@@ -81,7 +81,7 @@ public partial class ActionManager : Manager<ActionManager>
 					_ = RunTryTakeActionAsync(
 						action,
 						selectedGridObject,
-						selectedGridObject.GridPositionData.GridCell,
+						selectedGridObject.GridPositionData.AnchorCell,
 						currentGridCell
 					);
 					return;
@@ -283,7 +283,8 @@ public partial class ActionManager : Manager<ActionManager>
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		GD.Print("No data to transfer");
+		base.Load(data);
+		if(!HasLoadedData) return;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -292,4 +293,8 @@ public partial class ActionManager : Manager<ActionManager>
 	}
 	#endregion
 
+	public override void Deinitialize()
+	{
+		return;
+	}
 }

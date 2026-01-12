@@ -16,9 +16,14 @@ public partial class GameSaveUI : UIWindow
 
 	protected override Task _Setup()
 	{
-		_saveButton.Pressed += SaveButtonOnPressed;
-		_loadButton.Pressed += LoadButtonOnPressed;
-		_deleteButton.Pressed += DeleteButtonOnPressed;
+		if(!_saveButton.IsConnected(Button.SignalName.Pressed, Callable.From(SaveButtonOnPressed)))
+			_saveButton.Pressed += SaveButtonOnPressed;
+		
+		if(!_loadButton.IsConnected(Button.SignalName.Pressed, Callable.From(LoadButtonOnPressed)))
+			_loadButton.Pressed += LoadButtonOnPressed;
+		
+		if(!_deleteButton.IsConnected(Button.SignalName.Pressed, Callable.From(DeleteButtonOnPressed)))
+			_deleteButton.Pressed += DeleteButtonOnPressed;
 		
 		GameManager.Instance.GameSavesChanged += LoadSaveGameData;
 		LoadSaveGameData();
@@ -29,8 +34,9 @@ public partial class GameSaveUI : UIWindow
 	{
 		_itemList.Clear();
 		List<string> saveFileNames = GameManager.Instance.GetSaveFileDisplayNames();
-		
-		if (saveFileNames == null ||  saveFileNames.Count < 0) return;
+
+		if (saveFileNames == null || saveFileNames.Count <= 0)
+			return;
 
 		foreach (string saveFileName in saveFileNames)
 		{
@@ -41,23 +47,44 @@ public partial class GameSaveUI : UIWindow
 	private void DeleteButtonOnPressed()
 	{
 		if (_itemList.GetSelectedItems().Length < 1) return;
+		string saveName =_itemList.GetItemText(_itemList.GetSelectedItems()[0]);
+
+		GD.Print("Test");
+		GameManager.Instance.TryDeleteSaveGame(saveName);
 		
 	}
 
-	private void LoadButtonOnPressed()
+	private async void LoadButtonOnPressed()
 	{
-		if (_itemList.GetSelectedItems().Length < 1) return;
+		if (_itemList.GetSelectedItems().Length < 1)
+		{
+			GD.Print($"selected item null");
+			return;
+		}
+
+		string saveName = _itemList.GetItemText(_itemList.GetSelectedItems()[0]);
+		GD.Print($"Load {saveName}:");
+		bool ok = await GameManager.Instance.TryLoadGameSaveAsync(saveName);
 		
-		string saveName =_itemList.GetItemText(_itemList.GetSelectedItems()[0]);
-		GD.Print(saveName);
 	}
 
 	private void SaveButtonOnPressed()
 	{
-		if (_saveNameEdit.Text.Length < 1) return;
+		string saveName = "";
+		if (_itemList.GetSelectedItems().Length > 0)
+		{
+			saveName = _itemList.GetItemText(_itemList.GetSelectedItems()[0]);
+			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName));
+		}
+		else if (_saveNameEdit.Text.Length > 0)
+		{
+			saveName = _saveNameEdit.Text;
+		}
 		
-		string saveName = _saveNameEdit.Text;
-	 GD.Print(GameManager.Instance.TryCreateSaveGame(saveName));
+		if (saveName.Length > 0)
+		{
+			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName,  GameManager.GameScene.GlobeScene));
+		}
 	}
 
 	public override void _ExitTree()
@@ -66,5 +93,8 @@ public partial class GameSaveUI : UIWindow
 		_saveButton.Pressed -= SaveButtonOnPressed;
 		_loadButton.Pressed -= LoadButtonOnPressed;
 		_deleteButton.Pressed -= DeleteButtonOnPressed;
+
+		if (GameManager.Instance != null)
+			GameManager.Instance.GameSavesChanged -= LoadSaveGameData;
 	}
 }

@@ -55,17 +55,30 @@ public partial class GridShape : Resource
 
     [Export]
     public Array<bool> ShapeGrid { get; set; }
+	
 
+    public bool IsCellOccupied(int x, int y, int z)
+    {
+	    if (!IsValidCoordinate(x, y, z)) return false;
+	    int index = x + (z * GridSizeX) + (y * GridSizeX * GridSizeZ);
+	    return index < ShapeGrid.Count && ShapeGrid[index];
+    }
+
+    private bool IsValidCoordinate(int x, int y, int z)
+    {
+	    return x >= 0 && x < GridSizeX &&
+	           y >= 0 && y < GridSizeY &&
+	           z >= 0 && z < GridSizeZ;
+    }
     public GridShape()
     {
-        // Ensure we initialize with a safe default
+	    if (ShapeGrid == null) ShapeGrid = new Array<bool> { true };
         int newSize = _gridSizeX * _gridSizeY * _gridSizeZ;
         ShapeGrid = new Array<bool>();
         ShapeGrid.Resize(newSize);
         ShapeGrid.Fill(false);
     }
-
-    // UPDATED: Now takes X, Y, and Z
+	
     public void SetGridShapeCell(int x, int y, int z, bool value)
     {
         if (!IsValidCoordinate(x, y, z)) return;
@@ -81,8 +94,7 @@ public partial class GridShape : Resource
             if (Engine.IsEditorHint()) EmitChanged();
         }
     }
-
-    // UPDATED: Now takes X, Y, and Z
+	
     public bool GetGridShapeCell(int x, int y, int z)
     {
         if (ShapeGrid == null || !IsValidCoordinate(x, y, z)) return false;
@@ -107,13 +119,7 @@ public partial class GridShape : Resource
 
         if (anyChange && Engine.IsEditorHint()) EmitChanged();
     }
-
-    private bool IsValidCoordinate(int x, int y, int z)
-    {
-        return x >= 0 && x < _gridSizeX &&
-               y >= 0 && y < _gridSizeY &&
-               z >= 0 && _gridSizeZ > 0 && z < _gridSizeZ;
-    }
+	
 
     private void NotifyChange()
     {
@@ -157,5 +163,22 @@ public partial class GridShape : Resource
             }
         }
         ShapeGrid = newGrid;
+    }
+    
+    public System.Collections.Generic.IEnumerable<Vector3I> GetOccupiedLocalCells()
+    {
+	    for (int y = 0; y < GridSizeY; y++)
+	    {
+		    for (int x = 0; x < GridSizeX; x++)
+		    {
+			    for (int z = 0; z < GridSizeZ; z++)
+			    {
+				    if (IsCellOccupied(x, y, z))
+				    {
+					    yield return new Vector3I(x, y, z);
+				    }
+			    }
+		    }
+	    }
     }
 }

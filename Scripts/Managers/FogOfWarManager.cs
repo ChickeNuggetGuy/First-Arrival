@@ -37,7 +37,7 @@ public partial class FogOfWarManager : Manager<FogOfWarManager>
 
   public override string GetManagerName() => "FogOfWarManager";
 
-  protected override Task _Setup()
+  protected override Task _Setup(bool loadingData)
   {
     _playerTeamHolder = GridObjectManager.Instance
       .GetGridObjectTeamHolder(Enums.UnitTeam.Player);
@@ -46,7 +46,7 @@ public partial class FogOfWarManager : Manager<FogOfWarManager>
     return Task.CompletedTask;
   }
 
-  protected override Task _Execute()
+  protected override Task _Execute(bool loadingData)
   {
     if (CameraController.Instance != null)
     {
@@ -429,7 +429,8 @@ public partial class FogOfWarManager : Manager<FogOfWarManager>
   #region manager Data
   public override void Load(Godot.Collections.Dictionary<string,Variant> data)
   {
-    GD.Print("No data to transfer");
+	  base.Load(data);
+	  if(!HasLoadedData) return;
   }
 
   public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -437,4 +438,9 @@ public partial class FogOfWarManager : Manager<FogOfWarManager>
     return null;
   }
   #endregion
+
+  public override void Deinitialize()
+  {
+	  return;
+  }
 }

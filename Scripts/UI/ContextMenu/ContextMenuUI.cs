@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.Utility;
 using Godot;
 
 [GlobalClass]
@@ -74,6 +75,10 @@ public partial class ContextMenuUI : UIWindow
 
 			if (obj is IContextUserBase contextUser)
 			{
+				if (obj is GridObject gridObject)
+				{
+					if(gridObject.Team != Enums.UnitTeam.Player) return;
+				}
 				if (!TryGenerateContextMenu(contextUser)) return;
 				ShowCall();
 			}

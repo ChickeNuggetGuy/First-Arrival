@@ -93,7 +93,7 @@ public partial class GridSystem : Manager<GridSystem>
 
     public override string GetManagerName() => "GridSystem";
 
-    protected override async Task _Setup()
+    protected override async Task _Setup(bool loadingData)
     {
         // Safety check for MeshTerrainGenerator
         if (MeshTerrainGenerator.Instance != null)
@@ -127,7 +127,7 @@ public partial class GridSystem : Manager<GridSystem>
         }
     }
 
-    protected override async Task _Execute()
+    protected override async Task _Execute(bool loadingData)
     {
         try
         {
@@ -206,7 +206,7 @@ public partial class GridSystem : Manager<GridSystem>
     #endregion
 
 
-    private async Task<List<GridObject>> SetupGrid()
+   private async Task<List<GridObject>> SetupGrid()
     {
         GridCells = new GridCell[_gridSize.Y][,];
         var space = GetTree().Root.GetWorld3D().DirectSpaceState;
@@ -225,10 +225,11 @@ public partial class GridSystem : Manager<GridSystem>
 
         uint groundMask = (uint)PhysicsLayer.TERRAIN;
         float maxSlopeDot = Mathf.Cos(Mathf.DegToRad(_maxWalkableSlopeAngle));
+        
         float halfY = _cellSize.Y * 0.5f;
+        
+        // Use a small epsilon for the bottom, but the logic below changes the "from" behavior
         float surfEps = Mathf.Max(0.001f, _cellSize.Y * 0.01f);
-        if (surfEps >= halfY)
-            surfEps = halfY * 0.5f;
 
         for (int y = 0; y < _gridSize.Y; y++)
         {
@@ -240,11 +241,10 @@ public partial class GridSystem : Manager<GridSystem>
 		        {
 			        Vector3I coords = new Vector3I(x, y, z);
             
-			        // FIX: Calculation based on Origin + Index * Size + HalfOffset
 			        Vector3 worldCenter = _gridWorldOrigin + new Vector3(
-				        (x + (_cellSize.X/2)) * _cellSize.X,
-				        (y + (halfY)) * _cellSize.Y, 
-				        -(z + (_cellSize.X/2)) * _cellSize.X 
+				        (x + 0.5f) * _cellSize.X,  
+				        (y + 0.5f) * _cellSize.Y, 
+				        -(z + 0.5f) * _cellSize.X 
 			        );
 			        
                     bool hasGround = true;
@@ -278,14 +278,18 @@ public partial class GridSystem : Manager<GridSystem>
 
                             foreach (var offset in rayOffsets)
                             {
+                                // FIX: Start just above the cell top (halfY + margin) to avoid hitting floors from the cell above
+                                // while still being high enough to catch floors aligned with the top.
                                 Vector3 from = worldCenter
                                                + _raycastOffset
                                                + offset
-                                               + Vector3.Up * (halfY - surfEps);
+                                               + Vector3.Up * (halfY + _cellSize.Y * 0.1f); 
+                                
+                                // End slightly below the cell to catch floors aligned with the bottom
                                 Vector3 to = worldCenter
                                              + _raycastOffset
                                              + offset
-                                             + Vector3.Down * (halfY - surfEps);
+                                             + Vector3.Down * (halfY + surfEps);
 
                                 rayParams.From = from;
                                 rayParams.To = to;
@@ -293,10 +297,18 @@ public partial class GridSystem : Manager<GridSystem>
                                 var hit = space.IntersectRay(rayParams);
                                 if (hit.Count > 0)
                                 {
-                                    if (offset == Vector3.Zero)
+                                    var hitPos = hit["position"].As<Vector3>();
+                                    
+                                    // VALIDATION: Ensure the hit is actually INSIDE this cell's vertical bounds.
+                                    // If we hit something too high (belonging to the cell above), ignore it.
+                                    float cellTopY = worldCenter.Y + halfY + 0.01f; 
+                                    if (hitPos.Y > cellTopY) 
+                                        continue;
+
+                                    // Update Y if it's the center ray, OR if we haven't found ground yet (fallback to corner height)
+                                    if (offset == Vector3.Zero || !hasGround)
                                     {
-                                        var hitY = hit["position"].As<Vector3>().Y;
-                                        worldCenter.Y = hitY; // keep center at mid-height
+                                        worldCenter.Y = hitPos.Y; // keep center at ground height
                                     }
 
                                     hasGround = true;
@@ -358,11 +370,9 @@ public partial class GridSystem : Manager<GridSystem>
 	        }
         }
 
-        // Ensure we handle basic init tasks if needed, or return them for the main InitializeGridObjects call
         await Task.CompletedTask;
         return gridObjects;
     }
-
     private void CreateOrUpdateCell(
         Vector3I coords,
         Vector3 position,
@@ -904,59 +914,59 @@ public partial class GridSystem : Manager<GridSystem>
 
 	    if (_cellSize.X <= 0f || _cellSize.Y <= 0f || GridCells == null)
 		    return false;
-	    
-	    Vector3 localPos = worldPosition - _gridWorldOrigin;
-	    
     
+	    Vector3 localPos = worldPosition - _gridWorldOrigin;
+    
+	    // Use FloorToInt for accurate grid cell selection as cells map to [x, x+1)
 	    int X = Mathf.FloorToInt(localPos.X / _cellSize.X);
 	    int Y = Mathf.FloorToInt(localPos.Y / _cellSize.Y);
-	    int Z = Mathf.FloorToInt(-localPos.Z / _cellSize.X); 
-        Y = Mathf.Clamp(Y, 0, GridCells.Length - 1);
-        if (Y < 0 || Y >= GridCells.Length)
-            return false;
+	    int Z = Mathf.FloorToInt(-localPos.Z / _cellSize.X); // Note: Z is negated
+    
+	    Y = Mathf.Clamp(Y, 0, GridCells.Length - 1);
+	    if (Y < 0 || Y >= GridCells.Length)
+		    return false;
 
-        X = Mathf.Clamp(X, 0, GridCells[Y].GetLength(0) - 1);
-        Z = Mathf.Clamp(Z, 0, GridCells[Y].GetLength(1) - 1);
+	    X = Mathf.Clamp(X, 0, GridCells[Y].GetLength(0) - 1);
+	    Z = Mathf.Clamp(Z, 0, GridCells[Y].GetLength(1) - 1);
 
-        gridCoords = GridCells[Y][X, Z];
-        if (gridCoords != null)
-            return true;
+	    gridCoords = GridCells[Y][X, Z];
+	    if (gridCoords != null)
+		    return true;
 
-        if (!nullGetNearest)
-            return false;
+	    if (!nullGetNearest)
+		    return false;
 
-        float minDistance = float.MaxValue;
-        GridCell nearest = null;
-        int rows = GridCells[Y].GetLength(0);
-        int cols = GridCells[Y].GetLength(1);
+	    float minDistance = float.MaxValue;
+	    GridCell nearest = null;
+	    int rows = GridCells[Y].GetLength(0);
+	    int cols = GridCells[Y].GetLength(1);
 
-        for (int i = 0; i < rows; i++)
-        {
-            for (int j = 0; j < cols; j++)
-            {
-                GridCell candidate = GridCells[Y][i, j];
-                if (candidate != null)
-                {
-                    float distSq = (candidate.worldCenter - worldPosition)
-                        .LengthSquared();
-                    if (distSq < minDistance)
-                    {
-                        minDistance = distSq;
-                        nearest = candidate;
-                    }
-                }
-            }
-        }
+	    for (int i = 0; i < rows; i++)
+	    {
+		    for (int j = 0; j < cols; j++)
+		    {
+			    GridCell candidate = GridCells[Y][i, j];
+			    if (candidate != null)
+			    {
+				    float distSq = (candidate.worldCenter - worldPosition)
+					    .LengthSquared();
+				    if (distSq < minDistance)
+				    {
+					    minDistance = distSq;
+					    nearest = candidate;
+				    }
+			    }
+		    }
+	    }
 
-        if (nearest != null)
-        {
-            gridCoords = nearest;
-            return true;
-        }
+	    if (nearest != null)
+	    {
+		    gridCoords = nearest;
+		    return true;
+	    }
 
-        return false;
+	    return false;
     }
-
     public bool TryGetRandomGridCell(
         bool onlyWalkable,
         out GridCell gridCell,
@@ -1381,13 +1391,15 @@ public partial class GridSystem : Manager<GridSystem>
 
         if (positionData == null || positionData.gridShape == null)
         {
+	        GD.Print($"Position data is null");
             return occupiedCells;
         }
 
-        GridCell rootCell = positionData.GridCell;
+        GridCell rootCell = positionData.AnchorCell;
 
         if (rootCell == null)
         {
+	        GD.Print($"Root cell is null");
             return occupiedCells;
         }
 
@@ -1403,14 +1415,34 @@ public partial class GridSystem : Manager<GridSystem>
                     if (!shape.GetGridShapeCell(x, y, z))
                         continue;
 
-                    int offsetX = x - shape.RootCellCoordinates.X;
-                    int offsetZ = z - shape.RootCellCoordinates.Y;
+                    int relX = x - shape.RootCellCoordinates.X;
+                    int relZ = z - shape.RootCellCoordinates.Y;
                     int offsetY = y;
 
-                    // Note: If you implement rotation logic in the future based on positionData.Direction,
-                    // you would apply the rotation matrix to (offsetX, offsetZ) here.
+                    int rotatedX = relX;
+                    int rotatedZ = relZ;
 
-                    Vector3I targetCoords = rootCoords + new Vector3I(offsetX, offsetY, offsetZ);
+                    switch (positionData.Direction)
+                    {
+                        case Enums.Direction.North:
+                            rotatedX = relX;
+                            rotatedZ = relZ;
+                            break;
+                        case Enums.Direction.East:
+                            rotatedX = -relZ;
+                            rotatedZ = relX;
+                            break;
+                        case Enums.Direction.South:
+                            rotatedX = -relX;
+                            rotatedZ = -relZ;
+                            break;
+                        case Enums.Direction.West:
+                            rotatedX = relZ;
+                            rotatedZ = -relX;
+                            break;
+                    }
+
+                    Vector3I targetCoords = rootCoords + new Vector3I(rotatedX, offsetY, rotatedZ);
 
                     GridCell cell = GetGridCell(targetCoords);
 
@@ -1535,7 +1567,8 @@ public partial class GridSystem : Manager<GridSystem>
 
     public override void Load(Godot.Collections.Dictionary<string,Variant> data)
     {
-        GD.Print("No data to transfer");
+	    base.Load(data);
+	    if(!HasLoadedData) return;
     }
 
     public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -1545,5 +1578,9 @@ public partial class GridSystem : Manager<GridSystem>
 
     #endregion
 
+    public override void Deinitialize()
+    {
+	    return;
+    }
     #endregion
 }

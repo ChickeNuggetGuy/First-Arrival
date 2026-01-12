@@ -131,7 +131,7 @@ public partial class MoveActionDefinition : ActionDefinition
 	  
 	  if (!parentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sightArea)) return (null, 0);
 
-	  GridCell startingCell = parentGridObject.GridPositionData.GridCell;
+	  GridCell startingCell = parentGridObject.GridPositionData.AnchorCell;
 	  if (startingCell == null)
 	  {
 		  GD.Print("Starting grid cell is null");

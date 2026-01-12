@@ -1,6 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.UI.UIAnimations;
 
 [GlobalClass]
@@ -12,7 +13,7 @@ public partial class UIWindow : UIElement
 	[Export] protected Key toggleKey { get; private set; }
 	[Export] bool startHidden = false;
 	protected List<UIElement> uiElements = new List<UIElement>();
-	
+	[Export] protected bool blockInputs = false;
 	public bool IsShown {get; private set;}
 	
 	
@@ -23,6 +24,8 @@ public partial class UIWindow : UIElement
 	private UIAnimation showAnimation;
 	[Export(PropertyHint.ResourceType, "UIAnimation")]
 	private UIAnimation hideAnimation;
+	
+
 	
 	#endregion
 	protected override async Task _Setup()
@@ -93,6 +96,11 @@ public partial class UIWindow : UIElement
 			isBusy = false;
 		}
 
+		if (blockInputs)
+		{
+			UIManager.Instance.BlockInputs(this);
+		}
+
 		IsShown = true;
 	}
 
@@ -112,6 +120,11 @@ public partial class UIWindow : UIElement
 		_Hide();
 		Visual.Hide();
 		IsShown = false;
+		
+		if (blockInputs)
+		{
+			UIManager.Instance.UnblockInputs(this);
+		}
 	}
 
 	protected virtual void _Hide()

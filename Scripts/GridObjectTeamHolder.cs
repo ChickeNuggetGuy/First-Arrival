@@ -46,33 +46,38 @@ public partial class GridObjectTeamHolder : Node
 
     public void Setup()
     {
-        GridObjects =
-            new System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>>()
-            {
-                { Enums.GridObjectState.Active, new List<GridObject>() },
-                { Enums.GridObjectState.Inactive, new List<GridObject>() },
-            };
+	    GridObjects =
+		    new System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>>()
+		    {
+			    { Enums.GridObjectState.Active, new List<GridObject>() },
+			    { Enums.GridObjectState.Inactive, new List<GridObject>() },
+		    };
 
-        if (_activeUnitsHolder == null)
-        {
-            _activeUnitsHolder = new Node { Name = "ActiveUnits" };
-            AddChild(_activeUnitsHolder);
-        }
+	    if (_activeUnitsHolder == null)
+	    {
+		    _activeUnitsHolder = new Node { Name = "ActiveUnits" };
+		    AddChild(_activeUnitsHolder);
+	    }
 
-        if (_inactiveUnitsHolder == null)
-        {
-            _inactiveUnitsHolder = new Node { Name = "InactiveUnits" };
-            AddChild(_inactiveUnitsHolder);
-        }
+	    if (_inactiveUnitsHolder == null)
+	    {
+		    _inactiveUnitsHolder = new Node { Name = "InactiveUnits" };
+		    AddChild(_inactiveUnitsHolder);
+	    }
+		
+	    // Ensure any pre-existing children in the scene tree are cleaned up or registered
+	    // For a clean setup, we usually want to clear them unless we are in the editor
+	    foreach(Node child in _activeUnitsHolder.GetChildren()) child.QueueFree();
+	    foreach(Node child in _inactiveUnitsHolder.GetChildren()) child.QueueFree();
 
-        Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
-        for (int y = 0; y < mapSize.Y; y++)
-        {
-	        var image = Image.CreateEmpty(mapSize.X, mapSize.Z, false, Image.Format.Rgba8);
-	        image.Fill(Colors.Black);
-	        _visibilityImages[y] = image;
-	        VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
-        }
+	    Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
+	    for (int y = 0; y < mapSize.Y; y++)
+	    {
+		    var image = Image.CreateEmpty(mapSize.X, mapSize.Z, false, Image.Format.Rgba8);
+		    image.Fill(Colors.Black);
+		    _visibilityImages[y] = image;
+		    VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
+	    }
     }
 
     public HashSet<GridCell> ExploredCells { get; private set; } = new();
@@ -225,24 +230,26 @@ public partial class GridObjectTeamHolder : Node
 
     public GridObject GetNextGridObject()
     {
-	    if(CurrentGridObject == null) CurrentGridObject = GridObjects[Enums.GridObjectState.Active][0];
-	    
+	    if (GridObjects[Enums.GridObjectState.Active].Count == 0) return null;
+		
+	    if (CurrentGridObject == null) CurrentGridObject = GridObjects[Enums.GridObjectState.Active][0];
+
 	    if (CurrentGridObject == null) return null;
-        int index =
-            GridObjects[Enums.GridObjectState.Active].IndexOf(CurrentGridObject);
+	    int index =
+		    GridObjects[Enums.GridObjectState.Active].IndexOf(CurrentGridObject);
 
-        if (index == -1)
-            return null;
+	    if (index == -1)
+		    return null;
 
-        int nextIndex =
-            ((index + 1) >= GridObjects[Enums.GridObjectState.Active].Count)
-                ? 0
-                : index + 1;
+	    int nextIndex =
+		    ((index + 1) >= GridObjects[Enums.GridObjectState.Active].Count)
+			    ? 0
+			    : index + 1;
 
-        SetSelectedGridObject(
-            GridObjects[Enums.GridObjectState.Active][nextIndex]
-        );
-        return CurrentGridObject;
+	    SetSelectedGridObject(
+		    GridObjects[Enums.GridObjectState.Active][nextIndex]
+	    );
+	    return CurrentGridObject;
     }
 
     public void SetSelectedGridObject(GridObject gridObject)
@@ -296,4 +303,112 @@ public partial class GridObjectTeamHolder : Node
     {
         return GridObjects[Enums.GridObjectState.Active].Contains(gridObject);
     }
+
+
+public Godot.Collections.Dictionary<string, Variant> Save()
+	{
+		var data = new Godot.Collections.Dictionary<string, Variant>();
+		
+		// 1. Save Active Units
+		var activeList = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
+		foreach (var obj in GridObjects[Enums.GridObjectState.Active])
+		{
+			// ASSUMPTION: GridObject has a Save() method returning Dictionary<string, Variant>
+			// AND it includes "Filename" : obj.SceneFilePath
+			activeList.Add(obj.Save());
+		}
+		data["Active"] = activeList;
+
+		// 2. Save Inactive Units
+		var inactiveList = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
+		foreach (var obj in GridObjects[Enums.GridObjectState.Inactive])
+		{
+			inactiveList.Add(obj.Save());
+		}
+		data["Inactive"] = inactiveList;
+		
+		// 3. Save Team Info
+		data["Team"] = (int)Team;
+
+		return data;
+	}
+
+	public void Load(Godot.Collections.Dictionary<string, Variant> data)
+	{
+		Setup(); // Ensure holders and dicts are initialized
+
+		// 1. Clear existing units (destroying them to avoid duplicates)
+		foreach (var unit in GridObjects[Enums.GridObjectState.Active]) unit.QueueFree();
+		foreach (var unit in GridObjects[Enums.GridObjectState.Inactive]) unit.QueueFree();
+		
+		GridObjects[Enums.GridObjectState.Active].Clear();
+		GridObjects[Enums.GridObjectState.Inactive].Clear();
+
+		// 2. Load Active Units
+		if (data.ContainsKey("Active"))
+		{
+			var activeList = (Godot.Collections.Array)data["Active"];
+			foreach (Godot.Collections.Dictionary<string, Variant> unitData in activeList)
+			{
+				GridObject newUnit = InstantiateUnitFromData(unitData);
+				if (newUnit != null)
+				{
+					_activeUnitsHolder.AddChild(newUnit);
+					GridObjects[Enums.GridObjectState.Active].Add(newUnit);
+					
+					// Re-hook events
+					if (newUnit.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder))
+					{
+						if (statHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat health))
+						{
+							health.CurrentValueMin += HealthOnCurrentValueMin;
+						}
+					}
+				}
+			}
+		}
+
+		// 3. Load Inactive Units
+		if (data.ContainsKey("Inactive"))
+		{
+			var inactiveList = (Godot.Collections.Array)data["Inactive"];
+			foreach (Godot.Collections.Dictionary<string, Variant> unitData in inactiveList)
+			{
+				GridObject newUnit = InstantiateUnitFromData(unitData);
+				if (newUnit != null)
+				{
+					_inactiveUnitsHolder.AddChild(newUnit);
+					GridObjects[Enums.GridObjectState.Inactive].Add(newUnit);
+					newUnit.SetIsActive(false); // Helper to set internal state
+				}
+			}
+		}
+		
+		EmitSignal(SignalName.GridObjectListChanged, this);
+	}
+
+	private GridObject InstantiateUnitFromData(Godot.Collections.Dictionary<string, Variant> unitData)
+	{
+		// Requires "Filename" to be saved in the GridObject.Save() method
+		if (!unitData.ContainsKey("Filename"))
+		{
+			GD.PrintErr("Save data missing Filename for GridObject");
+			return null;
+		}
+
+		string scenePath = unitData["Filename"].AsString();
+		var scene = GD.Load<PackedScene>(scenePath);
+		if (scene == null)
+		{
+			GD.PrintErr($"Failed to load scene at path: {scenePath}");
+			return null;
+		}
+
+		GridObject unit = scene.Instantiate<GridObject>();
+		
+		// Load internal data (Position, Stats, etc.)
+		unit.Load(unitData); 
+		
+		return unit;
+	}
 }

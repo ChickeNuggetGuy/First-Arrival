@@ -31,6 +31,8 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
         }
 
         _doorCells.Clear();
+        doorData.SetupCall(this);
+        GridPositionData.SetupCall(this);
         var foundCells = gridSystem.GetCellsFromGridShape(doorData);
         if (foundCells != null) _doorCells.AddRange(foundCells);
 
@@ -40,25 +42,16 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
             return;
         }
 
-        GD.Print($"\n=== Door Init: {_doorCells.Count} cells found ===");
-
         foreach (var doorCell in _doorCells)
         {
             var oldState = doorCell.state;
             var connectionsBeforeInit = gridSystem.GetConnections(doorCell.gridCoordinates);
-            
-            GD.Print($"Cell {doorCell.gridCoordinates}:");
-            GD.Print($"  State before: {oldState}");
-            GD.Print($"  Connections before: {connectionsBeforeInit.Count}");
 
             Enums.GridCellState newState = doorCell.state | Enums.GridCellState.Obstructed;
             doorCell.ModifyOriginalState(newState);
             doorCell.SetState(newState);
 
             var connectionsAfterInit = gridSystem.GetConnections(doorCell.gridCoordinates);
-            
-            GD.Print($"  State after: {doorCell.state}");
-            GD.Print($"  Connections after: {connectionsAfterInit.Count}");
             
             if (connectionsAfterInit.Count > 0)
             {
@@ -69,10 +62,8 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
                 }
             }
         }
-
         UpdateVisuals();
         _initialized = true;
-        GD.Print("=== Door Init Complete ===\n");
     }
 
     public void Interact()
@@ -81,8 +72,7 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
 
         isOpen = !isOpen;
         UpdateVisuals();
-
-        GD.Print($"\n=== Door {(isOpen ? "OPENING" : "CLOSING")} ===");
+        
 
         foreach (var doorCell in _doorCells)
         {
@@ -95,15 +85,10 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
             else
                 newState = oldState | Enums.GridCellState.Obstructed;
 
-            GD.Print($"Cell {doorCell.gridCoordinates}:");
-            GD.Print($"  State: {oldState} -> {newState}");
-            GD.Print($"  Connections before: {oldConnections.Count}");
-
             doorCell.ModifyOriginalState(newState);
             doorCell.SetState(newState);
 
             var newConnections = GridSystem.Instance.GetConnections(doorCell.gridCoordinates);
-            GD.Print($"  Connections after: {newConnections.Count}");
 
             if (!isOpen && newConnections.Count > 0)
             {
@@ -114,8 +99,6 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
                 }
             }
         }
-
-        GD.Print($"=== Door {(isOpen ? "OPENED" : "CLOSED")} ===\n");
     }
 
     private void UpdateVisuals()

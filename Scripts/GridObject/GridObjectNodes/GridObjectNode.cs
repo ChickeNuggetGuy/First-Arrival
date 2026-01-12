@@ -2,7 +2,7 @@ using Godot;
 using System;
 
 [GlobalClass]
-public abstract partial class GridObjectNode : Node
+public abstract partial class GridObjectNode : Node3D
 {
 	public GridObject parentGridObject { get; protected set; }
 
@@ -13,4 +13,8 @@ public abstract partial class GridObjectNode : Node
 	}
 	
 	protected abstract void Setup();
+
+	public abstract Godot.Collections.Dictionary<string,Variant> Save();
+
+	public abstract void Load(Godot.Collections.Dictionary<string,Variant> data);
 }

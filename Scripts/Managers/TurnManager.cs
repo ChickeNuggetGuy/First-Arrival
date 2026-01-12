@@ -33,8 +33,10 @@ public partial class TurnManager : Manager<TurnManager>
 
 	public override string GetManagerName()=> "TurnManager";
 
-	protected override async Task _Setup()
+	protected override async Task _Setup(bool loadingData)
 	{
+		
+		
 		if (turns == null || turns.Length == 0)
 		{
 			GD.PushWarning("TurnManager: No turns defined. Setup complete.");
@@ -55,10 +57,23 @@ public partial class TurnManager : Manager<TurnManager>
 		}
 
 		SetCurrentTurn(0);
-		TurnStarted += GameManager.Instance.CheckGameState;
+		if (GameManager.Instance != null)
+		{
+			TurnStarted += GameManager.Instance.CheckGameState;
+		}
+		else 
+		{
+			GD.PushError("TurnManager: GameManager Instance is null during setup!");
+		}
+	}
+	
+	public override void Deinitialize()
+	{
+		TurnStarted -= GameManager.Instance.CheckGameState;
+		return;
 	}
 
-	protected override async Task _Execute()
+	protected override async Task _Execute(bool loadingData)
 	{
 		if (CurrentTurn == null)
 		{
@@ -68,9 +83,7 @@ public partial class TurnManager : Manager<TurnManager>
 		}
 
 		GD.Print("---> Executing Turn: ", CurrentTurn?.ResourceName ?? "NULL");
-
-		SetIsBusy(true);
-
+		
 		try
 		{
 			if (CurrentTurn != null) await CurrentTurn.ExecuteCall();
@@ -148,9 +161,11 @@ public partial class TurnManager : Manager<TurnManager>
 	{
 		base._Process(delta);
 
+
 		if (!IsBusy)
 		{
-			_ = _Execute();
+			SetIsBusy(true);
+			_ = _Execute(false);
 		}
 	}
 
@@ -166,7 +181,8 @@ public partial class TurnManager : Manager<TurnManager>
 
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		GD.Print("No data to transfer");
+		base.Load(data);
+		if(!HasLoadedData) return;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()

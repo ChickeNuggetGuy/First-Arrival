@@ -664,12 +664,12 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 	public override string GetManagerName() =>"Pathfinder";
 
-	protected override Task _Setup()
+	protected override Task _Setup(bool loadingData)
 	{
 		return Task.CompletedTask;
 	}
 
-	protected override Task _Execute()
+	protected override Task _Execute(bool loadingData)
 	{
 		return Task.CompletedTask;
 	}
@@ -677,7 +677,8 @@ public partial class Pathfinder : Manager<Pathfinder>
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		GD.Print("No data to transfer");
+		base.Load(data);
+		if(!HasLoadedData) return;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -685,4 +686,9 @@ public partial class Pathfinder : Manager<Pathfinder>
 		return null;
 	}
 	#endregion
+	
+	public override void Deinitialize()
+	{
+		return;
+	}
 }

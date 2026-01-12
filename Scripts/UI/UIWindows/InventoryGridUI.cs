@@ -34,7 +34,7 @@ public partial class InventoryGridUI : UIWindow
 		{
 			if (InventoryGrid == null)
 			{
-				GridCell currentGridCell = gridObject.GridPositionData.GridCell;
+				GridCell currentGridCell = gridObject.GridPositionData.AnchorCell;
 				if (currentGridCell == null || currentGridCell.InventoryGrid == null) return Task.CompletedTask;
 				InventoryGrid = currentGridCell.InventoryGrid;
 			}
@@ -71,7 +71,7 @@ public partial class InventoryGridUI : UIWindow
 		UpdateSlotsUI();
 		if (inventoryType == Enums.InventoryType.Ground)
 		{
-			SetupInventoryUI(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject.GridPositionData.GridCell.InventoryGrid);
+			SetupInventoryUI(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject.GridPositionData.AnchorCell.InventoryGrid);
 		}
 		
 		base._Show();

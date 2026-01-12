@@ -8,35 +8,46 @@ public abstract partial class ManagerBase : Node
 	[Export] protected bool DebugMode = false;
 	public bool SetupComplete { get; protected set; }
 	public bool ExecuteComplete { get; protected set; }
+	
+	public bool HasLoadedData { get; protected set; }
 
-	[Signal]
-	public delegate void SetupCompletedEventHandler();
-
-	[Signal]
-	public delegate void ExecuteCompletedEventHandler();
-
-
+	[Signal] public delegate void SetupCompletedEventHandler();
+	[Signal] public delegate void ExecuteCompletedEventHandler();
 
 	public abstract string GetManagerName();
 
-	public async Task SetupCall()
+	public async Task SetupCall(bool loadingData)
 	{
-		await _Setup();
-		EmitSignal("SetupCompleted");
+		await _Setup(loadingData);
+		EmitSignal(SignalName.SetupCompleted);
 		SetupComplete = true;
 	}
 
-	protected abstract Task _Setup();
+	protected abstract Task _Setup(bool loadingData);
 
-	public async Task ExecuteCall()
+	public async Task ExecuteCall(bool loadingData)
 	{
-		await _Execute();
+		await _Execute(loadingData);
 		EmitSignal("ExecuteCompleted");
 		ExecuteComplete = true;
 	}
 
-	protected abstract Task _Execute();
+	protected abstract Task _Execute(bool loadingData);
 
-	public abstract Godot.Collections.Dictionary<string,Variant> Save();
-	public abstract void Load(Godot.Collections.Dictionary<string,Variant> data);
+	public abstract Godot.Collections.Dictionary<string, Variant> Save();
+	
+	public virtual void Load(Godot.Collections.Dictionary<string, Variant> data)
+	{
+		if (data != null && data.Count > 0)
+			HasLoadedData = true;
+		else
+			HasLoadedData = false;
+	}
+	
+	public void DeinitializeCall()
+	{
+		Deinitialize();
+	}
+	
+	public abstract void Deinitialize();
 }

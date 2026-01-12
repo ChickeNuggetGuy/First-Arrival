@@ -21,19 +21,20 @@ public partial class InputManager : Manager<InputManager>
 
 	public override string GetManagerName() => "InputManager";
 
-	protected override Task _Setup()
+	protected override Task _Setup(bool loadingData)
 	{
 		gridSystem = GridSystem.Instance;
 		return Task.CompletedTask;
 	}
 
-	protected override Task _Execute()
+	protected override Task _Execute(bool loadingData)
 	{
 		return Task.CompletedTask;
 	}
 	private bool IsMouseOverUI() => GetViewport()?.GuiGetHoveredControl() != null;
 	public override void _Process(double delta)
 	{
+		if(UIManager.Instance.BlockingInput) return;
 		base._Process(delta);
 		if( !ExecuteComplete) return;
 		WorldMouseMarker();
@@ -41,12 +42,6 @@ public partial class InputManager : Manager<InputManager>
 		{
 			GD.Print($"Mouse position: {currentGridCell.gridCoordinates} {gridSystem.HasConnections(currentGridCell.gridCoordinates)}");
 		}
-	}
-
-	public override void _Input(InputEvent @event)
-	{
-		if( !ExecuteComplete) return;
-		base._Input(@event);
 	}
 
 	private void WorldMouseMarker()
@@ -80,7 +75,7 @@ public partial class InputManager : Manager<InputManager>
 
 		if (gridObject != null)
 		{
-			var cell = gridObject.GridPositionData?.GridCell;
+			var cell = gridObject.GridPositionData?.AnchorCell;
 
 			if (cell != null)
 			{
@@ -171,7 +166,7 @@ public partial class InputManager : Manager<InputManager>
 			
 			if (gridObject != null)
 			{
-				currentGridCell = gridObject.GridPositionData?.GridCell;
+				currentGridCell = gridObject.GridPositionData?.AnchorCell;
 				if (mouseMarker != null && currentGridCell != null)
 					mouseMarker.GlobalPosition = currentGridCell.worldCenter;
 				return gridObject;
@@ -186,7 +181,8 @@ public partial class InputManager : Manager<InputManager>
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		GD.Print("No data to transfer");
+		base.Load(data);
+		if(!HasLoadedData) return;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -194,5 +190,10 @@ public partial class InputManager : Manager<InputManager>
 		return null;
 	}
 	#endregion
+	
+	public override void Deinitialize()
+	{
+		return;
+	}
 	
 }

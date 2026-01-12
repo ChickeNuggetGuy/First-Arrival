@@ -72,12 +72,7 @@ public static class NodeExtensions
 	{
 		return gridCell.worldCenter;
 	}
-
-	// public static GridCell GetCell(this Vector3I gridCellCoords)
-	// {
-	// 	return GridManager.Instance.GetGridCell(gridCellCoords);
-	// }
-
+	
 	public static void ChangeParent(this Node3D node, Node3D newParent)
 	{
 		if (node.GetParent() != null)
@@ -173,6 +168,8 @@ public static class NodeExtensions
 		}
 		return node;
 	}
+	
+	
 	/// <summary>
 	/// Gets the first child node of the specified type, or null if none is found.
 	/// </summary>
@@ -307,4 +304,5 @@ public static class NodeExtensions
 
         return files;
     }
+    
 }

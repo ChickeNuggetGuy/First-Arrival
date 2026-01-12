@@ -40,6 +40,13 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
+		if (targetGridCell == startingGridCell)
+		{
+			GD.Print($"starting grid cell {startingGridCell} is equal to {targetGridCell}");
+			reason = $"starting grid cell {startingGridCell} is equal to {targetGridCell}";
+			return false;
+		}
+
 		if (!Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanRanged))
 		{
 			reason = "No ranged item equipped";

@@ -58,7 +58,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
   public override string GetManagerName() =>"TerrainGenerator";
 
-  protected override async Task _Setup()
+  protected override async Task _Setup(bool loadingData)
   {
     BuildChunkTypesFromOverrides();
     GenerateHeightMap();
@@ -66,44 +66,47 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
     await Task.CompletedTask;
   }
 
-  protected override async Task _Execute()
+  protected override async Task _Execute(bool loadingData)
   {
 	  GameManager gameManager = GameManager.Instance;
-
-	  // 1) Build/instantiate ALL chunk nodes
-	  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
+	  if (!HasLoadedData)
 	  {
-		  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
+		  // 1) Build/instantiate ALL chunk nodes
+		  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
 		  {
-			  EnsureChunkNodeExists(chunkX, chunkZ);
+			  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
+			  {
+				  EnsureChunkNodeExists(chunkX, chunkZ);
 
-			  var cData = GetChunkData(chunkX, chunkZ);
-			  var node = cData.GetChunkNode();
+				  var cData = GetChunkData(chunkX, chunkZ);
+				  var node = cData.GetChunkNode();
 
-			  float chunkWorldSize = chunkSize * cellSize.X;
-			  node.Position = new Vector3(
-				  chunkX * chunkWorldSize,
-				  0f,
-				  -(chunkZ * chunkWorldSize) // negative Z is forward (North)
-			  );
+				  float chunkWorldSize = chunkSize * cellSize.X;
+				  node.Position = new Vector3(
+					  chunkX * chunkWorldSize,
+					  0f,
+					  -(chunkZ * chunkWorldSize) // negative Z is forward (North)
+				  );
+			  }
 		  }
+
+		  // 2) Wait one physics frame
+		  await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		  // 3) Blend man-made borders smoothly to 0
+		  BlendHeightsToZeroAroundManmade();
+
+		  // 4) Smooth (ignore locked vertices)
+		  ValidateHeightsIgnoringLocked(terrainHeights, 2, 2);
+
+		  // 5) Clamp to a minimum Y level (procedural only by default).
+		  // Define 'minHeightY' in your class (e.g., [Export] private float minHeightY)
+		  ClampHeightsToMin(minHeightY, includeManMade: false);
+
 	  }
 
-	  // 2) Wait one physics frame
-	  await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
-
-	  // 3) Blend man-made borders smoothly to 0
-	  BlendHeightsToZeroAroundManmade();
-
-	  // 4) Smooth (ignore locked vertices)
-	  ValidateHeightsIgnoringLocked(terrainHeights, 2, 2);
-
-	  // 5) Clamp to a minimum Y level (procedural only by default).
-	  // Define 'minHeightY' in your class (e.g., [Export] private float minHeightY)
-	  ClampHeightsToMin(minHeightY, includeManMade: false);
-
 	  // 6) Generate meshes for procedural chunks
-	  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
+  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
 	  {
 		  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
 		  {
@@ -626,86 +629,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   #endregion
 
   #region Man-made Border Baking (Legacy - not used)
-
-  // Kept for reference; blending replaces the need for edge raycast baking.
-  private void LockManmadeEdges()
-  {
-    GameManager gameManager = GameManager.Instance;
-    int totalVertsX = gameManager.mapSize.X * chunkSize + 1;
-    int totalVertsZ = gameManager.mapSize.Y * chunkSize + 1;
-
-    for (int z = 0; z < totalVertsZ; z++)
-    {
-      for (int x = 0; x < totalVertsX; x++)
-      {
-        bool isVerticalBoundary = (x % chunkSize == 0 && x != 0);
-        bool isHorizontalBoundary = (z % chunkSize == 0 && z != 0);
-
-        if (!isVerticalBoundary && !isHorizontalBoundary)
-          continue;
-
-        ChunkData currentChunk = GetChunkFromVertexIndex(x, z, gameManager);
-        if (currentChunk == null)
-          continue;
-
-        // Check vertical boundary: between left and right chunks
-        if (isVerticalBoundary)
-        {
-          int leftX = x - 1;
-          ChunkData leftChunk = GetChunkFromVertexIndex(leftX, z, gameManager);
-
-          if (leftChunk != null)
-          {
-            bool boundaryBetweenManmadeAndProc =
-              (currentChunk.chunkType == ChunkData.ChunkType.ManMade
-                && leftChunk.chunkType == ChunkData.ChunkType.Procedural)
-              || (currentChunk.chunkType == ChunkData.ChunkType.Procedural
-                && leftChunk.chunkType == ChunkData.ChunkType.ManMade);
-
-            if (boundaryBetweenManmadeAndProc)
-            {
-              if (TryRaycastManmadeHeightAtVertex(x, z, out float height))
-              {
-                Vector3 v = terrainHeights[x, z];
-                v.Y = height;
-                terrainHeights[x, z] = v;
-                lockedVertices[x, z] = true;
-              }
-            }
-          }
-        }
-
-        // Check horizontal boundary: between adjacent chunks in Z direction
-        if (isHorizontalBoundary)
-        {
-          int belowZ = z - 1;
-          ChunkData belowChunk =
-            GetChunkFromVertexIndex(x, belowZ, gameManager);
-
-          if (belowChunk != null)
-          {
-            bool boundaryBetweenManmadeAndProc =
-              (currentChunk.chunkType == ChunkData.ChunkType.ManMade
-                && belowChunk.chunkType == ChunkData.ChunkType.Procedural)
-              || (currentChunk.chunkType == ChunkData.ChunkType.Procedural
-                && belowChunk.chunkType == ChunkData.ChunkType.ManMade);
-
-            if (boundaryBetweenManmadeAndProc)
-            {
-              if (TryRaycastManmadeHeightAtVertex(x, z, out float height))
-              {
-                Vector3 v = terrainHeights[x, z];
-                v.Y = height;
-                terrainHeights[x, z] = v;
-                lockedVertices[x, z] = true;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
   private bool TryRaycastManmadeHeightAtVertex(
     int vertexX,
     int vertexZ,
@@ -892,19 +815,109 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   public bool HasHeightData => terrainHeights != null;
 
   public ChunkData[] GetChunks() => chunkTypes;
+  
 
-  #region manager Data
+#region manager Data
 
-  public override void Load(Godot.Collections.Dictionary<string,Variant> data)
+  public override Godot.Collections.Dictionary<string, Variant> Save()
   {
-    GD.Print("No data to transfer");
+    if (terrainHeights == null || lockedVertices == null)
+    {
+      GD.PrintErr("MeshTerrainGenerator: Cannot save, data is null.");
+      return new Godot.Collections.Dictionary<string, Variant>();
+    }
+
+    int width = terrainHeights.GetLength(0);
+    int depth = terrainHeights.GetLength(1);
+
+    // 1. Flatten the 2D heightmap into a 1D float array
+    float[] flatHeights = new float[width * depth];
+    
+    // 2. Flatten the 2D locked boolean map into a 1D BYTE array
+    // Godot Variant cannot handle bool[], so we use byte[] (PackedByteArray)
+    byte[] flatLocked = new byte[width * depth];
+
+    for (int x = 0; x < width; x++)
+    {
+      for (int z = 0; z < depth; z++)
+      {
+        int index = x + (z * width);
+        flatHeights[index] = terrainHeights[x, z].Y;
+        
+        // Convert bool to byte (1 for true, 0 for false)
+        flatLocked[index] = lockedVertices[x, z] ? (byte)1 : (byte)0;
+      }
+    }
+
+    var data = new Godot.Collections.Dictionary<string, Variant>
+    {
+      { "GridWidth", width },
+      { "GridDepth", depth },
+      { "Heights", flatHeights },
+      { "LockedVertices", flatLocked } 
+    };
+
+    return data;
   }
 
-  public override Godot.Collections.Dictionary<string,Variant> Save()
+  public override void Load(Godot.Collections.Dictionary<string, Variant> data)
   {
-    return null;
+	  base.Load(data);
+	  if(!HasLoadedData) return;
+	  
+    if (!data.ContainsKey("GridWidth") || !data.ContainsKey("GridDepth") || !data.ContainsKey("Heights"))
+    {
+      GD.PrintErr("MeshTerrainGenerator: Save data is missing critical keys.");
+      return;
+    }
+
+    // 1. Retrieve Dimensions
+    int width = data["GridWidth"].As<int>();
+    int depth = data["GridDepth"].As<int>();
+
+    // 2. Retrieve Arrays
+    float[] flatHeights = data["Heights"].As<float[]>();
+    
+    // Retrieve Bytes and prepare to convert back to bool
+    byte[] flatLocked = null;
+    if (data.ContainsKey("LockedVertices"))
+    {
+      flatLocked = data["LockedVertices"].As<byte[]>();
+    }
+
+    // 3. Re-initialize the 2D arrays
+    terrainHeights = new Vector3[width, depth];
+    lockedVertices = new bool[width, depth];
+
+    // 4. Reconstruct the Vector3 grid
+    for (int x = 0; x < width; x++)
+    {
+      for (int z = 0; z < depth; z++)
+      {
+        int index = x + (z * width);
+
+        float worldX = x * cellSize.X;
+        float worldZ = -(z * cellSize.X); 
+        float loadedY = flatHeights[index];
+
+        terrainHeights[x, z] = new Vector3(worldX, loadedY, worldZ);
+
+        if (flatLocked != null)
+        {
+          // Convert byte back to bool
+          lockedVertices[x, z] = flatLocked[index] > 0;
+        }
+      }
+    }
+
+    GD.Print("MeshTerrainGenerator: Terrain heightmap loaded successfully.");
+  }
+  #endregion
+  #endregion
+  
+  public override void Deinitialize()
+  {
+	  return;
   }
 
-  #endregion
-  #endregion
 }

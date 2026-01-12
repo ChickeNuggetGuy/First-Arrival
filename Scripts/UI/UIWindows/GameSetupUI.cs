@@ -32,7 +32,7 @@ public partial class GameSetupUI : UIWindow
 		mapSize = new Vector2I(Mathf.RoundToInt(mapSizeX.Value),  Mathf.RoundToInt(mapSizeY.Value));
 		unitCounts = new Vector2I(Mathf.RoundToInt(PlayerUnitCounts.Value), Mathf.RoundToInt(EnemyUnitCounts.Value));
 
-		GameManager.Instance.TryChangeScene(GameManager.gameScene.BattleScene,new Callable(this ,nameof(onBattleSceneLoaded)), false);
+		GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene,new Callable(this ,nameof(onBattleSceneLoaded)), false);
 	}
 
 	public void onBattleSceneLoaded()

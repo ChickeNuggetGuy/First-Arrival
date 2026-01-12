@@ -11,6 +11,7 @@ public partial class MainMenuUI : UIWindow
 	[Export] public Button quickPlayButton;
 	[Export] public Button quitButton;
 	[Export] public UIWindow gameSettingsMenu;
+	[Export] public UIWindow gameSavesWindow;
 	#endregion
 	
 	#region Functions
@@ -45,10 +46,11 @@ public partial class MainMenuUI : UIWindow
 	
 	private void QuickPlayButtonOnPressed()
 	{
+		GD.Print("Quick Play");
 		GameManager.Instance.mapSize = new Vector2I(GD.RandRange(2,3), GD.RandRange(2,3));
 		GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), GD.RandRange(2,6));
 		
-		GameManager.Instance.TryChangeScene(GameManager.gameScene.BattleScene, null, false);
+		GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene, null, false);
 	}
 
 	private void Test()
@@ -64,7 +66,7 @@ public partial class MainMenuUI : UIWindow
 
 	private void NewGameButtonOnPressed()
 	{
-		gameSettingsMenu.ShowCall();
+		gameSavesWindow.Toggle();
 	}
 
 	#endregion

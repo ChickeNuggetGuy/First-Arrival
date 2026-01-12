@@ -8,10 +8,12 @@ namespace FirstArrival.Scripts.Managers;
 public partial class UIManager : Manager<UIManager>
 {
 	List<UIWindow> _windows =  new List<UIWindow>();
+	[Export] public bool BlockingInput { get; private set; } = false;
+	public UIWindow CurrentWindow { get; private set; }
 	[Export] private Control uiHolder;
 	public override string GetManagerName() => "UIManager";
 
-	protected override async Task _Setup()
+	protected override async Task _Setup(bool loadingData)
 	{
 		foreach (var child in uiHolder.GetChildren())
 		{
@@ -20,7 +22,7 @@ public partial class UIManager : Manager<UIManager>
 		}
 	}
 
-	protected override async Task _Execute()
+	protected override async Task _Execute(bool loadingData)
 	{
 		if (_windows.Count == 0) return;
 
@@ -29,11 +31,30 @@ public partial class UIManager : Manager<UIManager>
 			await window.SetupCall();
 		}
 	}
+
+	public bool BlockInputs( UIWindow blockingWindow)
+	{
+		if (BlockingInput) return false;
+		
+		CurrentWindow = blockingWindow;
+		BlockingInput = true;
+		return true;
+	}
+	
+	public bool UnblockInputs( UIWindow blockingWindow)
+	{
+		if (BlockingInput && CurrentWindow != blockingWindow) return false;
+		
+		CurrentWindow = null;
+		BlockingInput = false;
+		return true;
+	}
 	
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		GD.Print("No data to transfer");
+		base.Load(data);
+		if(!HasLoadedData) return;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()
@@ -41,4 +62,9 @@ public partial class UIManager : Manager<UIManager>
 		return null;
 	}
 	#endregion
+
+	public override void Deinitialize()
+	{
+		return;
+	}
 }
