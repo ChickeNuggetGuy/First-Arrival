@@ -10,6 +10,7 @@ public partial class GridCell
     public static GridCell Null = new GridCell(
         new Vector3I(-1, -1, -1),
         new Vector3(-1, -1, -1),
+        new Vector3(-1, -1, -1),
         Enums.GridCellState.None,
         Enums.FogState.Visible,
         null
@@ -17,15 +18,8 @@ public partial class GridCell
 
     public Vector3I gridCoordinates { get; protected set; }
     public Vector3 worldCenter { get; protected set; }
-
-    public Vector3 worldPosition
-    {
-	    get
-	    {
-		    return worldCenter; 
-	    }
-    }
-
+    public Vector3 trueCenter { get; protected set; }
+	
     // Removed local connections list - now queried from GridSystem
     public List<Vector3I> Connections => GridSystem.Instance?.GetConnections(gridCoordinates);
 
@@ -38,13 +32,13 @@ public partial class GridCell
     public List<GridObject> gridObjects { get; protected set; }
 
     public InventoryGrid InventoryGrid { get; protected set; }
-
-    // Now queries GridSystem for connections
+	
     public bool IsWalkable => state.HasFlag(Enums.GridCellState.Ground) && !state.HasFlag(Enums.GridCellState.Obstructed) && (GridSystem.Instance?.HasConnections(gridCoordinates) ?? false);
 
     public GridCell(
         Vector3I gridCoordinates,
         Vector3 worldCenter,
+        Vector3 trueCenter,
         Enums.GridCellState state,
         Enums.FogState fogState,
         InventoryGrid inventory,
@@ -53,12 +47,17 @@ public partial class GridCell
     {
         this.gridCoordinates = gridCoordinates;
         this.worldCenter = worldCenter;
+        this.trueCenter = trueCenter;
         this.state = state;
         this.originalState = state;
         this.fogState = fogState;
         this.gridObjects = new List<GridObject>();
         UnitTeamSpawn = unitTeamSpawn;
-        InventoryGrid = inventory;
+        if (inventory != null)
+        {
+	        InventoryGrid = inventory;
+	        InventoryGrid.Initialize();
+        }
     }
 
     public bool HasGridObject()
@@ -153,5 +152,12 @@ public partial class GridCell
     public void ModifyOriginalState(Enums.GridCellState newState)
     {
         originalState = newState;
+    }
+
+
+    public void SetInventory(InventoryGrid inventory)
+    {
+	    InventoryGrid = inventory;
+	    InventoryGrid.Initialize();
     }
 }

@@ -47,6 +47,7 @@ public partial class MainMenuUI : UIWindow
 	private void QuickPlayButtonOnPressed()
 	{
 		GD.Print("Quick Play");
+		GameManager.Instance.SetCurrentSaveName("quickplay_internal");
 		GameManager.Instance.mapSize = new Vector2I(GD.RandRange(2,3), GD.RandRange(2,3));
 		GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), GD.RandRange(2,6));
 		

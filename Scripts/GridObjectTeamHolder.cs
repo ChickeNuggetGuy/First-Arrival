@@ -282,6 +282,7 @@ public partial class GridObjectTeamHolder : Node
 
     private void HealthOnCurrentValueMin(int value, GridObject gridObject)
     {
+	    
         if (gridObject == CurrentGridObject)
         {
             // Select a new currentObject
@@ -290,9 +291,8 @@ public partial class GridObjectTeamHolder : Node
         GridObjects[Enums.GridObjectState.Active].Remove(gridObject);
         GridObjects[Enums.GridObjectState.Inactive].Add(gridObject);
 
-        gridObject.GetParent()?.RemoveChild(gridObject); // Remove from current parent
-        _inactiveUnitsHolder.AddChild(gridObject); // Add to inactive holder
-
+        GD.Print($"gridobject {gridObject}, holder {_inactiveUnitsHolder}");
+        gridObject.Reparent(_inactiveUnitsHolder);
         gridObject.SetIsActive(false);
         gridObject.Hide();
         gridObject.Position = new(-100, -100, -100);
@@ -354,6 +354,9 @@ public Godot.Collections.Dictionary<string, Variant> Save()
 				if (newUnit != null)
 				{
 					_activeUnitsHolder.AddChild(newUnit);
+					
+					// Load internal data (Position, Stats, etc.)
+					newUnit.Load(unitData); 
 					GridObjects[Enums.GridObjectState.Active].Add(newUnit);
 					
 					// Re-hook events
@@ -378,6 +381,8 @@ public Godot.Collections.Dictionary<string, Variant> Save()
 				if (newUnit != null)
 				{
 					_inactiveUnitsHolder.AddChild(newUnit);
+					// Load internal data (Position, Stats, etc.)
+					newUnit.Load(unitData); 
 					GridObjects[Enums.GridObjectState.Inactive].Add(newUnit);
 					newUnit.SetIsActive(false); // Helper to set internal state
 				}
@@ -405,9 +410,7 @@ public Godot.Collections.Dictionary<string, Variant> Save()
 		}
 
 		GridObject unit = scene.Instantiate<GridObject>();
-		
-		// Load internal data (Position, Stats, etc.)
-		unit.Load(unitData); 
+
 		
 		return unit;
 	}

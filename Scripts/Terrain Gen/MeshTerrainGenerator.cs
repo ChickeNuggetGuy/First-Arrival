@@ -69,26 +69,28 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   protected override async Task _Execute(bool loadingData)
   {
 	  GameManager gameManager = GameManager.Instance;
+	  
+	  // 1) Build/instantiate ALL chunk nodes
+	  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
+	  {
+		  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
+		  {
+			  EnsureChunkNodeExists(chunkX, chunkZ);
+
+			  var cData = GetChunkData(chunkX, chunkZ);
+			  var node = cData.GetChunkNode();
+
+			  float chunkWorldSize = chunkSize * cellSize.X;
+			  node.Position = new Vector3(
+				  chunkX * chunkWorldSize,
+				  0f,
+				  -(chunkZ * chunkWorldSize) // negative Z is forward (North)
+			  );
+		  }
+	  }
 	  if (!HasLoadedData)
 	  {
-		  // 1) Build/instantiate ALL chunk nodes
-		  for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
-		  {
-			  for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
-			  {
-				  EnsureChunkNodeExists(chunkX, chunkZ);
-
-				  var cData = GetChunkData(chunkX, chunkZ);
-				  var node = cData.GetChunkNode();
-
-				  float chunkWorldSize = chunkSize * cellSize.X;
-				  node.Position = new Vector3(
-					  chunkX * chunkWorldSize,
-					  0f,
-					  -(chunkZ * chunkWorldSize) // negative Z is forward (North)
-				  );
-			  }
-		  }
+		
 
 		  // 2) Wait one physics frame
 		  await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);

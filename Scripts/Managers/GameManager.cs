@@ -18,10 +18,11 @@ public partial class GameManager : Manager<GameManager>
 		{ GameScene.GlobeScene,  "res://Scenes/GameScenes/GlobeScene.tscn" },
 		{ GameScene.MainMenu,  "res://Scenes/GameScenes/MainMenuScene.tscn" }
 	};
+	
 	[Export] protected string saveDir = "user://saves/";
 
 	public Vector2I mapSize = new Vector2I(1, 1);
-	public Vector2I unitCounts = new Vector2I(1, 1);
+	public Vector2I unitCounts = new Vector2I(2, 2);
 
 	public enum GameScene
 	{
@@ -35,9 +36,11 @@ public partial class GameManager : Manager<GameManager>
 
 	private string currentSavename = "new SaveGame";
 	private const string SaveExt = ".sav";
+	private const string AutosaveName = "autosave";
 
 	private static Godot.Collections.Dictionary<string, Variant> _pendingSaveData =
 		null;
+	private static bool _loadFromAutosave = false;
 
 	private static string _pendingSaveName = "";
 
@@ -51,7 +54,12 @@ public partial class GameManager : Manager<GameManager>
 		base._Ready();
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
-		if (_pendingSaveData != null)
+		if (_loadFromAutosave)
+		{
+			_loadFromAutosave = false;
+			await LoadAutosaveInternal();
+		}
+		else if (_pendingSaveData != null)
 		{
 			currentSavename = _pendingSaveName;
 			var data = _pendingSaveData;
@@ -63,6 +71,32 @@ public partial class GameManager : Manager<GameManager>
 		{
 			await SetupCall(false);
 		}
+	}
+
+	private async Task LoadAutosaveInternal()
+	{
+		string fullName = AutosaveName + SaveExt;
+		var path = saveDir.PathJoin(fullName);
+
+		if (FileAccess.FileExists(path))
+		{
+			using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+			if (file != null)
+			{
+				try
+				{
+					var root = file.GetVar().AsGodotDictionary<string, Variant>();
+					await PerformInternalLoadSequence(root);
+					return;
+				}
+				catch (Exception e)
+				{
+					GD.PrintErr($"Failed to load autosave: {e.Message}");
+				}
+			}
+		}
+		// Fallback if autosave fails
+		await SetupCall(false);
 	}
 
 	protected override async Task _Setup(bool loadingData)
@@ -78,6 +112,10 @@ public partial class GameManager : Manager<GameManager>
 
 		foreach (ManagerBase manager in managers)
 		{
+			if (DebugMode)
+			{
+				GD.Print($"Setting up manager: {manager.GetManagerName()}");
+			}
 			await manager.SetupCall(loadingData);
 		}
 
@@ -88,6 +126,10 @@ public partial class GameManager : Manager<GameManager>
 	{
 		foreach (ManagerBase manager in managers)
 		{
+			if (DebugMode)
+			{
+				GD.Print($"Executing manager: {manager.GetManagerName()}");
+			}
 			await manager.ExecuteCall(loadingData);
 		}
 	}
@@ -105,12 +147,27 @@ public partial class GameManager : Manager<GameManager>
 		// 1. Update destination state
 		currentScene = sceneName;
 
-		// 2. Persistent State hand-off (Memory Only)
+		// 2. Autosave before transition
 		if (saveManagerData)
 		{
-			_pendingSaveData = PackageCurrentStateAsDictionary();
-			_pendingSaveName = currentSavename;
+			if (currentSavename.Contains("quickplay_internal"))
+			{
+				TryCreateSaveGame("quickplay_internal");
+				_loadFromAutosave = true;
+			}
+			else
+			{
+				TryCreateSaveGame(AutosaveName);
+				_loadFromAutosave = true;
+			}
+			
 		}
+		else
+		{
+			_loadFromAutosave = false;
+		}
+		
+		_pendingSaveData = null; // Ensure no stale memory data
 
 		// 3. CLEANUP: Deinitialize all managers before leaving the scene
 		CleanupManagers();
@@ -194,7 +251,17 @@ public partial class GameManager : Manager<GameManager>
 		}
 	}
 
-	private void EndGame() => TryChangeScene(GameScene.MainMenu, null);
+	private void EndGame()
+	{
+		if (currentSavename.Contains("quickplay_internal"))
+		{
+			TryChangeScene(GameScene.MainMenu, null);
+		}
+		else
+		{
+			TryChangeScene(GameScene.GlobeScene, null);
+		}
+	}
 
 	#endregion
 	
@@ -216,6 +283,7 @@ public partial class GameManager : Manager<GameManager>
 			var root = file.GetVar().AsGodotDictionary<string, Variant>();
 			
 			_pendingSaveData = root;
+			_loadFromAutosave = false;
 			_pendingSaveName = saveName.Replace(SaveExt, "");
 
 			var sceneStr = root["scene"].AsString();
@@ -314,7 +382,28 @@ public partial class GameManager : Manager<GameManager>
 
 		saveList.Add(this);
 
-		var managersDict = new Godot.Collections.Dictionary<string, Variant>();
+		Godot.Collections.Dictionary<string, Variant> managersDict = new();
+		
+		// 1. Try to load existing data to merge
+		string fullPath = saveDir + saveName;
+		if (!isNewGame && FileAccess.FileExists(fullPath))
+		{
+			using var fileRead = FileAccess.Open(fullPath, FileAccess.ModeFlags.Read);
+			if (fileRead != null)
+			{
+				try 
+				{
+					var oldRoot = fileRead.GetVar().AsGodotDictionary<string, Variant>();
+					if (oldRoot.ContainsKey("managers"))
+					{
+						managersDict = oldRoot["managers"].AsGodotDictionary<string, Variant>();
+					}
+				}
+				catch { /* Ignore corrupt existing saves, start fresh */ }
+			}
+		}
+
+		// 2. Overwrite/Update with current managers
 		foreach (var m in saveList)
 		{
 			managersDict[m.GetManagerName()] = m.Save();
@@ -330,7 +419,7 @@ public partial class GameManager : Manager<GameManager>
 		};
 
 		using var file = FileAccess.Open(
-			saveDir + saveName,
+			fullPath,
 			FileAccess.ModeFlags.Write
 		);
 		if (file == null)
@@ -419,6 +508,15 @@ public partial class GameManager : Manager<GameManager>
 		EmitSignal(SignalName.GameSavesChanged);
 		return true;
 	}
+
+	#endregion
+
+
+	#region Get/Set Functions
+
+	public string GetCurrentSaveName() => currentSavename;
+	
+	public void SetCurrentSaveName(string saveName) => currentSavename = saveName;
 
 	#endregion
 }

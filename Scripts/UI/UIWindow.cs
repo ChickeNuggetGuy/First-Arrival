@@ -47,8 +47,6 @@ public partial class UIWindow : UIElement
 		{
 			IsShown = true;
 		}
-		
-		return;
 	}
 
 	private void ToggleButtonOnPressed()

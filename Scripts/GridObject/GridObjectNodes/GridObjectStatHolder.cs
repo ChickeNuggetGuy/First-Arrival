@@ -24,7 +24,8 @@ public partial class GridObjectStatHolder : GridObjectNode
 		{
 			if (child is GridObjectStat stat)
 			{
-				_stats.Add(stat.Stat, stat);
+				if (!_stats.ContainsKey(stat.Stat))
+					_stats.Add(stat.Stat, stat);
 			}
 		}
 	}

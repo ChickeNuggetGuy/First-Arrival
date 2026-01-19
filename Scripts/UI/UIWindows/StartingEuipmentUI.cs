@@ -1,0 +1,163 @@
+using System.Collections.Generic;
+using Godot;
+using System.Threading.Tasks;
+using FirstArrival.Scripts.Inventory_System;
+using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.UI;
+using FirstArrival.Scripts.Utility;
+
+[GlobalClass]
+public partial class StartingEuipmentUI : UIWindow
+{
+	[Export] Godot.Collections.Dictionary<Enums.InventoryType,InventoryGrid> inventoryGrids = new Godot.Collections.Dictionary<Enums.InventoryType, InventoryGrid>();
+	[Export] Godot.Collections.Dictionary<Enums.InventoryType,InventoryGridUI> inventoryGridUIs = new Godot.Collections.Dictionary<Enums.InventoryType, InventoryGridUI>();
+
+	[Export] public Label unitNameLabel;
+	[Export] public Button acceptButton;
+	[Export] public Button previousButton;
+	[Export] public Button nextButton;
+
+	private List<GridObject> playerUnits = new List<GridObject>();
+	private int currentUnitIndex = 0;
+
+	protected override Task _Setup()
+	{
+		InventoryManager inventoryManager = InventoryManager.Instance;
+		if(inventoryManager == null)
+		{
+			GD.PrintErr("inventoryManager == null");
+			return Task.CompletedTask;
+		}
+
+		if (inventoryManager.startingItems == null || inventoryManager.startingItems.Count == 0)
+		{
+			GD.PrintErr("startingItems == null");
+			return Task.CompletedTask;
+		}
+		
+	
+		foreach (var inventoryGrid in inventoryGrids)
+		{
+			inventoryGrid.Value.Initialize();
+		}
+
+		previousButton.Pressed += PreviousUnit;
+		nextButton.Pressed += NextUnit;
+
+		return base._Setup();
+	}
+
+	private void InitializePlayerUnits()
+	{
+		playerUnits.Clear();
+		var teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+		if (teamHolder != null && teamHolder.GridObjects.ContainsKey(Enums.GridObjectState.Active))
+		{
+			playerUnits.AddRange(teamHolder.GridObjects[Enums.GridObjectState.Active]);
+		}
+		currentUnitIndex = 0;
+	}
+
+	private void NextUnit()
+	{
+		if (playerUnits.Count == 0) return;
+		currentUnitIndex = (currentUnitIndex + 1) % playerUnits.Count;
+		UpdateUnitInventory();
+	}
+
+	private void PreviousUnit()
+	{
+		if (playerUnits.Count == 0) return;
+		currentUnitIndex = (currentUnitIndex - 1 + playerUnits.Count) % playerUnits.Count;
+		UpdateUnitInventory();
+	}
+
+	private void UpdateUnitInventory()
+	{
+		if (playerUnits.Count == 0) return;
+		
+		GridObject currentUnit = playerUnits[currentUnitIndex];
+		if (currentUnit == null) return;
+		
+		unitNameLabel.Text = currentUnit.Name;
+
+		if (!currentUnit.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory))
+		{
+			GD.PrintErr($"Unit {currentUnit.Name} has no GridObjectInventory component");
+			return;
+		}
+
+		foreach (KeyValuePair<Enums.InventoryType, InventoryGridUI> pair in inventoryGridUIs)
+		{
+			// Skip Ground inventory, it stays constant as the starting items pool
+			if (pair.Key == Enums.InventoryType.Ground) continue;
+
+			if (gridObjectInventory.TryGetInventory(pair.Key, out var unitInventory))
+			{
+				pair.Value.SetInventroyGrid(unitInventory);
+				pair.Value.AutoFetchGround = false;
+				pair.Value.SetupInventoryUI(unitInventory);
+			}
+			else
+			{
+				// Unit might not have this inventory type (e.g. some units might not have a backpack)
+				// You might want to clear the UI or handle this case
+				GD.Print($"Unit {currentUnit.Name} missing inventory type {pair.Key}");
+			}
+		}
+	}
+
+	private void populateInventoryGrid(Enums.InventoryType inventoryType, 
+		Godot.Collections.Dictionary<ItemData, int> items, InventoryManager inventoryManager)
+	{
+		if (!inventoryGrids.ContainsKey(inventoryType)) return;
+		InventoryGrid grid = inventoryGrids[inventoryType];
+		
+		if (grid == null) return;
+
+		List<Item> itemsNotAdded = new();
+		foreach (var itemDataKVP in items)
+		{
+			Item item = inventoryManager.InstantiateItem(itemDataKVP.Key);
+			if (!grid.TryAddItem(item, itemDataKVP.Value))
+			{
+				itemsNotAdded.Add(item);
+			}
+		}
+		
+		GD.Print("Cound not add " + itemsNotAdded.Count + " items!");
+
+		foreach (Item item in itemsNotAdded)
+		{
+			item.QueueFree();
+		}
+		
+		
+	}
+
+	protected override void _Show()
+	{
+		InitializePlayerUnits();
+		InventoryManager inventoryManager = InventoryManager.Instance;
+		populateInventoryGrid(Enums.InventoryType.Ground, inventoryManager.startingItems, inventoryManager);
+	
+		foreach (KeyValuePair<Enums.InventoryType, InventoryGridUI> pair in inventoryGridUIs)
+		{
+			if (pair.Key == Enums.InventoryType.Ground)
+			{
+				if (!inventoryGrids.ContainsKey(pair.Key))
+				{
+					GD.Print("InventoryGrid not found: " + pair.Key);
+					continue;
+				}
+
+				pair.Value.SetInventroyGrid(inventoryGrids[pair.Key]);
+				pair.Value.AutoFetchGround = false;
+				pair.Value.ShowCall();
+			}
+		}
+
+		UpdateUnitInventory();
+		base._Show();
+	}
+}

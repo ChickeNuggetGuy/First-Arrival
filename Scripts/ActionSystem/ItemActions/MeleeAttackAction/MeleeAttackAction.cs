@@ -84,7 +84,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			return;
 		}
 		
-		if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
+		if(!targetGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
 
 
 		if (!statHolder.TryGetStat(Enums.Stat.Health, out var health))

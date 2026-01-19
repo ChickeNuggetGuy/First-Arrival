@@ -13,6 +13,9 @@ public partial class GridPositionData : GridObjectNode
 	[Export] public GridShape gridShape;
 	[Export] bool debugMode = false;
 	
+	[Export] public Vector3 CellSize { get; set; } = new Vector3(1, 1, 1);
+	[Export] public Vector3 GridWorldOrigin { get; set; } = Vector3.Zero;
+	
 	[ExportGroup("State")]
 	[Export] public Enums.Direction Direction { get; private set; } = Enums.Direction.North;
 
@@ -21,8 +24,6 @@ public partial class GridPositionData : GridObjectNode
 	
 	// A list of all cells currently occupied by this object
 	public List<GridCell> OccupiedCells { get; private set; } = new List<GridCell>();
-
-	private readonly Vector3 _cellSize = new Vector3(1, 1, 1);
 
 	[Signal] public delegate void GridPositionDataUpdatedEventHandler(GridPositionData gridPositionData);
 	[Signal] public delegate void GridCellPositionUpdatedEventHandler(Vector3I newGridCoordinates);
@@ -38,6 +39,14 @@ public partial class GridPositionData : GridObjectNode
 		if (parentGridObject == null)
 		{
 			parentGridObject = this.GetParent() as GridObject;
+		}
+		
+		// Attempt to sync settings from GridSystem if available
+		if (GridSystem.Instance != null)
+		{
+			var sysCellSize = GridSystem.Instance.CellSize;
+			CellSize = new Vector3(sysCellSize.X, sysCellSize.Y, sysCellSize.X);
+			GridWorldOrigin = GridSystem.Instance.GridWorldOrigin;
 		}
 
 		if (!GridSystem.Instance.TryGetGridCellFromWorldPosition(this.Position, out GridCell gridCell, true))
@@ -99,6 +108,7 @@ public partial class GridPositionData : GridObjectNode
 			cell.AddGridObject(parentGridObject, tempNewState, rebuildConnections: !isWalkThrough);
 		}
 
+		parentGridObject.GlobalPosition = AnchorCell.worldCenter;
 		EmitSignal(SignalName.GridPositionDataUpdated, this);
 		EmitSignal(SignalName.GridCellPositionUpdated, AnchorCell.gridCoordinates);
 	}
@@ -144,7 +154,6 @@ public partial class GridPositionData : GridObjectNode
 	#region Math & Coordinate Calculation
 
 	/// <summary>
-	/// THE CORE MATH FUNCTION.
 	/// Returns the absolute Grid Coordinates this object occupies based on an anchor, rotation, and shape.
 	/// Used by both Logic (SetGridCell) and Visuals (_Process).
 	/// </summary>
@@ -154,7 +163,6 @@ public partial class GridPositionData : GridObjectNode
 		if (gridShape == null) return results;
 
 		// Iterate over the "Local" shape definition
-		// Assuming GridShape has a helper or you iterate X/Y/Z manually
 		int sizeX = gridShape.GridSizeX;
 		int sizeY = gridShape.GridSizeY;
 		int sizeZ = gridShape.GridSizeZ;
@@ -168,14 +176,14 @@ public partial class GridPositionData : GridObjectNode
 					// If the shape doesn't exist at this local index, skip
 					if (!gridShape.GetGridShapeCell(x, y, z)) continue;
 
-					// 1. Calculate offset relative to the Root Cell
+					//Calculate offset relative to the Root Cell
 					int relX = x - gridShape.RootCellCoordinates.X;
 					int relZ = z - gridShape.RootCellCoordinates.Y; // Y in Vector2I is Z depth
 					
-					// 2. Rotate that offset
+					//Rotate that offset
 					Vector2I rotatedOffset = RotateOffset(relX, relZ, dir);
 
-					// 3. Add to anchor
+					//Add to anchor
 					Vector3I finalCoord = new Vector3I(
 						anchor.X + rotatedOffset.X,
 						anchor.Y + y, // Vertical height usually doesn't rotate 
@@ -195,7 +203,6 @@ public partial class GridPositionData : GridObjectNode
 	private Vector2I RotateOffset(int x, int z, Enums.Direction dir)
 	{
 		// Standard 2D Rotation matrix for 90 degree steps
-		// Assuming North is Forward/Up in local space.
 		return dir switch
 		{
 			Enums.Direction.North => new Vector2I(x, z),
@@ -241,12 +248,13 @@ public partial class GridPositionData : GridObjectNode
 
 		// 2. Calculate where the Anchor IS based on world position
 		Vector3 worldPos = GlobalPosition;
+		Vector3 localPos = worldPos - GridWorldOrigin;
 		
 		// Align this math with how GridSystem determines cell coordinates
 		Vector3I calculatedAnchor = new Vector3I(
-			Mathf.FloorToInt(worldPos.X), 
-			Mathf.FloorToInt(worldPos.Y), 
-			Mathf.FloorToInt(-worldPos.Z) // Assuming Z is inverted in your grid system
+			Mathf.FloorToInt(localPos.X / CellSize.X), 
+			Mathf.FloorToInt(localPos.Y / CellSize.Y), 
+			Mathf.FloorToInt(-localPos.Z / CellSize.Z) // Assuming Z is inverted in your grid system
 		);
 
 		// 3. Get Cells using the EXACT SAME function as logic
@@ -256,11 +264,11 @@ public partial class GridPositionData : GridObjectNode
 		foreach (var coord in coordsToDraw)
 		{
 			// Convert Grid Coord back to World Center for drawing
-			// Usually World = Grid + 0.5 (half cell size) to be in center
-			Vector3 drawPos = new Vector3(
-				coord.X + 0.5f, 
-				coord.Y, 
-				-coord.Z - 0.5f // Re-invert Z for world space
+			// World = Origin + (Grid + 0.5) * Size
+			Vector3 drawPos = GridWorldOrigin + new Vector3(
+				(coord.X + 0.5f) * CellSize.X, 
+				(coord.Y + 0.5f) * CellSize.Y, 
+				-(coord.Z + 0.5f) * CellSize.Z 
 			); 
 			
 			bool isRoot = (coord == calculatedAnchor);
@@ -276,7 +284,7 @@ public partial class GridPositionData : GridObjectNode
 			
 			if (isValid)
 			{
-				DebugDraw3D.DrawBox(drawPos, Quaternion.Identity, _cellSize * 0.9f, color, true);
+				DebugDraw3D.DrawBox(drawPos, Quaternion.Identity, CellSize * 0.9f, color, true);
 			}
 		}
 	}

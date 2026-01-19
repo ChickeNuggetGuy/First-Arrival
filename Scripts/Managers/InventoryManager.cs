@@ -21,8 +21,9 @@ public partial class InventoryManager : Manager<InventoryManager>
 	
 	[Export]public PackedScene InventorySlotPrefab{ get; protected set;}
 	[Export]public PackedScene BlankSlotPrefab{ get; protected set;}
-	
-	[Export]public Item[] startingItems = new Item[0];
+	[Export]public StartingEuipmentUI StartingEuipmentUi { get; protected set;}
+
+	[Export] public Dictionary<ItemData, int> startingItems = new();
 	public override string GetManagerName() => "InventoryManager";
 
 	protected override async Task _Setup(bool loadingData)
@@ -52,7 +53,10 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		// Just allow the task to complete, as setup is done
+		StartingEuipmentUi.ShowCall();
+		await ToSignal(StartingEuipmentUi.acceptButton, BaseButton.SignalName.Pressed);
+		StartingEuipmentUi.HideCall();
+		
 		await Task.CompletedTask;
 	}
 
@@ -73,6 +77,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 		}
 		else
 		{
+
 			runtimeInventoryGridUIs[Enums.InventoryType.Ground].SetupInventoryUI(gridObject.GridPositionData.AnchorCell.InventoryGrid);
 		}
 	}
@@ -102,7 +107,22 @@ public partial class InventoryManager : Manager<InventoryManager>
 		int randIndex = GD.RandRange(0, itemDatas.Count - 1);
 		return ItemData.CreateItem(itemDatas[randIndex]); 
 	}
-	
+
+
+	public ItemData GetItemData(string itemName)
+	{
+		ItemData returnItem = null;
+		foreach (ItemData itemData in itemDatas)
+		{
+			if (itemData.ItemName == itemName)
+			{
+				returnItem = itemData;
+				break;
+			}
+		}
+		
+		return returnItem;
+	}
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{

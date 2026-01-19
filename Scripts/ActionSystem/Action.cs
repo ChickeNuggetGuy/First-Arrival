@@ -10,6 +10,7 @@ public abstract partial class Action
   protected GridCell startingGridCell;
   protected GridCell targetGridCell;
   protected ActionDefinition parentActionDefinition;
+  public Action NextAction {get; protected set;}
 
   protected Dictionary<Enums.Stat, int> costs = new();
   public Action Parent { get; private set; } = null;
@@ -65,8 +66,21 @@ public abstract partial class Action
 
     if (this is ICompositeAction compositeAction)
     {
-      foreach (Action action in compositeAction.SubActions)
-        await action.ExecuteCall();
+	    for (int i = 0; i < compositeAction.SubActions.Count; i++)
+	    {
+		    if (i + 1 < compositeAction.SubActions.Count)
+		    {
+			    var action = compositeAction.SubActions[i];
+			    action.SetNextAction(compositeAction.SubActions[i + 1]);
+			    
+		    }
+	    }
+	    
+	    for (var index = 0; index < compositeAction.SubActions.Count; index++)
+	    {
+		    var action = compositeAction.SubActions[index];
+		    await action.ExecuteCall();
+	    }
     }
 
     await Execute();
@@ -103,4 +117,7 @@ public abstract partial class Action
   }
 
   protected abstract Task ActionComplete();
+  
+  
+  public void SetNextAction(Action nextAction) => NextAction = nextAction;
 }

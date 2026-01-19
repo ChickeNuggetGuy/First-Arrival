@@ -33,6 +33,13 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
         _doorCells.Clear();
         doorData.SetupCall(this);
         GridPositionData.SetupCall(this);
+        
+        // Ensure doorData has the correct direction, in case it is a separate node from GridPositionData
+        if (GridPositionData != null)
+        {
+            doorData.SetDirection(GridPositionData.Direction);
+        }
+
         var foundCells = gridSystem.GetCellsFromGridShape(doorData);
         if (foundCells != null) _doorCells.AddRange(foundCells);
 

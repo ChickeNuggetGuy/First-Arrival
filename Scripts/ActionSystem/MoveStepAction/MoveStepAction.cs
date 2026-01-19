@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,6 +9,10 @@ public class MoveStepAction : Action, ICompositeAction
 {
   public Action ParentAction { get; set; }
   public List<Action> SubActions { get; set; }
+  public Enums.Direction targetDirection { get; set; }
+
+
+  public Vector2 blendSpaceValue;
 
   public MoveStepAction(
     GridObject parentGridObject,
@@ -30,7 +35,7 @@ public class MoveStepAction : Action, ICompositeAction
         parentGridObject.Rotation.Y
       );
 
-    Enums.Direction targetDirection =
+	targetDirection =
       RotationHelperFunctions.GetDirectionBetweenCells(
         startingGridCell,
         targetGridCell
@@ -83,6 +88,26 @@ public class MoveStepAction : Action, ICompositeAction
 
       AddSubAction(rotateAction);
     }
+    
+    //Setup animation
+    Enums.Stance stance = parentGridObject.CurrentStance;
+    blendSpaceValue = new Vector2(0,0);
+    if (targetDirection == Enums.Direction.North || targetDirection == Enums.Direction.South
+                                                 || targetDirection == Enums.Direction.East ||
+                                                 targetDirection == Enums.Direction.West)
+    {
+	    //Moving 
+	    blendSpaceValue.X = 0;
+    }
+    else if (targetDirection == Enums.Direction.NorthEast || targetDirection == Enums.Direction.SouthEast)
+    {
+	    blendSpaceValue.X = 1;
+    }
+    else if (targetDirection == Enums.Direction.NorthWest || targetDirection == Enums.Direction.SouthWest)
+    {
+	    blendSpaceValue.X = -1;
+    }
+    blendSpaceValue.Y = 0;
 
     await Task.CompletedTask;
   }
@@ -99,7 +124,11 @@ public class MoveStepAction : Action, ICompositeAction
       await Task.CompletedTask;
       return;
     }
-
+	
+   
+    parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
+    parentGridObject.animationNode.TrySetParameter("moveBlendSpace", blendSpaceValue);
+    
     Tween tween = parentGridObject.CreateTween();
     tween.SetTrans(Tween.TransitionType.Linear);
     tween.SetEase(Tween.EaseType.OutIn);
@@ -115,6 +144,15 @@ public class MoveStepAction : Action, ICompositeAction
   protected override Task ActionComplete()
   {
     parentGridObject.GridPositionData.SetGridCell(targetGridCell);
+    if (NextAction == null || NextAction is not MoveStepAction)
+    {
+	    parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
+    }
+    else if (NextAction is MoveStepAction moveAction)
+    {
+	    parentGridObject.animationNode.TrySetParameter("moveBlendSpace", moveAction.blendSpaceValue);
+    }
+    parentGridObject.animationNode.TrySetParameter("moveBlendSpace", Vector2.Zero);
     return Task.CompletedTask;
   }
 }

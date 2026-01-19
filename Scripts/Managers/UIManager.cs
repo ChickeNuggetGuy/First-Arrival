@@ -20,6 +20,9 @@ public partial class UIManager : Manager<UIManager>
 			if (child is UIWindow window)
 				_windows.Add(window);
 		}
+
+		EmitSignal(SignalName.SetupCompleted);
+		await Task.CompletedTask;
 	}
 
 	protected override async Task _Execute(bool loadingData)
@@ -30,6 +33,9 @@ public partial class UIManager : Manager<UIManager>
 		{
 			await window.SetupCall();
 		}
+		
+		EmitSignal(SignalName.ExecuteCompleted);
+		await Task.CompletedTask;
 	}
 
 	public bool BlockInputs( UIWindow blockingWindow)

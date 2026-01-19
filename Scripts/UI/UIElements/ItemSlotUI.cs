@@ -17,6 +17,7 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 	public Vector2I inventoryCoords;
 	
 	[Export]Label itemCountLabel;
+	public Item Item { get; private set; }
 	#endregion
 
 
@@ -25,17 +26,39 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 		this.inventoryCoords  = inventoryCoords;
 		this.parentGridUI = parentGridUI;
 		Pressed += ButtonOnPressed;
-	}
+		MouseFilter = MouseFilterEnum.Stop; }
 
 	private void ButtonOnPressed()
 	{
-		GD.Print("ButtonOnPressed");
+		// Debug slot state
+		if (Item != null)
+			GD.Print($"  - Slot UI thinks it has: {Item.ItemData?.ItemName}");
+		else
+			GD.Print($"  - Slot UI thinks it is Empty");
+
+		// Debug grid state verification
+		if (parentGridUI != null && parentGridUI.InventoryGrid != null)
+		{
+			if (parentGridUI.InventoryGrid.TryGetItemAt(inventoryCoords.X, inventoryCoords.Y, out var itemInfo))
+			{
+				if (itemInfo.item != null)
+					GD.Print($"  - Grid verification: Found {itemInfo.item.ItemData?.ItemName} x{itemInfo.count}");
+				else
+					GD.Print($"  - Grid verification: Empty/Null item returned");
+			}
+			else
+			{
+				GD.Print($"  - Grid verification: Slot empty");
+			}
+		}
+		
 		parentGridUI.ItemSlot_Pressed(this);
 	}
 
 	
 	public void SetItem(Item item,int count, Vector2I coords)
 	{
+		Item = item;
 		if (item == null)
 		{ 
 			Icon = null;

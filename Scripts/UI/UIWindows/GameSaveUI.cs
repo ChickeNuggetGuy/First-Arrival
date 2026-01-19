@@ -73,8 +73,10 @@ public partial class GameSaveUI : UIWindow
 		string saveName = "";
 		if (_itemList.GetSelectedItems().Length > 0)
 		{
+			
 			saveName = _itemList.GetItemText(_itemList.GetSelectedItems()[0]);
 			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName));
+			return;
 		}
 		else if (_saveNameEdit.Text.Length > 0)
 		{

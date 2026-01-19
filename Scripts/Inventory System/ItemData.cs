@@ -8,7 +8,8 @@ namespace FirstArrival.Scripts.Inventory_System;
 [GlobalClass]
 public partial class ItemData : Resource
 {
-	
+	[Export]
+	public string ItemID { get; protected set; }
 
 	[Export]
 	public string ItemName { get; protected set; }

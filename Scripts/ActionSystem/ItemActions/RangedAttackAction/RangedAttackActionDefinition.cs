@@ -81,7 +81,6 @@ public partial class RangedAttackActionDefinition
 		}
 
 		AddCost(costs, Enums.Stat.TimeUnits, 8 * Item.ItemData.weight);
-		AddCost(costs, Enums.Stat.Stamina, 6 * Item.ItemData.weight);
 
 		reason = "success";
 		return true;

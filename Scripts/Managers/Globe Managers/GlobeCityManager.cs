@@ -14,7 +14,7 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
     [Export] private bool _flipLongitude = false; 
     [Export] private bool _flipLatitude = false;
     
-    private Dictionary<int, Dictionary> citiesData = new Dictionary<int,Dictionary>();
+    private Dictionary<int, Dictionary> citiesData = null;
 
     public override string GetManagerName() => "GlobeCityManager";
 
@@ -22,6 +22,24 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 
     protected override async Task _Execute(bool loadingData)
     {
+	    if (loadingData && HasLoadedData && citiesData != null)
+	    {
+		    foreach (var kvp in citiesData)
+		    {
+			    int cellIndex = kvp.Key;
+			    var cityData = kvp.Value;
+			    string cityName = cityData.ContainsKey("city") ? cityData["city"].AsString() : "City";
+
+			    var cell = GlobeHexGridManager.Instance.GetCellFromIndex(cellIndex);
+			    if (cell.HasValue)
+			    {
+				    SpawnCity(cell.Value, cityName);
+			    }
+		    }
+		    EmitSignal(SignalName.ExecuteCompleted);
+		    return;
+	    }
+
         if (!FileAccess.FileExists(_dataPath)) return;
 		
         GlobeHexGridManager hexGridManager = GlobeHexGridManager.Instance;
@@ -99,7 +117,17 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 	    
 	    return data;
     }
-    public override void Load(Godot.Collections.Dictionary<string, Variant> data) { }
+
+    public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+    {
+	    base.Load(data);
+	    if (!HasLoadedData) return;
+
+	    if (data.ContainsKey("cityData"))
+	    {
+		    citiesData = data["cityData"].AsGodotDictionary<int, Dictionary>();
+	    }
+    }
 
 
     public override void _Input(InputEvent @event)

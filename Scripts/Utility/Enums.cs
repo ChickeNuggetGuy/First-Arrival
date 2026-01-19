@@ -141,4 +141,26 @@ public class Enums
 	public enum HexGridType {Land, Water}
 	
 	public enum MissionType {None, Eliminate, Survive, Objective, Timed}
+
+
+	#region Animation
+
+	public enum LocomotionType
+	{
+		None = 0,
+		Idle = 1,
+		Moving = 2,
+		InAir = 4,
+	}
+
+	public enum Stance
+	{
+		None = 0,
+		Normal = 1,
+		Crouched = 2,
+		Prone = 4,
+		Sprinting = 8
+	}
+
+	#endregion
 }

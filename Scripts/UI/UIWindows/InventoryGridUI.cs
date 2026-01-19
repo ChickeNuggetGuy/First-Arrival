@@ -10,53 +10,18 @@ namespace FirstArrival.Scripts.UI;
 [GlobalClass]
 public partial class InventoryGridUI : UIWindow
 {
-	[Export] Enums.InventoryType inventoryType;
+	[Export] public Enums.InventoryType inventoryType;
 	public InventoryGrid InventoryGrid{get; protected set;}
 	[Export] private GridContainer slotHolder;
+	[Export] public bool AutoFetchGround { get; set; } = true;
 
 
 	private ItemSlotUI[,] slotUIs;
 	protected override Task _Setup()
 	{
 		InventoryManager.Instance.AddRuntimeInventoryGridUI(inventoryType, this);
-		GridObject gridObject =
-			GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
-
-
-		if (gridObject == null)
-		{
-			GD.Print("Error: GridObject is null!");
-			return Task.CompletedTask;
-		}
-
-		if (!gridObject.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory)) return Task.CompletedTask;
-		if (inventoryType == Enums.InventoryType.Ground)
-		{
-			if (InventoryGrid == null)
-			{
-				GridCell currentGridCell = gridObject.GridPositionData.AnchorCell;
-				if (currentGridCell == null || currentGridCell.InventoryGrid == null) return Task.CompletedTask;
-				InventoryGrid = currentGridCell.InventoryGrid;
-			}
-		}
-		else
-		{
-			if (InventoryGrid == null)
-			{
-				if (!gridObjectInventory.TryGetInventory(inventoryType, out var inventory))
-				{
-					GD.Print("Error: gridObjectInventory is null!");
-					return Task.CompletedTask;
-				}
-				GD.Print(inventory.InventoryType + " Name");
-
-				InventoryGrid = inventory;
-
-			}
-		}
-
-		SetupInventoryUI(InventoryGrid);
-		InventoryGrid.InventoryChanged += InventoryOnInventoryChanged;
+		
+		
 
 		return base._Setup();
 	}
@@ -68,11 +33,47 @@ public partial class InventoryGridUI : UIWindow
 
 	protected override void _Show()
 	{
-		UpdateSlotsUI();
-		if (inventoryType == Enums.InventoryType.Ground)
+		if(InventoryGrid == null)
 		{
-			SetupInventoryUI(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject.GridPositionData.AnchorCell.InventoryGrid);
+			GridObject gridObject = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player)
+				.CurrentGridObject;
+
+
+			if (gridObject == null)
+			{
+				GD.Print("Error: GridObject is null!!!");
+				return;
+			}
+
+			if (!gridObject.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory)) return;
+			if (inventoryType == Enums.InventoryType.Ground)
+			{
+				// Ground inventory logic handled below to ensure update on show
+			}
+			else
+			{
+				if (InventoryGrid != null)
+				{
+					InventoryGrid.InventoryChanged -= InventoryOnInventoryChanged;
+				}
+
+				if (!gridObjectInventory.TryGetInventory(inventoryType, out var inventory))
+				{
+					GD.Print("Error: gridObjectInventory is null!");
+					return;
+				}
+				
+
+				InventoryGrid = inventory;
+			}
 		}
+		
+		if (inventoryType == Enums.InventoryType.Ground && AutoFetchGround)
+		{
+			InventoryGrid = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject.GridPositionData.AnchorCell.InventoryGrid;
+		}
+
+		SetupInventoryUI(InventoryGrid);
 		
 		base._Show();
 	}
@@ -84,13 +85,19 @@ public partial class InventoryGridUI : UIWindow
 		{
 			InventoryGrid.InventoryChanged -= InventoryOnInventoryChanged;
 		}
+		
 		if(inventory != null)
 			ClearSlots();
+		else
+		{
+			GD.Print("Error: Inventory is null!!!");
+			return;
+		}
 		
 		InventoryGrid = inventory;
 		if (InventoryGrid == null)
 		{
-			GD.PrintErr("InventoryGrid resource is not assigned!");
+			GD.PrintErr("Error: InventoryGrid resource is not assigned!");
 			return;
 		}
 		
@@ -105,15 +112,23 @@ public partial class InventoryGridUI : UIWindow
 		InventoryGrid.InventoryChanged += OnInventoryChanged;
 	}
 
+
+	public void SetInventroyGrid(InventoryGrid inventory)
+	{
+		InventoryGrid = inventory;
+	}
 	private void ClearSlots()
 	{
 		// Clear any old slots before generating new ones
 		foreach (Node child in slotHolder.GetChildren())
 		{
+			slotHolder.RemoveChild(child);
 			child.QueueFree();
 		}
 
 	}
+	
+	
 	/// <summary>
     /// Clears and rebuilds the visual grid based on the inventory's shape.
     /// </summary>
@@ -130,11 +145,12 @@ public partial class InventoryGridUI : UIWindow
                 {
                     // Use the prefab for a real slot
                     newSlot = (ItemSlotUI)InventoryManager.Instance.InventorySlotPrefab.Instantiate<Control>();
+                    newSlot.Init(this, new Vector2I(x,y));
                     (Item item, int count) item = (null, 0);
                     
                     InventoryGrid.TryGetItemAt(x,y, out item);
                     newSlot.SetItem(item.item,item.count, new Vector2I(x, y));
-                    newSlot.Init(this, new Vector2I(x,y));
+  
                     slotUIs[x, y] = newSlot;
 
                     if (InventoryGrid.InventoryType == Enums.InventoryType.MouseHeld)
@@ -146,6 +162,7 @@ public partial class InventoryGridUI : UIWindow
                 {
                     // Use the prefab for a blank/disabled slot
                     newSlot = (ItemSlotUI)InventoryManager.Instance.InventorySlotPrefab.Instantiate<Control>();
+                    newSlot.Disabled = true;
                     slotUIs[x, y] = newSlot;
                 }
                 slotHolder.AddChild(newSlot);
@@ -177,42 +194,53 @@ public partial class InventoryGridUI : UIWindow
     public void ItemSlot_Pressed(ItemSlotUI slotPressed)
     {
         MouseHeldInventoryUI mouseHeldInventory = InventoryManager.Instance.mouseHeldInventoryUI;
-        if (InventoryGrid.TryGetItemAt(slotPressed.inventoryCoords.X, slotPressed.inventoryCoords.Y, out var itemInfo))
+        
+        // Check what's in the clicked slot
+        bool slotHasItem = InventoryGrid.TryGetItemAt(slotPressed.inventoryCoords.X, slotPressed.inventoryCoords.Y, out var slotItemInfo) && slotItemInfo.item != null;
+        
+        // Check what's in the mouse inventory
+        bool mouseHasItem = mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out var mouseItemInfo) && mouseItemInfo.item != null;
+
+        if (slotHasItem)
         {
-            //Item at slot, should be picked up by MouseHeld slot if empty
-            if (mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out var mouseHeldItemInfo))
-            {
-                //MouseHeldInventory has Item, nothing can be done
-                return;
-            }
-            else
-            {
-                //MouseHeldInventory does not have an Item, "pickup" item from clicked slot
-                if (!InventoryGrid.TryTransferItem(InventoryGrid, mouseHeldInventory.InventoryGrid, itemInfo.item, itemInfo.count))
-                {
-                    return;
-                }
-                mouseHeldInventory.ShowCall();
-                
-            }
+	        if (!mouseHasItem)
+	        {
+		        // Case: Pick up 1 item from slot to empty mouse
+		        InventoryGrid.TryTransferItem(InventoryGrid, mouseHeldInventory.InventoryGrid, slotItemInfo.item, 1);
+		        mouseHeldInventory.ShowCall();
+	        }
+	        else if (mouseItemInfo.item.ItemData.ItemID == slotItemInfo.item.ItemData.ItemID)
+	        {
+		        // Case: Matching items. Drop 1 from hand to slot (Merging).
+		        InventoryGrid.TryTransferItem(mouseHeldInventory.InventoryGrid, InventoryGrid, mouseItemInfo.item, 1);
+		        
+		        // If mouse is now empty, hide it
+		        if (!mouseHeldInventory.InventoryGrid.HasItemAt(0, 0))
+		        {
+			        mouseHeldInventory.HideCall();
+		        }
+	        }
+	        else 
+	        {
+		        // Different items, do nothing
+		        return;
+	        }
         }
         else
         {
-            //Clicked Slot is empty, Check if MouseHeld slot has item. If so place that item.
-            if (mouseHeldInventory.InventoryGrid.TryGetItemAt(0, 0, out var mouseHeldItemInfo))
-            {
-                if (!InventoryGrid.TryTransferItemAt(mouseHeldInventory.InventoryGrid,new Vector2I(0,0) , InventoryGrid,slotPressed.inventoryCoords, out Item transferedItem))
-                {
-                    return;
-                }
-                mouseHeldInventory.HideCall();
-                
-                return;
-            }
-            else
-            {
-                return;
-            }
+	        // Slot is empty
+	        if (mouseHasItem)
+	        {
+		        // Case: Place ALL mouse items into empty slot
+		        if (InventoryGrid.TryTransferItemAt(mouseHeldInventory.InventoryGrid, new Vector2I(0, 0), InventoryGrid, slotPressed.inventoryCoords, out Item transferredItem))
+		        {
+			        // If mouse is now empty, hide it
+			        if (!mouseHeldInventory.InventoryGrid.HasItemAt(0, 0))
+			        {
+				        mouseHeldInventory.HideCall();
+			        }
+		        }
+	        }
         }
     }
     

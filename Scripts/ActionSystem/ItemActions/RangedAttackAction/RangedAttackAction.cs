@@ -32,10 +32,12 @@ public partial class RangedAttackAction : Action, IItemAction
             return;
         }
         
-        if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
+        
+        
+        if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder parentStatHolder)) return;
 
-		if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out statHolder)) return;
-        GridObjectStat rangedAccuracy = statHolder.Stats.First(stat =>
+
+        GridObjectStat rangedAccuracy = parentStatHolder.Stats.First(stat =>
         {
 	        if (stat is not GridObjectStat gridObjectStat) return false;
 	        if(gridObjectStat.Stat != Enums.Stat.RangedAccuracy)return false;
@@ -88,9 +90,9 @@ public partial class RangedAttackAction : Action, IItemAction
             return;
         }
         
-        
+        if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder targetStatHolder)) return;
 
-        if (!statHolder.TryGetStat(Enums.Stat.Health, out var health))
+        if (!targetStatHolder.TryGetStat(Enums.Stat.Health, out var health))
         {
             GD.Print("Target Grid Object does not have Health stat");
         }

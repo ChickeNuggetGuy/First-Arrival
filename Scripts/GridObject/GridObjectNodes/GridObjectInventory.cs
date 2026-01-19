@@ -114,7 +114,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 						itemEntry.Add("x", x);
 						itemEntry.Add("y", y);
 						itemEntry.Add("count", itemData.count);
-						itemEntry.Add("item_resource_path", itemData.item.ItemData.ResourcePath);
+						itemEntry.Add("item_name", itemData.item.ItemData.ItemName);
 						itemsData.Add(itemEntry);
 					}
 				}
@@ -179,9 +179,8 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 						int x = (int)itemEntry["x"];
 						int y = (int)itemEntry["y"];
 						int count = (int)itemEntry["count"];
-						string itemResourcePath = (string)itemEntry["item_resource_path"];
-						
-						var itemData = GD.Load<ItemData>(itemResourcePath);
+						var itemData = InventoryManager.Instance.GetItemData(itemEntry["item_name"].AsString());
+							
 						if (itemData != null)
 						{
 							Item item = ItemData.CreateItem(itemData);

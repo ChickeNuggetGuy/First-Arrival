@@ -93,7 +93,7 @@ public partial class GridObjectStat : GridObjectNode
 
 			if (CurrentValue <= minValue && signalOnMinValue)
 			{
-				EmitSignal(SignalName.CurrentValueMin, CurrentValue,parentGridObject);
+				EmitSignal(SignalName.CurrentValueMin, CurrentValue, parentGridObject);
 			}
 		}
 		
@@ -132,7 +132,7 @@ public partial class GridObjectStat : GridObjectNode
 				if (incrementValue > 0 && incrementValue < 1)
 				{
 					//Percentage Increment
-					AddValue(CurrentValue * incrementValue);
+					AddValue(maxValue * incrementValue);
 				}
 				else
 				{
@@ -144,7 +144,7 @@ public partial class GridObjectStat : GridObjectNode
 				if (decrementValue > 0 && decrementValue < 1)
 				{
 					//Percentage decrement
-					RemoveValue(CurrentValue * decrementValue);
+					RemoveValue(maxValue * decrementValue);
 				}
 				else
 				{

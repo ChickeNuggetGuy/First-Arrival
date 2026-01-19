@@ -15,6 +15,7 @@ public partial class GridSystem : Manager<GridSystem>
 
     [ExportCategory("Grid Alignment")]
     [Export] private Vector3 _gridWorldOrigin = Vector3.Zero; // Offset to align grid [0,0,0] with world map
+    public Vector3 GridWorldOrigin => _gridWorldOrigin;
     
     [Export(PropertyHint.Layers3DPhysics)] private uint _connectionObstacleMask = 0;
 
@@ -23,6 +24,7 @@ public partial class GridSystem : Manager<GridSystem>
     [Export] private Vector3I _gridSize;
     public Vector3I GridSize => _gridSize;
     [Export] private Vector2 _cellSize;
+    public Vector2 CellSize => _cellSize;
 
     public GridCell[][,] GridCells { get; private set; }
     private HashSet<CellConnection> _cellConnections;
@@ -231,6 +233,18 @@ public partial class GridSystem : Manager<GridSystem>
         // Use a small epsilon for the bottom, but the logic below changes the "from" behavior
         float surfEps = Mathf.Max(0.001f, _cellSize.Y * 0.01f);
 
+        InventoryGrid groundInv = null;
+        if (inventoryManager != null)
+        {
+	        groundInv = inventoryManager.GetInventoryGrid(Enums.InventoryType.Ground);
+
+	        if (groundInv == null)
+	        {
+		        GD.Print("ERROR: GridSystem: groundInv is NULL inside SetupGrid.");
+	        }
+	        GD.Print("Ground Inventory Found!");
+        }
+
         for (int y = 0; y < _gridSize.Y; y++)
         {
 	        GridCells[y] = new GridCell[_gridSize.X, _gridSize.Z];
@@ -241,11 +255,13 @@ public partial class GridSystem : Manager<GridSystem>
 		        {
 			        Vector3I coords = new Vector3I(x, y, z);
             
-			        Vector3 worldCenter = _gridWorldOrigin + new Vector3(
+			        Vector3 trueCenter = _gridWorldOrigin + new Vector3(
 				        (x + 0.5f) * _cellSize.X,  
 				        (y + 0.5f) * _cellSize.Y, 
 				        -(z + 0.5f) * _cellSize.X 
 			        );
+
+			        Vector3 worldCenter = trueCenter;
 			        
                     bool hasGround = true;
 
@@ -280,13 +296,13 @@ public partial class GridSystem : Manager<GridSystem>
                             {
                                 // FIX: Start just above the cell top (halfY + margin) to avoid hitting floors from the cell above
                                 // while still being high enough to catch floors aligned with the top.
-                                Vector3 from = worldCenter
+                                Vector3 from = trueCenter
                                                + _raycastOffset
                                                + offset
                                                + Vector3.Up * (halfY + _cellSize.Y * 0.1f); 
                                 
                                 // End slightly below the cell to catch floors aligned with the bottom
-                                Vector3 to = worldCenter
+                                Vector3 to = trueCenter
                                              + _raycastOffset
                                              + offset
                                              + Vector3.Down * (halfY + surfEps);
@@ -301,7 +317,7 @@ public partial class GridSystem : Manager<GridSystem>
                                     
                                     // VALIDATION: Ensure the hit is actually INSIDE this cell's vertical bounds.
                                     // If we hit something too high (belonging to the cell above), ignore it.
-                                    float cellTopY = worldCenter.Y + halfY + 0.01f; 
+                                    float cellTopY = trueCenter.Y + halfY + 0.01f; 
                                     if (hitPos.Y > cellTopY) 
                                         continue;
 
@@ -334,7 +350,7 @@ public partial class GridSystem : Manager<GridSystem>
 	                    state |= Enums.GridCellState.Air;
                     }
                     
-                    CreateOrUpdateCell(coords, worldCenter, state, inventoryManager);
+                    CreateOrUpdateCell(coords, worldCenter, trueCenter, state, (InventoryGrid)groundInv.Duplicate(true ));
                 }
             }
         }
@@ -376,25 +392,25 @@ public partial class GridSystem : Manager<GridSystem>
     private void CreateOrUpdateCell(
         Vector3I coords,
         Vector3 position,
+        Vector3 trueCenter,
         Enums.GridCellState state,
-        InventoryManager inventoryManager
+        InventoryGrid groundInventory
     )
     {
-        // Safe access to inventory
-        InventoryGrid groundInv = null;
-        if (inventoryManager != null)
-        {
-            groundInv = inventoryManager.GetInventoryGrid(Enums.InventoryType.Ground);
-        }
+	    if (groundInventory == null)
+	    {
+		    GD.Print("ERROR: Ground inventory is null");return;
+	    }
 
         if (GridCells[coords.Y][coords.X, coords.Z] == null)
         {
             GridCells[coords.Y][coords.X, coords.Z] = new GridCell(
                 coords,
                 position,
+                trueCenter,
                 state,
                 Enums.FogState.Unseen,
-                groundInv
+                groundInventory
             );
         }
         else
@@ -403,9 +419,10 @@ public partial class GridSystem : Manager<GridSystem>
             cell.SetState(state);
             cell.SetWorldCenter(position);
             // Optionally update inventory if it was missing before
-            if(cell.InventoryGrid == null && groundInv != null)
+            if(cell.InventoryGrid == null && groundInventory != null)
             {
                  // You might need a setter on GridCell for this, or just leave as is
+                 cell.SetInventory(groundInventory);
             }
         }
     }
