@@ -9,7 +9,7 @@ public partial class GlobeInputManager : Manager<GlobeInputManager>
 {
 	[Export] public Camera3D camera3D;
 	[Export] public CollisionObject3D globeMesh;
-	[Export] public MeshInstance3D mouseMarker;
+	[Export] public Node3D mouseMarker;
 	public HexCellData? CurrentCell {get; private set;}
 	
 

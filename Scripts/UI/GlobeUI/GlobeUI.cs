@@ -2,14 +2,16 @@ using Godot;
 using System;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
+using Godot.Collections;
 
 [GlobalClass]
 public partial class GlobeUI : UIWindow
 {
-	[Export] private Label currentTimeUI;
 	[Export] private Label currentFundsUI;
 	[Export] private Button buildBaseButton;
 	[Export] private Button sendMissionButton;
+	[ExportGroup("Time"), Export] private Label currentDateUI;
+	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
 	
 
 	protected override Task _Setup()
@@ -24,6 +26,8 @@ public partial class GlobeUI : UIWindow
 		{
 			sendMissionButton.Pressed += sendMissionButtonOnPressed;
 		}
+		
+		GlobeTimeManager.Instance.DateChanged += TimeManagerOnDateChanged;
 		
 		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
 		if (teamManager != null)
@@ -40,7 +44,18 @@ public partial class GlobeUI : UIWindow
 			teamHolder.FundsChanged += TeamHolderOnFundsChanged;
 			
 		}
+		
 		return base._Setup();
+	}
+
+	private void SpeedButtonOnPressed()
+	{
+		throw new NotImplementedException();
+	}
+
+	private void TimeManagerOnDateChanged(int year, Enums.Month month, int date, Enums.Day day)
+	{
+		currentDateUI.Text = $"Current Time: {month}, {date},{year}";
 	}
 
 	private void TeamHolderOnFundsChanged(GlobeTeamHolder teamHolder, int currentFunds)
