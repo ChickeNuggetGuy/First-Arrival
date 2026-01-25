@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="Craft" format=3 uid="uid://b307r1871vdqi"]
+
+[ext_resource type="Script" uid="uid://duqdmmi83ptnx" path="res://Scripts/Globe/Craft.cs" id="1_myolf"]
+
+[resource]
+resource_name = "Troop Transport _Item"
+script = ExtResource("1_myolf")
+ItemID = 3
+ItemName = "Troop Transport "
+weight = 9999
+ActionDefinitions = []
+extraData = Dictionary[String, Variant]({
+"globe_only": true
+})

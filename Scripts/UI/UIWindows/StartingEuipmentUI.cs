@@ -39,6 +39,7 @@ public partial class StartingEuipmentUI : UIWindow
 		foreach (var inventoryGrid in inventoryGrids)
 		{
 			inventoryGrid.Value.Initialize();
+			inventoryGrid.Value.ClearInventory();
 		}
 
 		previousButton.Pressed += PreviousUnit;

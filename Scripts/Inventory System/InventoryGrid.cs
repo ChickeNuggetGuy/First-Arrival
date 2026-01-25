@@ -388,6 +388,22 @@ public partial class InventoryGrid : Resource
         return true;
     }
 
+
+    public void ClearInventory()
+    {
+	    for (int x = 0; x < Items.GetLength(0); x++)
+	    {
+		    for (int y = 0; y < Items.GetLength(1); y++)
+		    {
+			    (Item item, int count) itemSlot = Items[x, y];
+			    
+			    if (itemSlot.count == 0) continue;
+			    
+			    itemSlot.count = 0;
+			    itemSlot.item = null;
+		    }
+	    }
+    }
     public bool HasItem(Item item)
     {
         if (item == null || Items == null) return false;

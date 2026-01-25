@@ -8,8 +8,7 @@ using FirstArrival.Scripts.Utility;
 
 [GlobalClass]
 public partial class MeleeAttackActionDefinition
-	: ActionDefinition,
-		IItemActionDefinition
+	: ItemActionDefinition
 {
 	public Item Item { get; set; }
 

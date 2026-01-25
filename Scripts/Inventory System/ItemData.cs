@@ -5,11 +5,12 @@ using Godot.Collections;
 
 namespace FirstArrival.Scripts.Inventory_System;
 
+[Tool]
 [GlobalClass]
 public partial class ItemData : Resource
 {
 	[Export]
-	public string ItemID { get; protected set; }
+	public int ItemID { get; protected set; }
 
 	[Export]
 	public string ItemName { get; protected set; }
@@ -22,18 +23,17 @@ public partial class ItemData : Resource
 
 	[Export(PropertyHint.ResourceType, "GridShape")]
 	public GridShape ItemShape { get; set; }
+
+	[Export] public int weight;
 	
 	[Export]public PackedScene ItemScene { get; protected set; }
 
-	[Export(PropertyHint.ResourceType, "ActionDefinition")]
-	public ActionDefinition[] ActionDefinitions;
-
-	[Export] public int weight { get; protected set; } = 2;
-
+	[Export(PropertyHint.ResourceType, "ItemActionDefinition")]
+	public Array<ActionDefinition> ActionDefinitions;
+	
+	[Export] protected Dictionary<string, Variant> extraData = new();
 	[Export] public int MaxStackSize { get; protected set; } = 1;
 	[Export] public Enums.ItemSettings ItemSettings { get; protected set; }
-	[Export]public int Damage { get; set; }
-	[Export] public int Range { get; protected set; } = 1;
 	public static Item CreateItem(ItemData itemData)
 	{
 		Item retVal = new Item();
@@ -44,4 +44,6 @@ public partial class ItemData : Resource
 	}
 
 
+	public bool TryGetData(string key, out Variant variant) => extraData.TryGetValue(key, out variant);
+	
 }

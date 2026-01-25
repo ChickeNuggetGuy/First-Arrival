@@ -1,9 +1,9 @@
-using FirstArrival.Scripts.Inventory_System;
 using Godot;
+using System;
+using FirstArrival.Scripts.Inventory_System;
 
-namespace FirstArrival.Scripts.ActionSystem.ItemActions;
-
-public interface IItemActionDefinition
+[GlobalClass]
+public abstract partial class ItemActionDefinition : ActionDefinition
 {
 	public Item Item { get; set; }
 }

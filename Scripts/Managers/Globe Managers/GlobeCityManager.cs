@@ -134,14 +134,14 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
     {
 	    base._Input(@event);
 	    
-	    if (GlobeInputManager.Instance == null) return;
-	    if (GlobeInputManager.Instance.CurrentCell == null) return;
+	    if (InputManager.Instance == null) return;
+	    if (InputManager.Instance.CurrentCell == null) return;
 	    
 	    if (@event is InputEventMouseButton eventButton && eventButton.Pressed)
 	    {
 		    if (eventButton.ButtonIndex == MouseButton.Left)
 		    {
-			    int cellIndex = GlobeInputManager.Instance.CurrentCell.Value.Index;
+			    int cellIndex = InputManager.Instance.CurrentCell.Value.Index;
 			    
 			    if (!citiesData.ContainsKey(cellIndex)) return;
 

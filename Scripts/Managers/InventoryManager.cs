@@ -12,6 +12,8 @@ namespace FirstArrival.Scripts.Managers;
 [GlobalClass]
 public partial class InventoryManager : Manager<InventoryManager>
 {
+	
+	[Export] public ItemDatabase Database;
 	[Export] Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new Dictionary<Enums.InventoryType, InventoryGrid>();
 	[Export] Array<ItemData> itemDatas = new Array<ItemData>();
 	
@@ -28,8 +30,8 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 	protected override async Task _Setup(bool loadingData)
 	{
-		// Load data immediately so it's ready for GridSystem in the Execute phase
-		InventoryGrid[] grids = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/InventoryGrids/", "InventoryGrid").Cast<InventoryGrid>().ToArray();
+		InventoryGrid[] grids = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/InventoryGrids/", "InventoryGrid")
+			.Cast<InventoryGrid>().ToArray();
 
 		inventoryGrids.Clear();
 		foreach (InventoryGrid inventoryGrid in grids)
@@ -38,18 +40,9 @@ public partial class InventoryManager : Manager<InventoryManager>
 				inventoryGrids.Add(inventoryGrid.InventoryType, inventoryGrid);
 		}
     
-		ItemData[] items = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/Items/", "ItemData").Cast<ItemData>().ToArray();
-
-		itemDatas.Clear();
-		foreach (ItemData item in items)
-		{
-			if(item != null)
-				itemDatas.Add(item);
-		}
-		
-		// Keep your starting items logic if needed
 		await Task.CompletedTask;
 	}
+
 
 	protected override async Task _Execute(bool loadingData)
 	{
@@ -107,21 +100,15 @@ public partial class InventoryManager : Manager<InventoryManager>
 		int randIndex = GD.RandRange(0, itemDatas.Count - 1);
 		return ItemData.CreateItem(itemDatas[randIndex]); 
 	}
-
-
-	public ItemData GetItemData(string itemName)
+	
+	
+	public ItemData GetItemData(int itemID)
 	{
-		ItemData returnItem = null;
-		foreach (ItemData itemData in itemDatas)
+		if (Database != null && Database.Items.ContainsKey(itemID))
 		{
-			if (itemData.ItemName == itemName)
-			{
-				returnItem = itemData;
-				break;
-			}
+			return Database.Items[itemID];
 		}
-		
-		return returnItem;
+		return null;
 	}
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)

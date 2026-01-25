@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://cl5ux7qc5iogn"]
+
+[ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="1_klwhh"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_ufvyv"]
+[ext_resource type="Texture2D" uid="uid://vr708oypwwgd" path="res://icon.png" id="2_1avnv"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="3_oyuuw"]
+
+[sub_resource type="Resource" id="Resource_yew0j"]
+script = ExtResource("1_klwhh")
+metadata/_custom_type_script = "uid://60yksynr5w30"
+
+[sub_resource type="Resource" id="Resource_5mon7"]
+script = ExtResource("3_oyuuw")
+GridSizeX = 2
+GridSizeY = 1
+ShapeGrid = Array[bool]([true, true, true, true, true, true])
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+
+[resource]
+resource_name = "Grenade_Item"
+script = ExtResource("1_ufvyv")
+ItemName = "Grenade"
+ItemDescription = "Military grenade"
+ItemIcon = ExtResource("2_1avnv")
+ItemShape = SubResource("Resource_5mon7")
+weight = 5
+ActionDefinitions = [SubResource("Resource_yew0j")]
+extraData = Dictionary[String, Variant]({
+"damage": 200,
+"radius": 3
+})
+MaxStackSize = 2
+ItemSettings = 12

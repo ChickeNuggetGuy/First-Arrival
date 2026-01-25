@@ -34,7 +34,7 @@ project/assembly_name="First Arrival"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/fancy_folder_icons/plugin.cfg", "res://addons/gridshapeplugin/plugin.cfg", "res://addons/icosphere/plugin.cfg", "res://addons/mixamo_animation_retargeter/plugin.cfg", "res://addons/mixamo_root_motion_remover/plugin.cfg", "res://addons/phantom_camera/plugin.cfg")
+enabled=PackedStringArray("res://addons/fancy_folder_icons/plugin.cfg", "res://addons/gridshapeplugin/plugin.cfg", "res://addons/icosphere/plugin.cfg", "res://addons/inventory_database_editor/plugin.cfg", "res://addons/mixamo_animation_retargeter/plugin.cfg", "res://addons/mixamo_root_motion_remover/plugin.cfg", "res://addons/phantom_camera/plugin.cfg")
 
 [file_customization]
 
@@ -47,6 +47,10 @@ folder_colors={
 "res://Third-Party Assets/": "gray",
 "res://addons/": "gray"
 }
+
+[firstarrival]
+
+item_db_last_path="res://Data/InventorySystem/ItemsDatabase.tres"
 
 [global_group]
 

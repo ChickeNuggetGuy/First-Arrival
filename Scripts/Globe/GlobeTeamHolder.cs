@@ -7,7 +7,8 @@ public partial class GlobeTeamHolder : Node
 	public Enums.UnitTeam Team;
 	public int funds;
 	public List<TeamBaseCellDefinition> Bases;
-
+	
+	public Craft SelectedCraft { get; protected set; }
 	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, int currentFunds);
 
 	public GlobeTeamHolder(Enums.UnitTeam affiliation, List<TeamBaseCellDefinition> bases, int startingFunds = 1000000)
@@ -39,4 +40,32 @@ public partial class GlobeTeamHolder : Node
 			["bases"] = basesData
 		};
 	}
+
+	public bool TryGetBaseAtIndex(int cellIndex, out TeamBaseCellDefinition teamBase)
+	{
+		teamBase = null;
+		if (Bases == null) return false;
+
+		for (int i = 0; i < Bases.Count; i++)
+		{
+			TeamBaseCellDefinition baseDef = Bases[i];
+			
+			if(baseDef == null) continue;
+
+			if (baseDef.cellIndex == cellIndex)
+			{
+				teamBase = baseDef;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	#region Get/Set Functions
+
+	public Craft GetCraft() => SelectedCraft;
+	public void SetSelectedCraft(Craft craft) => SelectedCraft = craft;
+
+	#endregion
 }

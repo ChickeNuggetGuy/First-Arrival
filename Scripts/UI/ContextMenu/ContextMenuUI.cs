@@ -64,23 +64,32 @@ public partial class ContextMenuUI : UIWindow
 	public override void _Input(InputEvent @event)
 	{
 		base._Input(@event);
-
+		
 		if (@event is InputEventMouseButton mouseEvent && mouseEvent.ButtonIndex == MouseButton.Right &&
 		    mouseEvent.Pressed)
 		{
-			//Right Mouse Button was pressed, Check if the object preseed has IContextUser
-			GodotObject obj = InputManager.Instance.GetObjectAtMousePosition(out Vector3 hitPosition);
-
-			if (obj == null) return;
-
-			if (obj is IContextUserBase contextUser)
+			if(GameManager.Instance.currentScene == GameManager.GameScene.BattleScene)
 			{
-				if (obj is GridObject gridObject)
+				//Right Mouse Button was pressed, Check if the object preseed has IContextUser
+				GodotObject obj = InputManager.Instance.GetObjectAtMousePosition(out Vector3 hitPosition);
+
+				if (obj == null) return;
+
+				if (obj is IContextUserBase contextUser)
 				{
-					if(gridObject.Team != Enums.UnitTeam.Player) return;
+					if (obj is GridObject gridObject)
+					{
+						if (gridObject.Team != Enums.UnitTeam.Player) return;
+					}
+
+					if (!TryGenerateContextMenu(contextUser)) return;
+					ShowCall();
 				}
-				if (!TryGenerateContextMenu(contextUser)) return;
-				ShowCall();
+			}
+			else if (GameManager.Instance.currentScene == GameManager.GameScene.GlobeScene)
+			{
+				HexCellData? hexCellData = InputManager.Instance.CurrentCell;
+				//TODO Implement definition context menu
 			}
 		}
 		else if (@event is InputEventMouseMotion mouseMotionEvent)

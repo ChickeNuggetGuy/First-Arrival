@@ -1,6 +1,9 @@
+using Godot;
+
 namespace FirstArrival.Scripts.Inventory_System;
 
-public interface IMeleeCapable 
+[GlobalClass]
+public partial class MeleeCapable : ItemComponent
 {
 	public int Damage { get; set; }
 }

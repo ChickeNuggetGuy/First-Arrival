@@ -6,6 +6,7 @@ using FirstArrival.Scripts.Managers;
 
 public partial class GameSaveUI : UIWindow
 {
+	[Export] private GameManager.GameScene targetScene;
 	[Export] private ItemList _itemList;
 	[Export] private TextEdit _saveNameEdit;
 	
@@ -75,7 +76,7 @@ public partial class GameSaveUI : UIWindow
 		{
 			
 			saveName = _itemList.GetItemText(_itemList.GetSelectedItems()[0]);
-			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName));
+			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName, targetScene));
 			return;
 		}
 		else if (_saveNameEdit.Text.Length > 0)
@@ -85,7 +86,7 @@ public partial class GameSaveUI : UIWindow
 		
 		if (saveName.Length > 0)
 		{
-			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName,  GameManager.GameScene.GlobeScene));
+			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName, targetScene));
 		}
 	}
 

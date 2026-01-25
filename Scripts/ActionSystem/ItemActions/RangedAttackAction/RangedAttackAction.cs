@@ -90,6 +90,13 @@ public partial class RangedAttackAction : Action, IItemAction
             return;
         }
         
+        int damage;
+        if (!Item.ItemData.TryGetData("damage", out var value))
+        {
+	        damage = 10;
+        }
+        damage = value.AsInt32();
+        
         if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder targetStatHolder)) return;
 
         if (!targetStatHolder.TryGetStat(Enums.Stat.Health, out var health))
@@ -98,8 +105,8 @@ public partial class RangedAttackAction : Action, IItemAction
         }
         else if (Item != null && Item.ItemData != null && Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanRanged))
         {
-            health.RemoveValue(Item.ItemData.Damage);
-            GD.Print($"Target unit: {targetGridObject} Damaged for {Item.ItemData.Damage} damage, remaining health is {health.CurrentValue}");
+            health.RemoveValue(damage);
+            GD.Print($"Target unit: {targetGridObject} Damaged for {damage} damage, remaining health is {health.CurrentValue}");
         }
     }
 

@@ -24,7 +24,8 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 	protected override async Task Setup()
 	{
 		ParentAction = this;
-
+		
+		
 		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, true, false, out var neighbors))
 		{
 			GD.PrintErr("MeleeAttackAction.Setup: Could not find neighbors for target gridcell");
@@ -93,10 +94,17 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			return;
 		}
 
+		int damage;
+		if (!Item.ItemData.TryGetData("damage", out var value))
+		{
+			damage = 10;
+		}
+		damage = value.AsInt32();
+
 		if (Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanMelee))
 		{
-			health.RemoveValue(Item.ItemData.Damage);
-			GD.Print($"Target unit Damaged for {Item.ItemData.Damage} damage, remaining health is {health.CurrentValue}");
+			health.RemoveValue(damage);
+			GD.Print($"Target unit Damaged for {damage} damage, remaining health is {health.CurrentValue}");
 
 		}
 		return;

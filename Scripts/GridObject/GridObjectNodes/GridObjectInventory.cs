@@ -115,6 +115,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 						itemEntry.Add("y", y);
 						itemEntry.Add("count", itemData.count);
 						itemEntry.Add("item_name", itemData.item.ItemData.ItemName);
+						itemEntry.Add("item_id", itemData.item.ItemData.ItemID);
 						itemsData.Add(itemEntry);
 					}
 				}
@@ -179,7 +180,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 						int x = (int)itemEntry["x"];
 						int y = (int)itemEntry["y"];
 						int count = (int)itemEntry["count"];
-						var itemData = InventoryManager.Instance.GetItemData(itemEntry["item_name"].AsString());
+						var itemData = InventoryManager.Instance.GetItemData(itemEntry["item_id"].AsInt32());
 							
 						if (itemData != null)
 						{

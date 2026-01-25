@@ -133,7 +133,7 @@ public partial class ActionManager : Manager<ActionManager>
 	)
 	{
 		SelectedAction = action;
-		if (action is IItemActionDefinition itemActionDefinition)
+		if (action is ItemActionDefinition itemActionDefinition)
 		{
 			if (extraData != null && extraData.ContainsKey("item"))
 			{
@@ -177,7 +177,7 @@ public partial class ActionManager : Manager<ActionManager>
 			return false;
 		}
 
-		if (action is IItemActionDefinition itemActionDefinition &&
+		if (action is ItemActionDefinition itemActionDefinition &&
 		    itemActionDefinition.Item == null)
 		{
 			GD.Print("tryTakeAction: Item is null");
@@ -249,7 +249,7 @@ public partial class ActionManager : Manager<ActionManager>
 			case null:
 				GD.Print("Action is null");
 				return;
-			case IItemActionDefinition itemActionDefinition:
+			case ItemActionDefinition itemActionDefinition:
 				if(!actionDef.GetRemainSelected())
 					itemActionDefinition.Item = null;
 				break;

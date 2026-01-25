@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://pfmnbs1rycon"]
+
+[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_5cfim"]
+[ext_resource type="Texture2D" uid="uid://tlc3au84ttm1" path="res://Data/target.png" id="1_ogmoy"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_sqtke"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_5cfim"]
+[ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="2_did8u"]
+
+[sub_resource type="Resource" id="Resource_u2q4j"]
+script = ExtResource("1_5cfim")
+metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
+
+[sub_resource type="Resource" id="Resource_lvcgx"]
+script = ExtResource("2_did8u")
+metadata/_custom_type_script = "uid://60yksynr5w30"
+
+[sub_resource type="Resource" id="Resource_did8u"]
+script = ExtResource("2_5cfim")
+GridSizeX = 1
+GridSizeY = 1
+GridSizeZ = 2
+RootCellCoordinates = Vector2i(0, 1)
+ShapeGrid = Array[bool]([true, true])
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+
+[resource]
+resource_name = "knife_Item"
+script = ExtResource("1_sqtke")
+ItemID = 4
+ItemName = "knife"
+ItemDescription = "sharp blade"
+ItemIcon = ExtResource("1_ogmoy")
+ItemShape = SubResource("Resource_did8u")
+weight = 2
+ActionDefinitions = Array[Object]([SubResource("Resource_u2q4j"), SubResource("Resource_lvcgx")])
+extraData = Dictionary[String, Variant]({
+"damage": 15
+})
+MaxStackSize = 5
+ItemSettings = 13

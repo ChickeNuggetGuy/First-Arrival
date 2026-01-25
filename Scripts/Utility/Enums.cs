@@ -131,13 +131,6 @@ public class Enums
 	}
 	#endregion
 	
-	public enum InventoyShapeData
-	{
-		Enabled,
-		Disabled
-	}
-	
-	
 	public enum HexGridType {Land, Water}
 	
 	public enum MissionType {None, Eliminate, Survive, Objective, Timed}
@@ -194,6 +187,19 @@ public class Enums
 		November = 11,
 		December = 12
 		
+	}
+
+	#endregion
+
+
+	#region Globe Enums
+	
+	public enum CraftStatus
+	{
+		None = 0,
+		Idle = 1,
+		EnRoute = 2,
+		Home = 8,
 	}
 
 	#endregion

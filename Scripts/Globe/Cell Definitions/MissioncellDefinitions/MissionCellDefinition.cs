@@ -4,7 +4,7 @@ public partial class MissionCellDefinition : HexCellDefinition
 {
 	public MissionBase mission;
 
-	public MissionCellDefinition(int cellIndex, MissionBase mission) : base(cellIndex)
+	public MissionCellDefinition(int cellIndex, string name, MissionBase mission) : base(cellIndex, name)
 	{
 		this.mission = mission;
 	}

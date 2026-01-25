@@ -59,7 +59,7 @@ namespace FirstArrival.Scripts.AI
 
                             foreach (var itemActionDef in itemInfo.item.ItemData.ActionDefinitions)
                             {
-                                if (itemActionDef is ActionDefinition actionDefInstance && actionDefInstance is IItemActionDefinition itemActionInterface)
+                                if (itemActionDef is ActionDefinition actionDefInstance && actionDefInstance is ItemActionDefinition itemActionInterface)
                                 {
                                     itemActionInterface.Item = itemInfo.item;
                                     actionDefInstance.parentGridObject = activeGridObject;
@@ -78,7 +78,7 @@ namespace FirstArrival.Scripts.AI
                     // Scan non-item actions
                     foreach (var action in gridObjectActions.ActionDefinitions)
                     {
-                        if (action is not IItemActionDefinition)
+                        if (action is not ItemActionDefinition)
                         {
                             action.parentGridObject = activeGridObject;
                             var result = action.DetermineBestAIAction();

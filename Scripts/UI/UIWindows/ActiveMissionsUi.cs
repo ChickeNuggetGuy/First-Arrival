@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Managers;
 using Godot.Collections;
 
 public partial class ActiveMissionsUi : UIWindow

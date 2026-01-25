@@ -13,8 +13,13 @@ public partial class InputManager : Manager<InputManager>
 		get;
 		protected set;
 	}
-	
+	public HexCellData? CurrentCell {get; private set;}
+	[Export] public Camera3D camera3D;
 	[Export] private Node3D mouseMarker;
+	
+	[Export] public CollisionObject3D globeMesh;
+	
+	
 	public bool MouseOverUI
 	{
 		get => IsMouseOverUI(); private set{}}
@@ -32,11 +37,13 @@ public partial class InputManager : Manager<InputManager>
 		return Task.CompletedTask;
 	}
 	private bool IsMouseOverUI() => GetViewport()?.GuiGetHoveredControl() != null;
+	
+	
 	public override void _Process(double delta)
 	{
 		if(UIManager.Instance.BlockingInput) return;
 		base._Process(delta);
-		if( !ExecuteComplete) return;
+		if(!ExecuteComplete) return;
 		WorldMouseMarker();
 		if (DebugMode && currentGridCell != null)
 		{
@@ -47,71 +54,97 @@ public partial class InputManager : Manager<InputManager>
 	private void WorldMouseMarker()
 	{
 		if (MouseOverUI) return;
-
-		Node node = GetObjectAtMousePosition(out Vector3 hitPosition) as Node;
-
-		if (node == null) return;
-
-		GridObject gridObject = null;
-		int maxParentChecks = 3;
-		int parentLevel = 0;
-
-		// Traverse up to 3 parents to find a GridObject
-		Node currentNode = node;
-		if (node.IsInGroup("GridObjects"))
+		
+		if (GameManager.Instance.currentScene == GameManager.GameScene.BattleScene)
 		{
-			while (currentNode != null && parentLevel <= maxParentChecks)
+			Node node = GetObjectAtMousePosition(out Vector3 hitPosition) as Node;
+
+			if (node == null) return;
+
+			GridObject gridObject = null;
+			int maxParentChecks = 3;
+			int parentLevel = 0;
+
+			// Traverse up to 3 parents to find a GridObject
+			Node currentNode = node;
+			if (node.IsInGroup("GridObjects"))
 			{
-				if (currentNode is GridObject go)
+				while (currentNode != null && parentLevel <= maxParentChecks)
 				{
-					gridObject = go;
-					break;
+					if (currentNode is GridObject go)
+					{
+						gridObject = go;
+						break;
+					}
+
+					currentNode = currentNode.GetParent();
+					parentLevel++;
+				}
+			}
+
+			if (gridObject != null)
+			{
+				var cell = gridObject.GridPositionData?.AnchorCell;
+
+				if (cell != null)
+				{
+					currentGridCell = cell;
+					if (mouseMarker != null)
+						mouseMarker.GlobalPosition = cell.gridCoordinates * new Vector3I(1, 1, -1);
+					return;
+				}
+				else
+				{
+					GD.PrintErr($"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell.");
+				}
+			}
+
+			// Fall back to position-based lookup
+			if (gridSystem != null
+			    && gridSystem.TryGetGridCellFromWorldPosition(hitPosition, out GridCell gridCell, true)
+			    && gridCell != null)
+			{
+				if (gridCell.state.HasFlag(Enums.GridCellState.Air))
+				{
+					gridCell = gridSystem.GetGridCell(gridCell.gridCoordinates - new Vector3I(0, 1, 0));
 				}
 
-				currentNode = currentNode.GetParent();
-				parentLevel++;
-			}
-		}
-
-		if (gridObject != null)
-		{
-			var cell = gridObject.GridPositionData?.AnchorCell;
-
-			if (cell != null)
-			{
-				currentGridCell = cell;
-				if (mouseMarker != null)
-					mouseMarker.GlobalPosition = cell.gridCoordinates * new Vector3I(1, 1, -1);
-				return;
+				if (gridCell != null)
+				{
+					currentGridCell = gridCell;
+					if (mouseMarker != null)
+						mouseMarker.GlobalPosition = gridCell.gridCoordinates * new Vector3I(1, 1, -1);
+				}
 			}
 			else
 			{
-				GD.PrintErr($"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell.");
-			}
-		}
-
-		// Fall back to position-based lookup
-		if (gridSystem != null
-		    && gridSystem.TryGetGridCellFromWorldPosition(hitPosition, out GridCell gridCell, true)
-		    && gridCell != null)
-		{
-			if (gridCell.state.HasFlag(Enums.GridCellState.Air))
-			{
-				gridCell = gridSystem.GetGridCell(gridCell.gridCoordinates - new Vector3I(0, 1, 0));
-			}
-
-			if (gridCell != null)
-			{
-				currentGridCell = gridCell;
+				currentGridCell = GridCell.Null;
 				if (mouseMarker != null)
-					mouseMarker.GlobalPosition = gridCell.gridCoordinates * new Vector3I(1, 1, -1);
+					mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
 			}
 		}
-		else
+		else if (GameManager.Instance.currentScene == GameManager.GameScene.GlobeScene)
 		{
-			currentGridCell = GridCell.Null;
-			if (mouseMarker != null)
-				mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
+			Vector3? mousePos = GetMouseGlobePosition();
+
+			if (mousePos != null)
+			{
+
+				HexCellData? cell = GlobeHexGridManager.Instance.GetCellFromPosition(mousePos.Value);
+
+				if (cell != null)
+				{
+					CurrentCell = cell;
+				}
+			}
+			else
+			{
+			}
+
+			if (CurrentCell != null)
+			{
+				mouseMarker.GlobalPosition = CurrentCell.Value.Center;
+			}
 		}
 	}
 	
@@ -128,7 +161,7 @@ public partial class InputManager : Manager<InputManager>
 			var space = GetTree().Root.GetWorld3D().DirectSpaceState;
 			var mousePosition = GetViewport().GetMousePosition();
 
-			var cam = CameraController.Instance.MainCamera;
+			var cam = camera3D;
 			var from = cam.ProjectRayOrigin(mousePosition);
 			var to = from + cam.ProjectRayNormal(mousePosition) * cam.Far;
 
@@ -177,7 +210,57 @@ public partial class InputManager : Manager<InputManager>
 			return node;
 		}
 	}
+
+
+	#region Globe Input Functions
+
+	public Vector3? GetMouseGlobePosition()
+	{
+		var spaceState = GetTree().Root.GetWorld3D().DirectSpaceState;
+
+		var cam = camera3D;
+		var mousePos = GetViewport().GetMousePosition();
+
+		var origin = cam.ProjectRayOrigin(mousePos);
+		var end = origin + cam.ProjectRayNormal(mousePos) * 400;
+		var query = PhysicsRayQueryParameters3D.Create(origin, end);
+		query.CollideWithAreas = true;
+
+		var result = spaceState.IntersectRay(query);
+
+		if (result.Count == 0)
+		{
+			return null;
+		}
+		else if (result["collider"].AsGodotObject() == globeMesh)
+		{
+			return result["position"].AsVector3();
+		}
+		return null;
+	}
 	
+	
+	public Vector2 GetLatLonFromPosition(Vector3 position)
+	{
+		float radius = position.Length();
+    
+		// Normalize coordinates for the trig functions
+		if (radius == 0) return Vector2.Zero;
+
+		// 2. Calculate Latitude
+		// Range: -PI/2 to PI/2 (-90 to +90 degrees)
+		float latitude = Mathf.Asin(position.Y / radius);
+
+		// 3. Calculate Longitude
+		// Range: -PI to PI (-180 to +180 degrees)
+		float longitude = Mathf.Atan2(position.X, position.Z);
+
+		// Return as Radians (or convert to degrees if preferred)
+		
+		return new Vector2(Mathf.RadToDeg(latitude), Mathf.RadToDeg(longitude));
+	}
+
+	#endregion
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{

@@ -10,6 +10,9 @@ public partial class GlobeUI : UIWindow
 	[Export] private Label currentFundsUI;
 	[Export] private Button buildBaseButton;
 	[Export] private Button sendMissionButton;
+	[Export] private Button buyCraftButton;
+	[Export] private SelectCraftUI selectCraftUI;
+	
 	[ExportGroup("Time"), Export] private Label currentDateUI;
 	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
 	
@@ -28,6 +31,8 @@ public partial class GlobeUI : UIWindow
 		}
 		
 		GlobeTimeManager.Instance.DateChanged += TimeManagerOnDateChanged;
+		
+		buyCraftButton.Pressed += BuyCraftButtonOnPressed;
 		
 		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
 		if (teamManager != null)
@@ -48,11 +53,25 @@ public partial class GlobeUI : UIWindow
 		return base._Setup();
 	}
 
-	private void SpeedButtonOnPressed()
-	{
-		throw new NotImplementedException();
-	}
 
+	#region Signal Listeners
+	private void sendMissionButtonOnPressed()
+	{
+		selectCraftUI.ShowCall();
+	}
+	
+	private void BuyCraftButtonOnPressed()
+	{
+		GlobeTeamManager baseManager = GlobeTeamManager.Instance;
+		if (baseManager == null)
+		{
+			GD.Print($"Base Manager not found");
+			return;
+		}
+		
+		baseManager.buyCraftMode = !baseManager.buyCraftMode;
+	}
+	
 	private void TimeManagerOnDateChanged(int year, Enums.Month month, int date, Enums.Day day)
 	{
 		currentDateUI.Text = $"Current Time: {month}, {date},{year}";
@@ -79,14 +98,8 @@ public partial class GlobeUI : UIWindow
 	}
 	
 	
-	private void sendMissionButtonOnPressed()
-	{
-		GlobeMissionManager missionManager = GlobeMissionManager.Instance;
-		if (missionManager == null)
-		{
-			GD.Print($"Base Manager not found");
-			return;
-		}
-		missionManager.sendMissionMode = !missionManager.sendMissionMode;
-	}
+
+
+	#endregion
+	
 }

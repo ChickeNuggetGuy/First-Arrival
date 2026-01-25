@@ -8,7 +8,7 @@ using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
 [GlobalClass]
-public partial class ThrowActionDefinition : ActionDefinition, IItemActionDefinition
+public partial class ThrowActionDefinition : ItemActionDefinition
 {
   public Item Item { get; set; }
 

@@ -8,8 +8,7 @@ using FirstArrival.Scripts.Utility;
 
 [GlobalClass]
 public partial class RangedAttackActionDefinition
-	: ActionDefinition,
-		IItemActionDefinition
+	: ItemActionDefinition
 {
 	public Item Item { get; set; }
 
@@ -65,8 +64,15 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
+		if (!Item.ItemData.TryGetData("range", out var value))
+		{
+			reason = "No ranged variable";
+			return false;
+		}
+		int range = value.AsInt32();
+
 		float distance = startingGridCell.gridCoordinates.DistanceTo(targetGridCell.gridCoordinates);
-		if (distance > Item.ItemData.Range)
+		if (distance > range)
 		{
 			reason = "Target is out of range";
 			return false;

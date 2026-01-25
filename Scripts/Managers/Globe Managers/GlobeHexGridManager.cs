@@ -367,7 +367,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		    base._Input(@event);
 		    if (@event.IsPressed())
 		    {
-			    GlobeInputManager inputManager = GlobeInputManager.Instance;
+			    InputManager inputManager = InputManager.Instance;
 
 			    if (inputManager == null) return;
 

@@ -32,7 +32,7 @@ public partial class GameManager : Manager<GameManager>
 		GlobeScene
 	}
 
-	public GameScene currentScene = GameScene.MainMenu;
+	[Export] public GameScene currentScene;
 
 	private string currentSavename = "new SaveGame";
 	private const string SaveExt = ".sav";
@@ -152,12 +152,12 @@ public partial class GameManager : Manager<GameManager>
 		{
 			if (currentSavename.Contains("quickplay_internal"))
 			{
-				TryCreateSaveGame("quickplay_internal");
+				TryCreateSaveGame("quickplay_internal", sceneName);
 				_loadFromAutosave = true;
 			}
 			else
 			{
-				TryCreateSaveGame(AutosaveName);
+				TryCreateSaveGame(AutosaveName, sceneName);
 				_loadFromAutosave = true;
 			}
 			
@@ -316,7 +316,7 @@ public partial class GameManager : Manager<GameManager>
 		if (!root.ContainsKey("managers")) return;
 		var managersDict = root["managers"].AsGodotDictionary<string, Variant>();
 		
-		// 1. Load this GameManager's data first
+		// Load this GameManager's data first
 		string myKey = GetManagerName();
 		if (managersDict.ContainsKey(myKey))
 		{
@@ -361,7 +361,7 @@ public partial class GameManager : Manager<GameManager>
 
 	public bool TryCreateSaveGame(
 		string saveName,
-		GameScene scene = GameScene.NONE,
+		GameScene scene,
 		bool isNewGame = false
 	)
 	{
@@ -413,8 +413,7 @@ public partial class GameManager : Manager<GameManager>
 		{
 			["version"] = 1,
 			["isNewGame"] = isNewGame, // Store the flag
-			["scene"] =
-				scene == GameScene.NONE ? currentScene.ToString() : scene.ToString(),
+			["scene"] = scene.ToString(),
 			["managers"] = managersDict,
 		};
 
@@ -454,10 +453,10 @@ public partial class GameManager : Manager<GameManager>
 			unitCounts = (Vector2I)data["unitCounts"];
 		}
 
-		if (data.ContainsKey("currentScene"))
-		{
-			currentScene = (GameScene)data["currentScene"].AsInt32();
-		}
+		// if (data.ContainsKey("currentScene"))
+		// {
+		// 	currentScene = (GameScene)data["currentScene"].AsInt32();
+		// }
 	}
 
 	#endregion
