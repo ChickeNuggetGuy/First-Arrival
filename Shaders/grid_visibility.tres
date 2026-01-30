@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://crgxv2w3k0aa0"]
+
+[ext_resource type="Shader" uid="uid://64so22x1pxjf" path="res://Shaders/grid_visibility.gdshader" id="1_7fci6"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_7fci6")
+shader_parameter/grid_origin_world = Vector3(0, 0, 0)
+shader_parameter/cell_size_world = Vector2(1, 1)
+shader_parameter/texture_resolution = Vector3(0, 0, 0)
+shader_parameter/flip_z = false

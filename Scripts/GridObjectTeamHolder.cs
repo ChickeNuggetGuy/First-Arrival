@@ -6,6 +6,7 @@ using FirstArrival.Scripts.Utility;
 using Godot;
 using Godot.Collections;
 
+
 [GlobalClass]
 public partial class GridObjectTeamHolder : Node
 {
@@ -14,404 +15,350 @@ public partial class GridObjectTeamHolder : Node
     [Export] private Node _activeUnitsHolder;
     [Export] private Node _inactiveUnitsHolder;
 
-    
     public int VisibilityMinX { get; private set; }
     public int VisibilityMinZ { get; private set; }
     public int VisibilityWidth { get; private set; }
-    public int VisibilityHeight { get; private set; }
+    public int VisibilityHeight { get; private set; } // This is World Z size
+    public int VisibilityDepth { get; private set; } // This is World Y (Vertical) size
+    
     public System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>> GridObjects { get; protected set; }
-
     public GridObject CurrentGridObject { get; protected set; }
 
-    [Export] public Godot.Collections.Dictionary<int, ImageTexture> VisibilityTextures =
-	    new Godot.Collections.Dictionary<int, ImageTexture>();
-    private readonly Godot.Collections.Dictionary<int, Image> _visibilityImages =
-	    new Godot.Collections.Dictionary<int, Image>();
-    [Export] public Godot.Collections.Array<ImageTexture> VisibilityTexturesForDebug { get; private set; } = new Godot.Collections.Array<ImageTexture>();
+    // Stores 2D slices for debug or logic (Key = Y Level)
+    [Export] public Godot.Collections.Dictionary<int, ImageTexture> VisibilityTextures = new();
+    private readonly Godot.Collections.Dictionary<int, Image> _visibilityImages = new();
+    
+    // The final 3D texture used by the shader
+    public ImageTexture3D VisibilityTexture3D { get; private set; } = new ImageTexture3D();
 
+    [Export] public Godot.Collections.Array<ImageTexture> VisibilityTexturesForDebug { get; private set; } = new();
+	
+    public HashSet<GridCell> TeamVisibleCells { get; private set; } = new();
+    public HashSet<GridCell> ExploredCells { get; private set; } = new();
+    public HashSet<GridCell> TeamNoLongerVisibleCells { get; private set; } = new();
 
     #region Signals
-    [Signal]
-    public delegate void SelectedGridObjectChangedEventHandler(GridObject gridObject);
-
-    [Signal]
-    public delegate void GridObjectListChangedEventHandler(
-	    GridObjectTeamHolder gridObjectTeamHolder
-    );
-    
-    [Signal]
-    public delegate void VisibilityChangedEventHandler(GridObjectTeamHolder gridObjectTeamHolder);
+    [Signal] public delegate void SelectedGridObjectChangedEventHandler(GridObject gridObject);
+    [Signal] public delegate void GridObjectListChangedEventHandler(GridObjectTeamHolder gridObjectTeamHolder);
+    // Updated signal to pass the 3D texture directly
+    [Signal] public delegate void VisibilityChangedEventHandler(Enums.UnitTeam team, ImageTexture3D texture);
     #endregion
-
 
     public void Setup()
     {
-	    GridObjects =
-		    new System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>>()
+        GridObjects = new System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>>()
+        {
+            { Enums.GridObjectState.Active, new List<GridObject>() },
+            { Enums.GridObjectState.Inactive, new List<GridObject>() },
+        };
+
+        if (_activeUnitsHolder == null)
+        {
+            _activeUnitsHolder = new Node { Name = "ActiveUnits" };
+            AddChild(_activeUnitsHolder);
+        }
+
+        if (_inactiveUnitsHolder == null)
+        {
+            _inactiveUnitsHolder = new Node { Name = "InactiveUnits" };
+            AddChild(_inactiveUnitsHolder);
+        }
+        
+        foreach(Node child in _activeUnitsHolder.GetChildren()) child.QueueFree();
+        foreach(Node child in _inactiveUnitsHolder.GetChildren()) child.QueueFree();
+
+        if(MeshTerrainGenerator.Instance != null)
+        {
+            Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
+            // Assuming mapSize Y is vertical levels
+            VisibilityDepth = mapSize.Y; 
+        }
+    }
+
+    /// <summary>
+    /// Recalculates team visibility union, updates tracking sets, and refreshes the texture.
+    /// </summary>
+    public void UpdateVisibility()
+    {
+	    var gridObjects = GridObjects[Enums.GridObjectState.Active];
+	    var newTeamVisible = new HashSet<GridCell>();
+
+	    foreach (var gridObject in gridObjects)
+	    {
+		    if (gridObject == null || !gridObject.IsInitialized) continue;
+
+		    if (!gridObject.TryGetGridObjectNode<GridObjectSight>(out var sight) || sight == null) continue;
+
+		    sight.EnsureUpToDate();
+
+		    foreach (var cell in sight.VisibleCells)
 		    {
-			    { Enums.GridObjectState.Active, new List<GridObject>() },
-			    { Enums.GridObjectState.Inactive, new List<GridObject>() },
-		    };
-
-	    if (_activeUnitsHolder == null)
-	    {
-		    _activeUnitsHolder = new Node { Name = "ActiveUnits" };
-		    AddChild(_activeUnitsHolder);
+			    if (cell != null && cell != GridCell.Null)
+				    newTeamVisible.Add(cell);
+		    }
 	    }
 
-	    if (_inactiveUnitsHolder == null)
-	    {
-		    _inactiveUnitsHolder = new Node { Name = "InactiveUnits" };
-		    AddChild(_inactiveUnitsHolder);
-	    }
-		
-	    // Ensure any pre-existing children in the scene tree are cleaned up or registered
-	    // For a clean setup, we usually want to clear them unless we are in the editor
-	    foreach(Node child in _activeUnitsHolder.GetChildren()) child.QueueFree();
-	    foreach(Node child in _inactiveUnitsHolder.GetChildren()) child.QueueFree();
+	    TeamNoLongerVisibleCells.Clear();
+	    TeamNoLongerVisibleCells.UnionWith(TeamVisibleCells);
+	    TeamNoLongerVisibleCells.ExceptWith(newTeamVisible);
 
-	    Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
-	    for (int y = 0; y < mapSize.Y; y++)
-	    {
-		    var image = Image.CreateEmpty(mapSize.X, mapSize.Z, false, Image.Format.Rgba8);
-		    image.Fill(Colors.Black);
-		    _visibilityImages[y] = image;
-		    VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
-	    }
+	    TeamVisibleCells.Clear();
+	    TeamVisibleCells.UnionWith(newTeamVisible);
+	    ExploredCells.UnionWith(TeamVisibleCells);
+
+	    UpdateVisibilityTextures();
+
+        // Pass Team and Texture to the manager
+	    EmitSignal(SignalName.VisibilityChanged, (int)Team, VisibilityTexture3D);
     }
 
-    public HashSet<GridCell> ExploredCells { get; private set; } = new();
-
-   public void UpdateVisibility()
-{
-    var currentlyVisibleCells = new HashSet<GridCell>();
-    var gridObjects = GridObjects[Enums.GridObjectState.Active];
-
-    foreach (var gridObject in gridObjects)
+    /// <summary>
+    /// Generates Image slices and constructs the ImageTexture3D.
+    /// </summary>
+    private void UpdateVisibilityTextures()
     {
-	    if (!gridObject.TryGetGridObjectNode<GridObjectSight>(out var sight)) continue;
-
-        if (sight != null)
-        {
-            sight.CalculateSightArea();
-            foreach (var cell in sight.VisibleCells)
-                currentlyVisibleCells.Add(cell);
-        }
-    }
-
-    foreach (var cell in currentlyVisibleCells)
-        ExploredCells.Add(cell);
-
-    var allCells = GridSystem.Instance.AllGridCells;
-    if (allCells == null || !allCells.Any()) return;
-
-    int minX = allCells.Min(c => c.gridCoordinates.X);
-    int maxX = allCells.Max(c => c.gridCoordinates.X);
-    int minZ = allCells.Min(c => c.gridCoordinates.Z);
-    int maxZ = allCells.Max(c => c.gridCoordinates.Z);
-
-    VisibilityMinX = minX;
-    VisibilityMinZ = minZ;
-    VisibilityWidth = MeshTerrainGenerator.Instance.GetMapCellSize().X;
-    VisibilityHeight = MeshTerrainGenerator.Instance.GetMapCellSize().Y;
-    
-    int gridWidth = maxX - minX + 1;
-    int gridHeight = maxZ - minZ + 1;
-
-    var yLevels = allCells.Select(c => c.gridCoordinates.Y)
-                          .Distinct()
-                          .OrderBy(v => v);
-
-    VisibilityTexturesForDebug ??= new Godot.Collections.Array<ImageTexture>();
-    VisibilityTexturesForDebug.Clear();
-
-    foreach (var y in yLevels)
-    {
-        Image image;
-        if (!_visibilityImages.TryGetValue(y, out image) ||
-            image.GetWidth() != gridWidth || image.GetHeight() != gridHeight)
-        {
-            // Create a new Image and a new ImageTexture when size changes
-            image = Image.Create(gridWidth, gridHeight, false, Image.Format.Rgba8);
-            _visibilityImages[y] = image;
-            VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
-        }
-
-        image.Fill(Colors.Black);
-
-        for (int x = 0; x < gridWidth; x++)
-        {
-            for (int z = 0; z < gridHeight; z++)
-            {
-                var gridCoords = new Vector3I(x + minX, y, z + minZ);
-                GridCell cell = GridSystem.Instance.GetGridCell(gridCoords);
-
-                Color pixelColor = Colors.Black;
-                if (cell != GridCell.Null)
-                {
-                    if (currentlyVisibleCells.Contains(cell))
-                        pixelColor = Colors.White;
-                    else if (ExploredCells.Contains(cell))
-                        pixelColor = Colors.DarkGray;
-                }
-
-                if (pixelColor != Colors.Black)
-                    image.SetPixel(x, z, pixelColor);
-            }
-        }
-
-        var tex = VisibilityTextures[y];
-        tex.Update(image);
-
-        VisibilityTexturesForDebug.Add(tex);
-    }
-
-    foreach (var cell in allCells)
-    {
-        Enums.FogState newState =
-            currentlyVisibleCells.Contains(cell) ? Enums.FogState.Visible :
-            ExploredCells.Contains(cell) ? Enums.FogState.PreviouslySeen :
-            Enums.FogState.Unseen;
-
-        cell.SetFogState(newState);
-    }
-
-    EmitSignal(SignalName.VisibilityChanged, this);
-}
-
-    private static int _updateCounter = 0;
-
-    public List<GridCell> GetVisibleGridCells()
-    {
-        var visibleCells = new List<GridCell>();
         var allCells = GridSystem.Instance.AllGridCells;
-
-        if (allCells == null || !allCells.Any())
-        {
-            return visibleCells;
-        }
+        if (allCells == null || !allCells.Any()) return;
 
         int minX = allCells.Min(c => c.gridCoordinates.X);
+        int maxX = allCells.Max(c => c.gridCoordinates.X);
         int minZ = allCells.Min(c => c.gridCoordinates.Z);
+        int maxZ = allCells.Max(c => c.gridCoordinates.Z);
 
-        foreach (var entry in _visibilityImages)
+        VisibilityMinX = minX;
+        VisibilityMinZ = minZ;
+        VisibilityWidth = maxX - minX + 1;
+        VisibilityHeight = maxZ - minZ + 1; // In Godot Texture3D, this maps to 'Height'
+        
+        // 1. Prepare data for 3D Texture
+        // We need a list of Images, one for each Y level.
+        // Assuming Y starts at 0 and goes to VisibilityDepth.
+        Godot.Collections.Array<Image> allSlices = new Godot.Collections.Array<Image>();
+
+        VisibilityTexturesForDebug ??= new Godot.Collections.Array<ImageTexture>();
+        VisibilityTexturesForDebug.Clear();
+
+        // Iterate through all Y levels defined by the map
+        for (int y = 0; y < VisibilityDepth; y++)
         {
-            int y = entry.Key;
-            Image image = entry.Value;
-
-            for (int x = 0; x < image.GetWidth(); x++)
+            Image image;
+            
+            // Check cache
+            if (!_visibilityImages.TryGetValue(y, out image) ||
+                image.GetWidth() != VisibilityWidth || image.GetHeight() != VisibilityHeight)
             {
-                for (int z = 0; z < image.GetHeight(); z++)
+                image = Image.Create(VisibilityWidth, VisibilityHeight, false, Image.Format.Rgba8);
+                _visibilityImages[y] = image;
+                VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
+            }
+
+            // Fill black (Fog)
+            image.Fill(Colors.Black);
+
+            // 2. Paint pixels on this slice
+            // Note: Optimizing this to only iterate cells in this Y level would be faster than xy loops
+            for (int x = 0; x < VisibilityWidth; x++)
+            {
+                for (int z = 0; z < VisibilityHeight; z++)
                 {
-                    if (image.GetPixel(x, z).IsEqualApprox(Colors.White))
+                    var gridCoords = new Vector3I(x + minX, y, z + minZ);
+                    GridCell cell = GridSystem.Instance.GetGridCell(gridCoords);
+
+                    Color pixelColor = Colors.Black;
+                    
+                    if (cell != GridCell.Null)
                     {
-                        var gridCoords = new Vector3I(x + minX, y, z + minZ);
-                        GridCell cell = GridSystem.Instance.GetGridCell(gridCoords);
-                        if (cell != GridCell.Null)
+                        bool isVisible = TeamVisibleCells.Contains(cell);
+                        bool isExplored = ExploredCells.Contains(cell);
+
+                        if (isVisible)
+                            pixelColor = Colors.White;
+                        else if (isExplored)
+                            pixelColor = new Color(0.5f, 0.5f, 0.5f); // Grey
+
+                        // Logic to update Cell state for gameplay logic
+                        if (Team == Enums.UnitTeam.Player)
                         {
-                            visibleCells.Add(cell);
+                            Enums.FogState newState = isVisible ? Enums.FogState.Visible :
+                                                      isExplored ? Enums.FogState.PreviouslySeen :
+                                                      Enums.FogState.Unseen;
+                            
+                            if(cell.fogState != newState)
+                                cell.SetFogState(newState);
                         }
                     }
+
+                    if (pixelColor != Colors.Black)
+                        image.SetPixel(x, z, pixelColor);
                 }
             }
+
+            // Update debug texture
+            var tex = VisibilityTextures[y];
+            tex.Update(image);
+            VisibilityTexturesForDebug.Add(tex);
+            
+            // Add to stack for 3D Texture
+            allSlices.Add(image);
         }
-	GD.Print("GetVisibleGridCells: " + visibleCells.Count);
-        return visibleCells;
+
+        // 3. Create or Update ImageTexture3D
+        // Format, Width(X), Height(Z), Depth(Y), UseMipmaps, Data
+        VisibilityTexture3D.Create(Image.Format.Rgba8, VisibilityWidth, VisibilityHeight, VisibilityDepth, false, allSlices);
     }
 
-    public void UpdateGridObjects(
-        ActionDefinition actionCompleted,
-        ActionDefinition currentAction
-    )
+    public List<GridCell> GetVisibleGridCells() => TeamVisibleCells.ToList();
+
+    public void UpdateGridObjects(ActionDefinition actionCompleted, ActionDefinition currentAction)
     {
-        GD.Print("Updating grid objects");
+        if (CurrentGridObject != null && CurrentGridObject.IsInitialized)
+        {
+            if (CurrentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sight))
+                sight.CalculateSightArea();
+        }
         UpdateVisibility();
     }
 
     public GridObject GetNextGridObject()
     {
-	    if (GridObjects[Enums.GridObjectState.Active].Count == 0) return null;
-		
-	    if (CurrentGridObject == null) CurrentGridObject = GridObjects[Enums.GridObjectState.Active][0];
+        if (GridObjects[Enums.GridObjectState.Active].Count == 0) return null;
+        if (CurrentGridObject == null) CurrentGridObject = GridObjects[Enums.GridObjectState.Active][0];
 
-	    if (CurrentGridObject == null) return null;
-	    int index =
-		    GridObjects[Enums.GridObjectState.Active].IndexOf(CurrentGridObject);
+        int index = GridObjects[Enums.GridObjectState.Active].IndexOf(CurrentGridObject);
+        if (index == -1) index = 0; 
+        int nextIndex = (index + 1) >= GridObjects[Enums.GridObjectState.Active].Count ? 0 : index + 1;
 
-	    if (index == -1)
-		    return null;
-
-	    int nextIndex =
-		    ((index + 1) >= GridObjects[Enums.GridObjectState.Active].Count)
-			    ? 0
-			    : index + 1;
-
-	    SetSelectedGridObject(
-		    GridObjects[Enums.GridObjectState.Active][nextIndex]
-	    );
-	    return CurrentGridObject;
+        SetSelectedGridObject(GridObjects[Enums.GridObjectState.Active][nextIndex]);
+        return CurrentGridObject;
     }
 
     public void SetSelectedGridObject(GridObject gridObject)
     {
-        GridObject oldGridObject = CurrentGridObject;
         CurrentGridObject = gridObject;
-        GD.Print("1");
         EmitSignal(SignalName.SelectedGridObjectChanged, CurrentGridObject);
     }
 
     public async Task AddGridObject(GridObject gridObject)
     {
-        while (!gridObject.IsInitialized)
-        {
-            await Task.Yield();
-        }
-        GridObjects[Enums.GridObjectState.Active].Add(gridObject);
+        while (!gridObject.IsInitialized) await Task.Yield();
+        
+        if (!GridObjects[Enums.GridObjectState.Active].Contains(gridObject))
+            GridObjects[Enums.GridObjectState.Active].Add(gridObject);
 
-        gridObject.GetParent()?.RemoveChild(gridObject);
-        _activeUnitsHolder.AddChild(gridObject); // Reparent to active holder
-
-        if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
-        if (statHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat health))
+        if (gridObject.GetParent() != _activeUnitsHolder)
         {
-            health.CurrentValueMin += HealthOnCurrentValueMin;
+            gridObject.GetParent()?.RemoveChild(gridObject);
+            _activeUnitsHolder.AddChild(gridObject);
         }
 
+        // Stat logic correction
+        if(gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder))
+        {
+            if (statHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat health))
+            {
+                health.CurrentValueMin -= HealthOnCurrentValueMin;
+                health.CurrentValueMin += HealthOnCurrentValueMin;
+            }
+        }
+
+        if (gridObject.TryGetGridObjectNode<GridObjectSight>(out var sight))
+            sight.CalculateSightArea();
+
+        UpdateVisibility();
         EmitSignal(SignalName.GridObjectListChanged, this);
     }
 
     private void HealthOnCurrentValueMin(int value, GridObject gridObject)
     {
-	    
-        if (gridObject == CurrentGridObject)
-        {
-            // Select a new currentObject
-            GetNextGridObject();
-        }
+        if (gridObject == CurrentGridObject) GetNextGridObject();
+        
         GridObjects[Enums.GridObjectState.Active].Remove(gridObject);
-        GridObjects[Enums.GridObjectState.Inactive].Add(gridObject);
+        if (!GridObjects[Enums.GridObjectState.Inactive].Contains(gridObject))
+            GridObjects[Enums.GridObjectState.Inactive].Add(gridObject);
 
-        GD.Print($"gridobject {gridObject}, holder {_inactiveUnitsHolder}");
         gridObject.Reparent(_inactiveUnitsHolder);
         gridObject.SetIsActive(false);
         gridObject.Hide();
         gridObject.Position = new(-100, -100, -100);
+        
+        UpdateVisibility(); 
         EmitSignal(SignalName.GridObjectListChanged, this);
     }
 
-    public bool IsGridObjectActive(GridObject gridObject)
+    public bool IsGridObjectActive(GridObject gridObject) => GridObjects[Enums.GridObjectState.Active].Contains(gridObject);
+
+    // Save/Load Logic
+    public Godot.Collections.Dictionary<string, Variant> Save()
     {
-        return GridObjects[Enums.GridObjectState.Active].Contains(gridObject);
+        var data = new Godot.Collections.Dictionary<string, Variant>();
+        
+        var activeList = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
+        foreach (var obj in GridObjects[Enums.GridObjectState.Active]) activeList.Add(obj.Save());
+        data["Active"] = activeList;
+
+        var inactiveList = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
+        foreach (var obj in GridObjects[Enums.GridObjectState.Inactive]) inactiveList.Add(obj.Save());
+        data["Inactive"] = inactiveList;
+        
+        data["Team"] = (int)Team;
+        return data;
     }
 
+    public void Load(Godot.Collections.Dictionary<string, Variant> data)
+    {
+        Setup();
+        foreach (var unit in GridObjects[Enums.GridObjectState.Active]) unit.QueueFree();
+        foreach (var unit in GridObjects[Enums.GridObjectState.Inactive]) unit.QueueFree();
+        GridObjects[Enums.GridObjectState.Active].Clear();
+        GridObjects[Enums.GridObjectState.Inactive].Clear();
 
-public Godot.Collections.Dictionary<string, Variant> Save()
-	{
-		var data = new Godot.Collections.Dictionary<string, Variant>();
-		
-		// 1. Save Active Units
-		var activeList = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
-		foreach (var obj in GridObjects[Enums.GridObjectState.Active])
-		{
-			// ASSUMPTION: GridObject has a Save() method returning Dictionary<string, Variant>
-			// AND it includes "Filename" : obj.SceneFilePath
-			activeList.Add(obj.Save());
-		}
-		data["Active"] = activeList;
+        if (data.ContainsKey("Active"))
+        {
+            var activeList = (Godot.Collections.Array)data["Active"];
+            foreach (Godot.Collections.Dictionary<string, Variant> unitData in activeList)
+            {
+                GridObject newUnit = InstantiateUnitFromData(unitData);
+                if (newUnit != null)
+                {
+                    _activeUnitsHolder.AddChild(newUnit);
+                    newUnit.Load(unitData); 
+                    GridObjects[Enums.GridObjectState.Active].Add(newUnit);
+                    
+                    if (newUnit.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder))
+                    {
+                        if (statHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat health))
+                            health.CurrentValueMin += HealthOnCurrentValueMin;
+                    }
+                    if (newUnit.TryGetGridObjectNode<GridObjectSight>(out var sight))
+                        sight.CalculateSightArea();
+                }
+            }
+        }
 
-		// 2. Save Inactive Units
-		var inactiveList = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
-		foreach (var obj in GridObjects[Enums.GridObjectState.Inactive])
-		{
-			inactiveList.Add(obj.Save());
-		}
-		data["Inactive"] = inactiveList;
-		
-		// 3. Save Team Info
-		data["Team"] = (int)Team;
+        if (data.ContainsKey("Inactive"))
+        {
+            var inactiveList = (Godot.Collections.Array)data["Inactive"];
+            foreach (Godot.Collections.Dictionary<string, Variant> unitData in inactiveList)
+            {
+                GridObject newUnit = InstantiateUnitFromData(unitData);
+                if (newUnit != null)
+                {
+                    _inactiveUnitsHolder.AddChild(newUnit);
+                    newUnit.Load(unitData); 
+                    GridObjects[Enums.GridObjectState.Inactive].Add(newUnit);
+                    newUnit.SetIsActive(false); 
+                }
+            }
+        }
+        UpdateVisibility();
+        EmitSignal(SignalName.GridObjectListChanged, this);
+    }
 
-		return data;
-	}
-
-	public void Load(Godot.Collections.Dictionary<string, Variant> data)
-	{
-		Setup(); // Ensure holders and dicts are initialized
-
-		// 1. Clear existing units (destroying them to avoid duplicates)
-		foreach (var unit in GridObjects[Enums.GridObjectState.Active]) unit.QueueFree();
-		foreach (var unit in GridObjects[Enums.GridObjectState.Inactive]) unit.QueueFree();
-		
-		GridObjects[Enums.GridObjectState.Active].Clear();
-		GridObjects[Enums.GridObjectState.Inactive].Clear();
-
-		// 2. Load Active Units
-		if (data.ContainsKey("Active"))
-		{
-			var activeList = (Godot.Collections.Array)data["Active"];
-			foreach (Godot.Collections.Dictionary<string, Variant> unitData in activeList)
-			{
-				GridObject newUnit = InstantiateUnitFromData(unitData);
-				if (newUnit != null)
-				{
-					_activeUnitsHolder.AddChild(newUnit);
-					
-					// Load internal data (Position, Stats, etc.)
-					newUnit.Load(unitData); 
-					GridObjects[Enums.GridObjectState.Active].Add(newUnit);
-					
-					// Re-hook events
-					if (newUnit.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder))
-					{
-						if (statHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat health))
-						{
-							health.CurrentValueMin += HealthOnCurrentValueMin;
-						}
-					}
-				}
-			}
-		}
-
-		// 3. Load Inactive Units
-		if (data.ContainsKey("Inactive"))
-		{
-			var inactiveList = (Godot.Collections.Array)data["Inactive"];
-			foreach (Godot.Collections.Dictionary<string, Variant> unitData in inactiveList)
-			{
-				GridObject newUnit = InstantiateUnitFromData(unitData);
-				if (newUnit != null)
-				{
-					_inactiveUnitsHolder.AddChild(newUnit);
-					// Load internal data (Position, Stats, etc.)
-					newUnit.Load(unitData); 
-					GridObjects[Enums.GridObjectState.Inactive].Add(newUnit);
-					newUnit.SetIsActive(false); // Helper to set internal state
-				}
-			}
-		}
-		
-		EmitSignal(SignalName.GridObjectListChanged, this);
-	}
-
-	private GridObject InstantiateUnitFromData(Godot.Collections.Dictionary<string, Variant> unitData)
-	{
-		// Requires "Filename" to be saved in the GridObject.Save() method
-		if (!unitData.ContainsKey("Filename"))
-		{
-			GD.PrintErr("Save data missing Filename for GridObject");
-			return null;
-		}
-
-		string scenePath = unitData["Filename"].AsString();
-		var scene = GD.Load<PackedScene>(scenePath);
-		if (scene == null)
-		{
-			GD.PrintErr($"Failed to load scene at path: {scenePath}");
-			return null;
-		}
-
-		GridObject unit = scene.Instantiate<GridObject>();
-
-		
-		return unit;
-	}
+    private GridObject InstantiateUnitFromData(Godot.Collections.Dictionary<string, Variant> unitData)
+    {
+        if (!unitData.ContainsKey("Filename")) return null;
+        string scenePath = unitData["Filename"].AsString();
+        var scene = GD.Load<PackedScene>(scenePath);
+        return scene?.Instantiate<GridObject>();
+    }
 }

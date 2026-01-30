@@ -5,10 +5,8 @@
 [resource]
 resource_name = "Troop Transport _Item"
 script = ExtResource("1_myolf")
-ItemID = 3
+ItemID = 4
 ItemName = "Troop Transport "
+globeOnly = true
 weight = 9999
 ActionDefinitions = []
-extraData = Dictionary[String, Variant]({
-"globe_only": true
-})

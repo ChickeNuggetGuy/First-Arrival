@@ -9,10 +9,13 @@
 
 [sub_resource type="Resource" id="Resource_2jyhj"]
 script = ExtResource("1_71kes")
+damage = 10
 metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
 
 [sub_resource type="Resource" id="Resource_wvx2b"]
 script = ExtResource("2_e5pci")
+range = 10
+damage = 20
 
 [sub_resource type="Resource" id="Resource_fv7ql"]
 script = ExtResource("3_lougv")
@@ -36,7 +39,6 @@ ItemIcon = ExtResource("1_b4ww0")
 ItemShape = SubResource("Resource_uou2a")
 weight = 10
 ActionDefinitions = [SubResource("Resource_2jyhj"), SubResource("Resource_wvx2b"), SubResource("Resource_fv7ql")]
-itemComponents = []
 MaxStackSize = 2
-ItemSettings = 1
+ItemSettings = 3
 metadata/_custom_type_script = "uid://da4j8smky5g6x"

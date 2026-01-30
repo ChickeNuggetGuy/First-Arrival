@@ -25,9 +25,5 @@ ItemIcon = ExtResource("2_1avnv")
 ItemShape = SubResource("Resource_5mon7")
 weight = 5
 ActionDefinitions = [SubResource("Resource_yew0j")]
-extraData = Dictionary[String, Variant]({
-"damage": 200,
-"radius": 3
-})
 MaxStackSize = 2
 ItemSettings = 12

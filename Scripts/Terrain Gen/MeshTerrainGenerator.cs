@@ -22,7 +22,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
   [Export] private int minHeightY =0;
   [Export] private int maxHeightY = 20;
   [Export]
-  private Color color { get; set; }
+  private ShaderMaterial chunkMaterial { get; set; }
   
   public Vector3[,] terrainHeights { get; set; }
 
@@ -124,7 +124,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				  cellSize.X,
 				  cData
 			  );
-			  cData.chunk.Generate(color);
+			  cData.chunk.Generate(chunkMaterial);
 		  }
 	  }
 

@@ -19,8 +19,7 @@ public partial class GridCell
     public Vector3I gridCoordinates { get; protected set; }
     public Vector3 worldCenter { get; protected set; }
     public Vector3 trueCenter { get; protected set; }
-	
-    // Removed local connections list - now queried from GridSystem
+    
     public List<Vector3I> Connections => GridSystem.Instance?.GetConnections(gridCoordinates);
 
     public Enums.GridCellState originalState { get; protected set; }
@@ -35,14 +34,8 @@ public partial class GridCell
 	
     public bool IsWalkable => state.HasFlag(Enums.GridCellState.Ground) && !state.HasFlag(Enums.GridCellState.Obstructed) && (GridSystem.Instance?.HasConnections(gridCoordinates) ?? false);
 
-    public GridCell(
-        Vector3I gridCoordinates,
-        Vector3 worldCenter,
-        Vector3 trueCenter,
-        Enums.GridCellState state,
-        Enums.FogState fogState,
-        InventoryGrid inventory,
-        Enums.UnitTeam unitTeamSpawn = Enums.UnitTeam.All
+    public GridCell(Vector3I gridCoordinates, Vector3 worldCenter, Vector3 trueCenter, Enums.GridCellState state,
+        Enums.FogState fogState, InventoryGrid inventory, Enums.UnitTeam unitTeamSpawn = Enums.UnitTeam.All
     )
     {
         this.gridCoordinates = gridCoordinates;
@@ -50,7 +43,7 @@ public partial class GridCell
         this.trueCenter = trueCenter;
         this.state = state;
         this.originalState = state;
-        this.fogState = fogState;
+        SetFogState(fogState);
         this.gridObjects = new List<GridObject>();
         UnitTeamSpawn = unitTeamSpawn;
         if (inventory != null)
@@ -68,6 +61,26 @@ public partial class GridCell
     public void SetFogState(Enums.FogState state)
     {
         this.fogState = state;
+        if (HasGridObject())
+        {
+	        switch (this.fogState)
+	        {
+		        case Enums.FogState.Unseen:
+			        foreach (var gridObject in gridObjects)
+				        gridObject.Hide();
+			        break;
+		        case Enums.FogState.PreviouslySeen:
+			        foreach (var gridObject in gridObjects)
+				        gridObject.Show();
+			        break;
+		        case Enums.FogState.Visible:
+			        foreach (var gridObject in gridObjects)
+				        gridObject.Show();
+			        break;
+		        default:
+			        throw new ArgumentOutOfRangeException();
+	        }
+        }
     }
 
     public void SetUnitSpawnState(Enums.UnitTeam state)

@@ -90,10 +90,10 @@ public partial class InventoryGrid : Resource
     public delegate void InventoryChangedEventHandler();
 
     [Signal]
-    public delegate void ItemAddedEventHandler(Item itemAdded);
+    public delegate void ItemAddedEventHandler(InventoryGrid inventoryGrid, Item itemAdded);
 
     [Signal]
-    public delegate void ItemRemovedEventHandler(Item itemRemoved);
+    public delegate void ItemRemovedEventHandler(InventoryGrid inventoryGrid,Item itemRemoved);
 
     #endregion
 
@@ -283,7 +283,7 @@ public partial class InventoryGrid : Resource
                         }
                     }
                     item.currentGrid = this;
-                    EmitSignal(SignalName.ItemAdded, item);
+                    EmitSignal(SignalName.ItemAdded, this, item);
                 }
             }
         }
@@ -302,7 +302,7 @@ public partial class InventoryGrid : Resource
                      Items[x, y] = (item, count);
                      GD.Print($"AddItemAt: Placed new item at {x},{y}. Count: {count}");
                      item.currentGrid = this;
-                     EmitSignal(SignalName.ItemAdded, item);
+                     EmitSignal(SignalName.ItemAdded,this, item);
                 }
             }
         }
@@ -375,7 +375,7 @@ public partial class InventoryGrid : Resource
                 item.currentGrid = null;
         }
         
-        EmitSignal(SignalName.ItemRemoved, item);
+        EmitSignal(SignalName.ItemRemoved,this, item);
         EmitSignal(SignalName.InventoryChanged);
 
         _isCacheDirty = true;

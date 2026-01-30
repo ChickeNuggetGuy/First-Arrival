@@ -10,8 +10,9 @@ using FirstArrival.Scripts.Utility;
 public partial class RangedAttackActionDefinition
 	: ItemActionDefinition
 {
-	public Item Item { get; set; }
-
+	
+	[Export] public int range;
+	[Export] public int damage;
 	public override Action InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,
@@ -35,7 +36,7 @@ public partial class RangedAttackActionDefinition
 	{
 		if (Item == null)
 		{
-			reason = "No ranged item equipped";
+			reason = "No item equipped";
 			return false;
 		}
 
@@ -63,13 +64,6 @@ public partial class RangedAttackActionDefinition
 			reason = "Target grid object is equal to parent";
 			return false;
 		}
-
-		if (!Item.ItemData.TryGetData("range", out var value))
-		{
-			reason = "No ranged variable";
-			return false;
-		}
-		int range = value.AsInt32();
 
 		float distance = startingGridCell.gridCoordinates.DistanceTo(targetGridCell.gridCoordinates);
 		if (distance > range)

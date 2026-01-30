@@ -21,17 +21,24 @@ public partial class ItemData : Resource
 	[Export]
 	public Texture2D ItemIcon { get; protected set; }
 
+	[Export] public bool globeOnly { get; protected set; } = false;
+
 	[Export(PropertyHint.ResourceType, "GridShape")]
 	public GridShape ItemShape { get; set; }
 
 	[Export] public int weight;
 	
-	[Export]public PackedScene ItemScene { get; protected set; }
+	[Export] public Mesh ItemMesh { get; protected set; }
+	[Export] public Vector3 visualScale = new Vector3(.01f, .01f, .01f);
+	[Export] public Vector3 LeftHandItemPosition { get; protected set; }
+	[Export] public Vector3 LeftHandItemRotation { get; protected set; }
+	
+	[Export] public Vector3 RightHandItemPosition { get; protected set; }
+	[Export] public Vector3 RightHandItemRotation { get; protected set; }
 
 	[Export(PropertyHint.ResourceType, "ItemActionDefinition")]
 	public Array<ActionDefinition> ActionDefinitions;
 	
-	[Export] protected Dictionary<string, Variant> extraData = new();
 	[Export] public int MaxStackSize { get; protected set; } = 1;
 	[Export] public Enums.ItemSettings ItemSettings { get; protected set; }
 	public static Item CreateItem(ItemData itemData)
@@ -42,8 +49,25 @@ public partial class ItemData : Resource
 		retVal.Init((ItemData)itemData.Duplicate());
 		return retVal;
 	}
+	
+	public bool TryGetItemActionDefinition<T>(out ItemActionDefinition def) where T : ItemActionDefinition
+	{
+		def = null;
+		if (ActionDefinitions == null || ActionDefinitions.Count == 0)
+		{
+			return false;
+		}
 
+		for (int i = 0; i < ActionDefinitions.Count; i++)
+		{
+			if (ActionDefinitions[i].GetType() == typeof(T))
+			{
+				def = ActionDefinitions[i] as T;
+				return true;
+			}
+		}
 
-	public bool TryGetData(string key, out Variant variant) => extraData.TryGetValue(key, out variant);
+		return false;
+	}
 	
 }

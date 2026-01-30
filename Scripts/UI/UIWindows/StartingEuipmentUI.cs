@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using Godot;
+using Godot.Collections;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
@@ -9,15 +9,16 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class StartingEuipmentUI : UIWindow
 {
-	[Export] Godot.Collections.Dictionary<Enums.InventoryType,InventoryGrid> inventoryGrids = new Godot.Collections.Dictionary<Enums.InventoryType, InventoryGrid>();
-	[Export] Godot.Collections.Dictionary<Enums.InventoryType,InventoryGridUI> inventoryGridUIs = new Godot.Collections.Dictionary<Enums.InventoryType, InventoryGridUI>();
+	[Export] Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new();
+	
+	Dictionary<Enums.InventoryType,InventoryGridUI> inventoryGridUIs = new Dictionary<Enums.InventoryType, InventoryGridUI>();
 
 	[Export] public Label unitNameLabel;
 	[Export] public Button acceptButton;
 	[Export] public Button previousButton;
 	[Export] public Button nextButton;
 
-	private List<GridObject> playerUnits = new List<GridObject>();
+	private Array<GridObject> playerUnits = new Array<GridObject>();
 	private int currentUnitIndex = 0;
 
 	protected override Task _Setup()
@@ -34,12 +35,28 @@ public partial class StartingEuipmentUI : UIWindow
 			GD.PrintErr("startingItems == null");
 			return Task.CompletedTask;
 		}
-		
-	
-		foreach (var inventoryGrid in inventoryGrids)
+
+		foreach (var inventoryGridKVP in inventoryGrids)
 		{
-			inventoryGrid.Value.Initialize();
-			inventoryGrid.Value.ClearInventory();
+			InventoryGrid inventoryGrid = inventoryGridKVP.Value == null? 	inventoryManager.GetInventoryGrid(inventoryGridKVP.Key) : inventoryGridKVP.Value;
+			
+			if (inventoryGrid == null)
+			{
+				GD.PrintErr("inventoryGrid == null");
+				continue;
+			}
+			
+			inventoryGrid.Initialize();
+			inventoryGrid.ClearInventory();
+		}
+
+		inventoryGridUIs.Clear();
+		if (this.TryGetAllComponentsInChildrenRecursive<InventoryGridUI>(out var inventoryGridUIList))
+		{
+			foreach (var inventoryGridUI in inventoryGridUIList)
+			{
+				inventoryGridUIs.Add(inventoryGridUI.inventoryType ,inventoryGridUI);
+			}
 		}
 
 		previousButton.Pressed += PreviousUnit;
@@ -88,7 +105,7 @@ public partial class StartingEuipmentUI : UIWindow
 			return;
 		}
 
-		foreach (KeyValuePair<Enums.InventoryType, InventoryGridUI> pair in inventoryGridUIs)
+		foreach (var pair in inventoryGridUIs)
 		{
 			// Skip Ground inventory, it stays constant as the starting items pool
 			if (pair.Key == Enums.InventoryType.Ground) continue;
@@ -116,7 +133,7 @@ public partial class StartingEuipmentUI : UIWindow
 		
 		if (grid == null) return;
 
-		List<Item> itemsNotAdded = new();
+		Array<Item> itemsNotAdded = new();
 		foreach (var itemDataKVP in items)
 		{
 			Item item = inventoryManager.InstantiateItem(itemDataKVP.Key);
@@ -142,7 +159,7 @@ public partial class StartingEuipmentUI : UIWindow
 		InventoryManager inventoryManager = InventoryManager.Instance;
 		populateInventoryGrid(Enums.InventoryType.Ground, inventoryManager.startingItems, inventoryManager);
 	
-		foreach (KeyValuePair<Enums.InventoryType, InventoryGridUI> pair in inventoryGridUIs)
+		foreach (var pair in inventoryGridUIs)
 		{
 			if (pair.Key == Enums.InventoryType.Ground)
 			{

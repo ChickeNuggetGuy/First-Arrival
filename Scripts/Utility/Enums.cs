@@ -95,6 +95,8 @@ public class Enums
 		leftLeg,
 		rightLeg,
 		MouseHeld,
+		RightShoulder,
+		LeftShoulder,
 	}
 
 	[Flags]
@@ -155,6 +157,13 @@ public class Enums
 		Sprinting = 8
 	}
 
+	[System.Flags]
+	public enum WeaponState
+	{
+		None = 0,
+		Ranged = 1,
+		Melee = 2,
+	}
 	#endregion
 
 

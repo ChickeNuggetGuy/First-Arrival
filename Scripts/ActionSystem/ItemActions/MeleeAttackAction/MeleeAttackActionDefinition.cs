@@ -10,8 +10,8 @@ using FirstArrival.Scripts.Utility;
 public partial class MeleeAttackActionDefinition
 	: ItemActionDefinition
 {
-	public Item Item { get; set; }
-
+	[Export] public int damage;
+	
 	public override Action InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,

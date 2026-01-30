@@ -15,7 +15,6 @@ public partial class InventoryManager : Manager<InventoryManager>
 	
 	[Export] public ItemDatabase Database;
 	[Export] Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new Dictionary<Enums.InventoryType, InventoryGrid>();
-	[Export] Array<ItemData> itemDatas = new Array<ItemData>();
 	
 	
 	Dictionary<Enums.InventoryType, InventoryGridUI> runtimeInventoryGridUIs = new Dictionary<Enums.InventoryType, InventoryGridUI>();
@@ -46,10 +45,12 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		StartingEuipmentUi.ShowCall();
-		await ToSignal(StartingEuipmentUi.acceptButton, BaseButton.SignalName.Pressed);
-		StartingEuipmentUi.HideCall();
-		
+		if(GameManager.Instance.currentScene == GameManager.GameScene.BattleScene)
+		{
+			StartingEuipmentUi.ShowCall();
+			await ToSignal(StartingEuipmentUi.acceptButton, BaseButton.SignalName.Pressed);
+			StartingEuipmentUi.HideCall();
+		}
 		await Task.CompletedTask;
 	}
 
@@ -97,8 +98,13 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 	public Item GetRandomItem()
 	{
-		int randIndex = GD.RandRange(0, itemDatas.Count - 1);
-		return ItemData.CreateItem(itemDatas[randIndex]); 
+		if(Database == null) return null;
+		if(Database.Items.Count ==0) return null;
+		Array<ItemData> items = Database.Items.Values.Where(itemData => itemData != null && 
+		                                                                !itemData.globeOnly) as Array<ItemData>;
+		
+		if(items == null) return null;
+		return ItemData.CreateItem(items.PickRandom()); 
 	}
 	
 	
@@ -110,6 +116,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 		}
 		return null;
 	}
+	
 	#region manager Data
 	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
 	{

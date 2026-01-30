@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="InventoryGrid" format=3 uid="uid://yuk6bvexp0e5"]
+
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="1_c0jhy"]
+[ext_resource type="Script" uid="uid://bhryrg4yb7i00" path="res://Scripts/Inventory System/InventoryGrid.cs" id="1_ru8sq"]
+
+[sub_resource type="Resource" id="Resource_pg5ew"]
+script = ExtResource("1_c0jhy")
+GridSizeX = 1
+GridSizeY = 1
+GridSizeZ = 2
+ShapeGrid = Array[bool]([true, true])
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+
+[resource]
+script = ExtResource("1_ru8sq")
+InventoryType = 10
+GridShape = SubResource("Resource_pg5ew")
+InventorySettings = 2
+metadata/_custom_type_script = "uid://bhryrg4yb7i00"

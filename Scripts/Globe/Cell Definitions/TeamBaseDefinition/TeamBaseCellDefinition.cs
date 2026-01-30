@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
@@ -12,7 +13,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	private int maxCraft = 3;
 	private Dictionary<Enums.CraftStatus, List<Craft>> craft = new();
 
-	
+	public Dictionary<Enums.CraftStatus, List<Craft>> GetAllCraftData() => craft;
 	protected Dictionary<int, int> itemCounts = new();
 	
 	public List<Craft> CraftList
@@ -46,25 +47,110 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 	}
 
-	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team) : base(cellIndex, name)
+	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(cellIndex, name)
 	{
 		this.teamAffiliation = team;
-		craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
-		craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
-		craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+		if(craftList != null)
+		{
+			craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
+			craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
+			craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+			foreach (var c in craftList)
+			{
+				craft[c.Status].Add(c);
+			}
+		}
+		else
+		{
+			craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
+			craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
+			craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+		}
 	}
 	
-	public override Godot.Collections.Dictionary<string, Variant> Save()
-	{
-		// Get the base data (cellIndex)
-		var data = base.Save();
-        
-		// Add specific data for this class
-		data.Add("teamAffiliation", (int)teamAffiliation);
-        
-		return data;
-	}
 
+    public override Godot.Collections.Dictionary<string, Variant> Save()
+    {
+        var data = base.Save(); // Saves cellIndex and name
+
+        // 1. Serialize Craft
+        // We will flatten the dictionary into a single list of data objects
+        // The 'Status' field inside the Craft data will let us sort them back later.
+        Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>> serializedCrafts = new();
+
+        foreach (var pair in craft)
+        {
+            foreach (var c in pair.Value)
+            {
+                if(c != null)
+                    serializedCrafts.Add(c.Save());
+            }
+        }
+
+        data.Add("teamAffiliation", (int)teamAffiliation);
+        data.Add("crafts", serializedCrafts); // Note: Changed key to "crafts"
+        
+        // Save Inventory Items if needed
+        // data.Add("itemCounts", itemCounts); 
+
+        return data;
+    }
+
+    public void Load(Godot.Collections.Dictionary<string, Variant> data)
+    {
+	    if (data.ContainsKey("teamAffiliation"))
+		    teamAffiliation = (Enums.UnitTeam)data["teamAffiliation"].AsInt32();
+
+	    craft.Clear();
+	    craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
+	    craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
+	    craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+
+	    if (data.ContainsKey("crafts"))
+	    {
+		    var craftsArray = data["crafts"].AsGodotArray<Godot.Collections.Dictionary<string, Variant>>();
+
+		    foreach (var craftData in craftsArray)
+		    {
+			    if (craftData == null) continue;
+
+			    int itemID = craftData.ContainsKey("itemID") 
+				    ? craftData["itemID"].AsInt32() 
+				    : -1;
+
+			    if (itemID == -1)
+			    {
+				    GD.PrintErr("Craft data missing itemID, skipping.");
+				    continue;
+			    }
+
+			    Enums.CraftStatus status = Enums.CraftStatus.Home;
+			    if (craftData.ContainsKey("status"))
+				    status = (Enums.CraftStatus)craftData["status"].AsInt32();
+
+			    ItemData originalData = InventoryManager.Instance.GetItemData(itemID);
+
+			    if (originalData is Craft craftResource)
+			    {
+				    Craft newInstance = (Craft)craftResource.Duplicate();
+				    
+				    newInstance.Load(craftData);
+				    
+				    // only fill in defaults for unset values
+				    newInstance.Setup(newInstance.Index, cellIndex, this);
+
+				    // Status should already be set by Load(), but ensure consistency
+				    newInstance.Status = status;
+
+				    craft[status].Add(newInstance);
+			    }
+			    else
+			    {
+				    GD.PrintErr($"ItemID {itemID} did not resolve to a Craft resource.");
+			    }
+		    }
+	    }
+    }
 
 	#region Craft Functions
 

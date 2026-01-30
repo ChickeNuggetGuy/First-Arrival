@@ -82,7 +82,7 @@ public partial class Chunk : Node3D
         );
     }
 
-    public void Generate(Color color)
+    public void Generate(ShaderMaterial material)
     {
         if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
             return;
@@ -178,15 +178,8 @@ public partial class Chunk : Node3D
         CalculateSmoothNormals(mesh);
 
         meshInstance.Mesh = mesh;
-
-        var newMaterial = new StandardMaterial3D
-        {
-            AlbedoColor = color,
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel,
-            CullMode = BaseMaterial3D.CullModeEnum.Back,
-            // ReceiveDecals = true
-        };
-        meshInstance.MaterialOverride = newMaterial;
+        
+        meshInstance.MaterialOverride = material;
 
         meshInstance.CreateTrimeshCollision();
         // Set collision layer/mask safely if StaticBody was created

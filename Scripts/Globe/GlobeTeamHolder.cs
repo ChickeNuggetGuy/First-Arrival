@@ -40,6 +40,46 @@ public partial class GlobeTeamHolder : Node
 			["bases"] = basesData
 		};
 	}
+	
+	public void Load(Godot.Collections.Dictionary<string, Variant> data)
+	{
+		// 1. Load basic stats
+		if (data.ContainsKey("team"))
+			Team = (Enums.UnitTeam)data["team"].AsInt32();
+
+		if (data.ContainsKey("funds"))
+			funds = data["funds"].AsInt32();
+
+		// 2. Load Bases
+		if (data.ContainsKey("bases"))
+		{
+			var basesData = data["bases"].AsGodotDictionary<string, Variant>();
+			Bases.Clear();
+
+			foreach (var kvp in basesData)
+			{
+				int cellIndex = int.Parse(kvp.Key);
+				var baseData = kvp.Value.AsGodotDictionary<string, Variant>();
+
+				string baseName = baseData.ContainsKey("definitionName")
+					? baseData["definitionName"].AsString()
+					: "Loaded Base";
+
+				// Create new definition - pass null for craftList, Load() will populate it
+				TeamBaseCellDefinition newBase = new TeamBaseCellDefinition(
+					cellIndex, 
+					baseName, 
+					Team, 
+					null
+				);
+
+				// This now correctly loads crafts from the "crafts" array
+				newBase.Load(baseData);
+
+				Bases.Add(newBase);
+			}
+		}
+	}
 
 	public bool TryGetBaseAtIndex(int cellIndex, out TeamBaseCellDefinition teamBase)
 	{

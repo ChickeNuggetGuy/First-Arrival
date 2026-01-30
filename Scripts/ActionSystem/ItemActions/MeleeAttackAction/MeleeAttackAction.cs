@@ -95,11 +95,15 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 		}
 
 		int damage;
-		if (!Item.ItemData.TryGetData("damage", out var value))
+		
+		MeleeAttackActionDefinition meleeAttackActionDefinition = parentActionDefinition as MeleeAttackActionDefinition;
+
+		if (meleeAttackActionDefinition != null)
 		{
-			damage = 10;
+			damage = meleeAttackActionDefinition.damage;
 		}
-		damage = value.AsInt32();
+		else
+			damage = 10;
 
 		if (Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanMelee))
 		{

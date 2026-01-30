@@ -91,11 +91,10 @@ public partial class RangedAttackAction : Action, IItemAction
         }
         
         int damage;
-        if (!Item.ItemData.TryGetData("damage", out var value))
-        {
-	        damage = 10;
-        }
-        damage = value.AsInt32();
+
+	    RangedAttackActionDefinition rangedAttackActionDefinition = parentActionDefinition as RangedAttackActionDefinition;
+	    damage = rangedAttackActionDefinition.damage;
+        
         
         if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder targetStatHolder)) return;
 

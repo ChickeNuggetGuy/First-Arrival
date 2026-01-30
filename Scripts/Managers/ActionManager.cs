@@ -177,8 +177,7 @@ public partial class ActionManager : Manager<ActionManager>
 			return false;
 		}
 
-		if (action is ItemActionDefinition itemActionDefinition &&
-		    itemActionDefinition.Item == null)
+		if (action is ItemActionDefinition { Item: null })
 		{
 			GD.Print("tryTakeAction: Item is null");
 			return false;

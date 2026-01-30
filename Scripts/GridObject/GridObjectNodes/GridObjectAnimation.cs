@@ -8,26 +8,37 @@ public partial class GridObjectAnimation : GridObjectNode
 {
 	[Export] AnimationTree animationTree;
 	[Export] AnimationPlayer animationPlayer;
-	public Enums.LocomotionType LocomotionType { get; protected set; } = Enums.LocomotionType.None;
+	[Export] public bool isMoving;
+	[Export] public bool isIdle;
+	[Export]public Enums.WeaponState WeaponState { get; protected set; } = Enums.WeaponState.None;
+	
+	
 	protected override void Setup()
 	{
-		LocomotionType = Enums.LocomotionType.Idle;
+		isMoving = false;
+		isIdle = true;
+		WeaponState = Enums.WeaponState.None;
 	}
 
 	public override Dictionary<string, Variant> Save()
 	{
 		Dictionary<string, Variant> data =  new Dictionary<string, Variant>();
 		
-		data.Add("LocomotionType", LocomotionType.ToString());
+		data.Add("isMoving", isMoving.ToString());
+		data.Add("isIdle", isIdle.ToString());
 		return data;
 	}
 
 	public override void Load(Dictionary<string, Variant> data)
 	{
-		if (data.TryGetValue("LocomotionType", out Variant locomotionType))
+		if (data.TryGetValue("isIdle", out Variant locomotionType))
 		{
-			
-			LocomotionType = Enum.Parse<Enums.LocomotionType>(locomotionType.ToString());
+			isIdle = Enum.Parse<bool>(locomotionType.ToString());
+		}
+		
+		if (data.TryGetValue("isMoving", out Variant movingData))
+		{
+			isMoving = Enum.Parse<bool>(movingData.ToString());
 		}
 	}
 
@@ -49,7 +60,42 @@ public partial class GridObjectAnimation : GridObjectNode
 
 	#region Get/Set Functions
 
-	public void SetLocomotionType(Enums.LocomotionType locomotionType) => this.LocomotionType = locomotionType;
+	public void SetLocomotionType(Enums.LocomotionType locomotionType) {
+
+		GD.Print("Test: SetLocomotionType");
+		switch (locomotionType)
+		{
+			case Enums.LocomotionType.None:
+				break;
+			case Enums.LocomotionType.Idle:
+				isIdle = true;
+				isMoving = false;
+				break;
+			case Enums.LocomotionType.Moving:
+				isMoving = true;
+				isIdle = false;
+				break;
+			case Enums.LocomotionType.InAir:
+				break;
+				isIdle = false;
+			default:
+				throw new ArgumentOutOfRangeException(nameof(locomotionType), locomotionType, null);
+		}
+	}
+	
+	public void AddWeaponState(Enums.WeaponState weaponState)
+	{
+		if(WeaponState.HasFlag(weaponState)) return;
+		this.WeaponState |= weaponState;
+		GD.Print($"unit now has {weaponState.ToString()}");
+	}
+	
+	public void RemoveWeaponState(Enums.WeaponState weaponState)
+	{
+		if(!WeaponState.HasFlag(weaponState)) return;
+		this.WeaponState &= ~weaponState;
+		GD.Print($"unit no longer has {weaponState.ToString()}");
+	}
 
 	#endregion
 }

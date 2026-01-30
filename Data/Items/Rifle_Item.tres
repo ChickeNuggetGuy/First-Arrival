@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bfkutk4217uhc"]
+
+[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_axqm3"]
+[ext_resource type="Texture2D" uid="uid://bmfmqqjd087m7" path="res://Third-Party Assets/Polygon Prototype/Textures/PolygonPrototype_Texture_01_Emission.png" id="1_ovpre"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="2_atvu6"]
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="2_w5xnn"]
+[ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="3_2n7ds"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="3_b6yg5"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="4_axqm3"]
+
+[sub_resource type="Resource" id="Resource_xgeb5"]
+script = ExtResource("1_axqm3")
+damage = 15
+metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
+
+[sub_resource type="Resource" id="Resource_tj85d"]
+script = ExtResource("2_w5xnn")
+range = 16
+damage = 30
+
+[sub_resource type="Resource" id="Resource_ipk4j"]
+script = ExtResource("3_2n7ds")
+metadata/_custom_type_script = "uid://60yksynr5w30"
+
+[sub_resource type="Resource" id="Resource_w5xnn"]
+script = ExtResource("3_b6yg5")
+GridSizeY = 1
+GridSizeZ = 2
+ShapeGrid = Array[bool]([true, true, true, true, true, true])
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+
+[resource]
+resource_name = "Rifle_Item"
+script = ExtResource("4_axqm3")
+ItemID = 3
+ItemName = "Rifle"
+ItemDescription = "Standard Issue Assult Rifle"
+ItemIcon = ExtResource("1_ovpre")
+ItemShape = SubResource("Resource_w5xnn")
+weight = 1
+ItemMesh = ExtResource("2_atvu6")
+LeftHandItemPosition = Vector3(0.24844818, -0.05375739, -0.06803122)
+LeftHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
+RightHandItemPosition = Vector3(0.01, 0.01, 0.01)
+RightHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
+ActionDefinitions = Array[Object]([SubResource("Resource_xgeb5"), SubResource("Resource_tj85d"), SubResource("Resource_ipk4j")])
+MaxStackSize = 4
+ItemSettings = 15

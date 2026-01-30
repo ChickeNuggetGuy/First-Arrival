@@ -24,6 +24,8 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export] public CollisionObject3D collisionShape;
 	[Export] public Node3D objectCenter;
 	[Export] public Enums.Stance CurrentStance = Enums.Stance.Normal;
+	[Export] public BoneAttachment3D LeftHandBoneAttachment;
+	[Export] public BoneAttachment3D RightHandBoneAttachment;
 	public GridObjectTeamHolder TeamHolder { get; protected set; }
 	[Export] public Array<GridObjectNode> gridObjectNodes = new Array<GridObjectNode>();
 

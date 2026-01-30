@@ -41,12 +41,12 @@ public partial class MouseHeldInventoryUI : InventoryGridUI
 
 	#region Event Handlers
 
-	private void InventoryGridOnItemRemoved(Item itemREmoved)
+	private void InventoryGridOnItemRemoved(InventoryGrid inventoryGrid, Item itemREmoved)
 	{
 		HideCall();
 	}
 
-	private void InventoryGridOnItemAdded(Item itemAdded)
+	private void InventoryGridOnItemAdded(InventoryGrid inventoryGrid, Item itemAdded)
 	{
 		ShowCall();
 	}

@@ -8,6 +8,7 @@
 
 [sub_resource type="Resource" id="Resource_u2q4j"]
 script = ExtResource("1_5cfim")
+damage = 22
 metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
 
 [sub_resource type="Resource" id="Resource_lvcgx"]
@@ -26,15 +27,12 @@ metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 [resource]
 resource_name = "knife_Item"
 script = ExtResource("1_sqtke")
-ItemID = 4
+ItemID = 1
 ItemName = "knife"
 ItemDescription = "sharp blade"
 ItemIcon = ExtResource("1_ogmoy")
 ItemShape = SubResource("Resource_did8u")
 weight = 2
 ActionDefinitions = Array[Object]([SubResource("Resource_u2q4j"), SubResource("Resource_lvcgx")])
-extraData = Dictionary[String, Variant]({
-"damage": 15
-})
 MaxStackSize = 5
 ItemSettings = 13

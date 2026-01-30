@@ -12,10 +12,9 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	public GridObjectNode parent { get; set; }
 	
 	[Export]
-	protected Godot.Collections.Array<Enums.InventoryType> inventoryTypes = new Godot.Collections.Array<Enums.InventoryType>();
+	protected Godot.Collections.Array<Enums.InventoryType> inventoryTypes = new();
 
-	private System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids =
-		new System.Collections.Generic.Dictionary<Enums.InventoryType, InventoryGrid>();
+	private Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new();
 
 	protected override void Setup()
 	{
@@ -33,19 +32,88 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 			InventoryGrid inventory = inventoryManager.GetInventoryGrid(inventoryType);
 			if (inventory == null)
 			{
-				GD.Print("Error: inventory not found");
+				GD.Print($"Error: inventory type {inventoryType}  not found");
 				continue;
 			}
 			inventoryGrids.Add(inventoryType, inventory);
-
-			if (inventoryType == Enums.InventoryType.LeftHand)
-			{
-				GD.Print($" test adding Item to {Enum.GetName(typeof(Enums.InventoryType), Enums.InventoryType.LeftHand)}: " +
-				         $"{inventory.TryAddItem(InventoryManager.Instance.GetRandomItem(),1)} ");
-			}
+			
+			
+			inventory.ItemAdded += InventoryOnItemAdded;
+			inventory.ItemRemoved += InventoryOnItemRemoved;
+			// if (inventoryType == Enums.InventoryType.LeftHand)
+			// {
+			// 	GD.Print($" test adding Item to {Enum.GetName(typeof(Enums.InventoryType), Enums.InventoryType.LeftHand)}: " +
+			// 	         $"{inventory.TryAddItem(InventoryManager.Instance.GetRandomItem(),1)} ");
+			// }
 		}	
 	}
-	
+
+	private void InventoryOnItemRemoved(InventoryGrid inventoryGrid, Item itemRemoved)
+	{
+		if (parentGridObject.TryGetGridObjectNode<GridObjectAnimation>(out var gridObjectAnimation))
+		{
+			if (inventoryGrid.InventorySettings.HasFlag(Enums.InventorySettings.IsEquipmentinventory))
+			{
+				//Item was equipped. Determine of the item was a weapon.
+				if (itemRemoved.ItemData.ActionDefinitions.Any(definition => definition is RangedAttackActionDefinition))
+				{
+					//Ranged Weapon
+					gridObjectAnimation.RemoveWeaponState(Enums.WeaponState.Ranged);
+				}
+				else if (itemRemoved.ItemData.ActionDefinitions.Any(definition => definition is MeleeAttackActionDefinition))
+				{
+					//Melee Weapon
+					gridObjectAnimation.RemoveWeaponState(Enums.WeaponState.Melee);
+				}
+				
+				//Hide Visual
+				if (inventoryGrid.InventoryType == Enums.InventoryType.LeftHand)
+				{
+					itemRemoved.HideVisual(parentGridObject.LeftHandBoneAttachment);
+				}
+				else if (inventoryGrid.InventoryType == Enums.InventoryType.RightHand)
+				{
+					itemRemoved.HideVisual(parentGridObject.RightHandBoneAttachment);
+				}
+			}
+		}
+	}
+
+	private void InventoryOnItemAdded(InventoryGrid inventoryGrid, Item itemAdded)
+	{
+		if (parentGridObject.TryGetGridObjectNode<GridObjectAnimation>(out var gridObjectAnimation))
+		{
+			if (inventoryGrid.InventorySettings.HasFlag(Enums.InventorySettings.IsEquipmentinventory))
+			{
+				//Item was equipped. Determine of the item was a weapon.
+				if (itemAdded.ItemData.ActionDefinitions.Any(definition => definition is RangedAttackActionDefinition))
+				{
+					//Ranged Weapon
+					gridObjectAnimation.AddWeaponState(Enums.WeaponState.Ranged);
+				}
+				else if (itemAdded.ItemData.ActionDefinitions.Any(definition => definition is MeleeAttackActionDefinition))
+				{
+					//Melee Weapon
+					gridObjectAnimation.AddWeaponState(Enums.WeaponState.Melee);
+				}
+
+				//Show Visual
+				if (inventoryGrid.InventoryType == Enums.InventoryType.LeftHand)
+				{
+					itemAdded.ShowVisual(parentGridObject.LeftHandBoneAttachment);
+				}
+				else if (inventoryGrid.InventoryType == Enums.InventoryType.RightHand)
+				{
+					itemAdded.ShowVisual(parentGridObject.RightHandBoneAttachment);
+				}
+				
+				
+			
+			}
+		}
+	}
+
+
 	public bool TryGetInventory(Enums.InventoryType inventoryType, out InventoryGrid inventory)
 	{
 		inventory = null;
@@ -80,6 +148,8 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 		return actions;
 	}
 
+	
+	
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
 		var data = new Godot.Collections.Dictionary<string, Variant>();
