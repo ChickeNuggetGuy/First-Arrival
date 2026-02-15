@@ -6,9 +6,11 @@ namespace FirstArrival.Scripts.Utility
 {
   public static class RotationHelperFunctions
   {
-    // Godot default: when rotation.y == 0, models face -Z. Use 180 so that
-    // DirectionAngles maps directions to the correct Node3D.Rotation.Y.
-    public const float ModelForwardYawOffsetDeg = 180f;
+    // Godot default: Models usually face -Z (Forward). 
+    // If your imported models face +Z, set this to 180.
+    // If they face -Z natively, set this to 0.
+    // Assuming standard Godot convention where Forward is -Z:
+    public const float ModelForwardYawOffsetDeg = 0f; 
 
     // Ordered clockwise starting at North (-Z)
     private static readonly Enums.Direction[] Ordered8 =
@@ -23,7 +25,6 @@ namespace FirstArrival.Scripts.Utility
         .Select((dir, index) => new { dir, index })
         .ToDictionary(x => x.dir, x => x.index);
 
-    // Yaw (in degrees) you can assign to Node3D.Rotation.Y to face each dir.
     public static readonly IReadOnlyDictionary<Enums.Direction, float>
       DirectionAngles = BuildDirectionAngles();
 
@@ -45,19 +46,26 @@ namespace FirstArrival.Scripts.Utility
 
     private static int Mod8(int x) => ((x % 8) + 8) % 8;
 
-    // Convert a world-space forward vector to "world yaw" degrees (0° = +Z).
+    // Convert a world-space direction vector to "world yaw" degrees.
+    // In Godot: atan2(x, z). 
+    // 0 deg = +Z (South)
+    // 90 deg = +X (East)
+    // 180/-180 deg = -Z (North)
+    // -90 deg = -X (West)
     private static float VectorToYawWorldDeg(Vector3 v)
     {
       return NormalizeDeg(Mathf.RadToDeg(Mathf.Atan2(v.X, v.Z)));
     }
 
-    // Node yaw (deg) to face the given direction with -Z model forward.
+    // Node yaw (deg) to face the given direction.
     private static float GetNodeYawDegForDirection(Enums.Direction dir)
     {
       Vector3 v = GetWorldVector3FromDirection(dir);
       if (v == Vector3.Zero) return 0f;
 
       float yawWorldDeg = VectorToYawWorldDeg(v);
+      // If the model faces -Z, and we want it to face South (+Z), 
+      // the rotation should be 180.
       return NormalizeDeg(yawWorldDeg + ModelForwardYawOffsetDeg);
     }
 
@@ -69,22 +77,44 @@ namespace FirstArrival.Scripts.Utility
     }
 
     // Given a Node3D rotation.y (radians), returns the nearest 8-way direction.
-    // Mapping note:
-    // - yawWorldDeg = rotationY(deg) - ModelForwardYawOffsetDeg
-    // - world yaw 0° = +Z (South), 180° = -Z (North)
-    // - Ordered8 index i = (4 - sector) mod 8, where sector = round(yaw/45)
     public static Enums.Direction GetDirectionFromRotation3D(float rotationY)
     {
-      float yawWorldDeg = NormalizeDeg(
-        Mathf.RadToDeg(rotationY) - ModelForwardYawOffsetDeg
-      );
-      int sector = Mathf.RoundToInt(yawWorldDeg / 45f);
-      int idx = Mod8(4 - sector);
-      return Ordered8[idx];
+      // Convert rotationY to degrees
+      float rotDeg = NormalizeDeg(Mathf.RadToDeg(rotationY) - ModelForwardYawOffsetDeg);
+      
+      // Map degrees to sectors. 
+      // 0 deg (+Z) = South. 
+      // 180 deg (-Z) = North.
+      // Logic:
+      // South (0) -> Sector 0
+      // SW (45) -> Sector 1
+      // West (90) -> Sector 2
+      // NW (135) -> Sector 3
+      // North (180) -> Sector 4
+      // NE (225) -> Sector 5
+      // East (270) -> Sector 6
+      // SE (315) -> Sector 7
+      
+      int sector = Mathf.RoundToInt(rotDeg / 45f);
+      sector = Mod8(sector);
+
+      return sector switch
+      {
+        0 => Enums.Direction.South,
+        1 => Enums.Direction.SouthWest,
+        2 => Enums.Direction.West,
+        3 => Enums.Direction.NorthWest,
+        4 => Enums.Direction.North,
+        5 => Enums.Direction.NorthEast,
+        6 => Enums.Direction.East,
+        7 => Enums.Direction.SouthEast,
+        _ => Enums.Direction.South
+      };
     }
 
     // Calculates an 8-way direction from one grid cell to another based
-    // on their grid coordinates. Grid's -Z is North (forward).
+    // on their grid coordinates.
+    // Assumes grid X+ is East, Z+ is South.
     public static Enums.Direction GetDirectionBetweenCells(
       GridCell fromCell,
       GridCell toCell
@@ -93,25 +123,28 @@ namespace FirstArrival.Scripts.Utility
       if (
         fromCell == null
         || toCell == null
-        || fromCell.gridCoordinates == toCell.gridCoordinates
+        || fromCell.GridCoordinates == toCell.GridCoordinates
       )
         return Enums.Direction.None;
 
-      var d = toCell.gridCoordinates - fromCell.gridCoordinates;
+      var d = toCell.GridCoordinates - fromCell.GridCoordinates;
       var key = (System.Math.Sign(d.X), System.Math.Sign(d.Z));
 
-      // Note: Grid Z increases towards world -Z (North).
-      // A move North (e.g. z=0 to z=1) means d.Z is positive.
+      // Grid Mapping (Normal System):
+      // Z decreases going North (-1)
+      // Z increases going South (+1)
+      // X increases going East (+1)
+      // X decreases going West (-1)
       return key switch
       {
-        (0, 1) => Enums.Direction.North,
-        (1, 1) => Enums.Direction.NorthEast,
+        (0, -1) => Enums.Direction.North,
+        (1, -1) => Enums.Direction.NorthEast,
         (1, 0) => Enums.Direction.East,
-        (1, -1) => Enums.Direction.SouthEast,
-        (0, -1) => Enums.Direction.South,
-        (-1, -1) => Enums.Direction.SouthWest,
+        (1, 1) => Enums.Direction.SouthEast,
+        (0, 1) => Enums.Direction.South,
+        (-1, 1) => Enums.Direction.SouthWest,
         (-1, 0) => Enums.Direction.West,
-        (-1, 1) => Enums.Direction.NorthWest,
+        (-1, -1) => Enums.Direction.NorthWest,
         _ => Enums.Direction.None
       };
     }
@@ -130,20 +163,33 @@ namespace FirstArrival.Scripts.Utility
     }
 
     // Converts a Vector3 direction to the nearest 8-way compass direction.
-    // Uses the same world-yaw basis (0° = +Z) then maps to -Z=North index.
     public static Enums.Direction GetDirectionFromVector3(Vector3 direction)
     {
       if (direction.LengthSquared() < 0.001f)
         return Enums.Direction.None;
 
       float yawWorldDeg = VectorToYawWorldDeg(direction.Normalized());
+      
       int sector = Mathf.RoundToInt(yawWorldDeg / 45f);
-      int idx = Mod8(4 - sector);
-      return Ordered8[idx];
+      sector = Mod8(sector);
+
+      // Same switch mapping as GetDirectionFromRotation3D (yaw 0 = South)
+      return sector switch
+      {
+        0 => Enums.Direction.South,
+        1 => Enums.Direction.SouthWest,
+        2 => Enums.Direction.West,
+        3 => Enums.Direction.NorthWest,
+        4 => Enums.Direction.North,
+        5 => Enums.Direction.NorthEast,
+        6 => Enums.Direction.East,
+        7 => Enums.Direction.SouthEast,
+        _ => Enums.Direction.South
+      };
     }
 
     // Direction to normalized world-space Vector3.
-    // North is world -Z (Godot forward), East is world +X.
+    // North is -Z, East is +X.
     public static Vector3 GetWorldVector3FromDirection(
       Enums.Direction direction
     )

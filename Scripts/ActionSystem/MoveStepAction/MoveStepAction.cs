@@ -10,6 +10,9 @@ public class MoveStepAction : Action, ICompositeAction
   public Action ParentAction { get; set; }
   public List<Action> SubActions { get; set; }
   public Enums.Direction targetDirection { get; set; }
+  
+  public Vector3 TargetWorldPos => targetGridCell.WorldPosition; // or WorldCenter
+  public GridCell TargetCell => targetGridCell;
 
 
   public Vector2 blendSpaceValue;
@@ -31,10 +34,9 @@ public class MoveStepAction : Action, ICompositeAction
 
     // Use actual transform-facing, not cached direction state
     Enums.Direction currentDirection =
-      RotationHelperFunctions.GetDirectionFromRotation3D(
-        parentGridObject.Rotation.Y
-      );
-
+	    RotationHelperFunctions.GetDirectionFromRotation3D(
+		    parentGridObject.visualMesh.Rotation.Y
+	    );
 	targetDirection =
       RotationHelperFunctions.GetDirectionBetweenCells(
         startingGridCell,
@@ -87,6 +89,12 @@ public class MoveStepAction : Action, ICompositeAction
         );
 
       AddSubAction(rotateAction);
+      
+      foreach (var kv in rotateCosts)
+      {
+	      if (costs.ContainsKey(kv.Key))
+		      costs[kv.Key] -= kv.Value;
+      }
     }
     
     //Setup animation
@@ -114,45 +122,42 @@ public class MoveStepAction : Action, ICompositeAction
 
   protected override async Task Execute()
   {
-    float distance = startingGridCell.worldCenter.DistanceTo(
-      targetGridCell.worldCenter
-    );
-	
-    if (distance < 0.0001f)
-    {
-      parentGridObject.Position = targetGridCell.worldCenter;
-      await Task.CompletedTask;
-      return;
-    }
-	
-   
-    parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
-    parentGridObject.animationNode.TrySetParameter("moveBlendSpace", blendSpaceValue);
-    
-    Tween tween = parentGridObject.CreateTween();
-    tween.SetTrans(Tween.TransitionType.Linear);
-    tween.SetEase(Tween.EaseType.OutIn);
-    tween.TweenProperty(
-      parentGridObject,
-      "position",
-      targetGridCell.worldCenter,
-      0.5f
-    );
-    await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+	  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
+	  parentGridObject.animationNode.TrySetParameter("moveBlendSpace", blendSpaceValue);
+
+	  var tween = parentGridObject.CreateTween();
+	  var moveTw = tween.TweenProperty(
+		  parentGridObject,
+		  "position",
+		  targetGridCell.WorldPosition,
+		  0.5f // StepMoveDurationSec
+	  );
+	  moveTw.SetTrans(Tween.TransitionType.Linear);
+
+	  await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
   }
 
   protected override Task ActionComplete()
   {
-    parentGridObject.GridPositionData.SetGridCell(targetGridCell);
-    if (NextAction == null || NextAction is not MoveStepAction)
-    {
-	    parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
-    }
-    else if (NextAction is MoveStepAction moveAction)
-    {
-	    parentGridObject.animationNode.TrySetParameter("moveBlendSpace", moveAction.blendSpaceValue);
-    }
-    parentGridObject.animationNode.TrySetParameter("moveBlendSpace", Vector2.Zero);
-    return Task.CompletedTask;
+	  parentGridObject.GridPositionData.SetGridCell(targetGridCell);
+
+	  if (NextAction is MoveStepAction nextStep)
+	  {
+		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
+		  parentGridObject.animationNode.TrySetParameter(
+			  "moveBlendSpace",
+			  nextStep.blendSpaceValue
+		  );
+	  }
+	  else
+	  {
+		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
+		  parentGridObject.animationNode.TrySetParameter(
+			  "moveBlendSpace",
+			  Vector2.Zero
+		  );
+	  }
+
+	  return Task.CompletedTask;
   }
 }

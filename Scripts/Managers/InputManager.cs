@@ -4,25 +4,24 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 
 namespace FirstArrival.Scripts.Managers;
+
 [GlobalClass]
 public partial class InputManager : Manager<InputManager>
 {
 	private GridSystem gridSystem;
-	public GridCell currentGridCell
-	{
-		get;
-		protected set;
-	}
-	public HexCellData? CurrentCell {get; private set;}
+	public GridCell currentGridCell { get; protected set; }
+	public HexCellData? CurrentCell { get; private set; }
 	[Export] public Camera3D camera3D;
 	[Export] private Node3D mouseMarker;
-	
+
 	[Export] public CollisionObject3D globeMesh;
-	
-	
+
+
 	public bool MouseOverUI
 	{
-		get => IsMouseOverUI(); private set{}}
+		get => IsMouseOverUI();
+		private set { }
+	}
 
 	public override string GetManagerName() => "InputManager";
 
@@ -36,25 +35,33 @@ public partial class InputManager : Manager<InputManager>
 	{
 		return Task.CompletedTask;
 	}
+
 	private bool IsMouseOverUI() => GetViewport()?.GuiGetHoveredControl() != null;
-	
-	
+
+
 	public override void _Process(double delta)
 	{
-		if(UIManager.Instance.BlockingInput) return;
+		if (UIManager.Instance.BlockingInput) return;
 		base._Process(delta);
-		if(!ExecuteComplete) return;
+		if (!ExecuteComplete) return;
 		WorldMouseMarker();
 		if (DebugMode && currentGridCell != null)
 		{
-			GD.Print($"Mouse position: {currentGridCell.gridCoordinates} {gridSystem.HasConnections(currentGridCell.gridCoordinates)}");
+			GD.Print(
+				$"Mouse position: {currentGridCell.GridCoordinates} {gridSystem.HasConnections(currentGridCell.GridCoordinates)}");
 		}
 	}
 
+	public override void _PhysicsProcess(double delta)
+	{
+		return;
+	}
+
+	
 	private void WorldMouseMarker()
 	{
 		if (MouseOverUI) return;
-		
+
 		if (GameManager.Instance.currentScene == GameManager.GameScene.BattleScene)
 		{
 			Node node = GetObjectAtMousePosition(out Vector3 hitPosition) as Node;
@@ -90,30 +97,39 @@ public partial class InputManager : Manager<InputManager>
 				{
 					currentGridCell = cell;
 					if (mouseMarker != null)
-						mouseMarker.GlobalPosition = cell.gridCoordinates * new Vector3I(1, 1, -1);
+						mouseMarker.GlobalPosition = cell.GridCoordinates * new Vector3I(1, 1, 1);
 					return;
 				}
 				else
 				{
-					GD.PrintErr($"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell.");
+					GD.PrintErr(
+						$"GridObject '{gridObject?.Name}' has null GridPositionData or GridCell."
+					);
 				}
 			}
 
 			// Fall back to position-based lookup
 			if (gridSystem != null
-			    && gridSystem.TryGetGridCellFromWorldPosition(hitPosition, out GridCell gridCell, true)
+			    && gridSystem.TryGetGridCellFromWorldPosition(
+				    hitPosition,
+				    out GridCell gridCell,
+				    true
+			    )
 			    && gridCell != null)
 			{
 				if (gridCell.state.HasFlag(Enums.GridCellState.Air))
 				{
-					gridCell = gridSystem.GetGridCell(gridCell.gridCoordinates - new Vector3I(0, 1, 0));
+					gridCell = gridSystem.GetGridCell(
+						gridCell.GridCoordinates - new Vector3I(0, 1, 0)
+					);
 				}
 
 				if (gridCell != null)
 				{
 					currentGridCell = gridCell;
 					if (mouseMarker != null)
-						mouseMarker.GlobalPosition = gridCell.gridCoordinates * new Vector3I(1, 1, -1);
+						mouseMarker.GlobalPosition =
+							gridCell.GridCoordinates * new Vector3I(1, 1, 1);
 				}
 			}
 			else
@@ -129,28 +145,35 @@ public partial class InputManager : Manager<InputManager>
 
 			if (mousePos != null)
 			{
-
-				HexCellData? cell = GlobeHexGridManager.Instance.GetCellFromPosition(mousePos.Value);
+				HexCellData? cell =
+					GlobeHexGridManager.Instance.GetCellFromPosition(mousePos.Value);
 
 				if (cell != null)
 				{
 					CurrentCell = cell;
+					GlobeHexGridManager.Instance.SetDebugHighlightedCountryFromIndex(
+						cell.Value.Index
+					);
+
+					if (mouseMarker != null)
+						mouseMarker.GlobalPosition = cell.Value.Center;
+
+					return;
 				}
 			}
-			else
-			{
-			}
 
-			if (CurrentCell != null)
-			{
-				mouseMarker.GlobalPosition = CurrentCell.Value.Center;
-			}
+			// No hit / no cell: clear hover + highlight
+			CurrentCell = null;
+			GlobeHexGridManager.Instance.SetDebugHighlightedCountryFromIndex(-1);
+
+			if (mouseMarker != null)
+				mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
 		}
 	}
-	
+
 	public GodotObject GetObjectAtMousePosition(out Vector3 worldPosition)
 	{
-		worldPosition =new Vector3(-1,-1,-1);
+		worldPosition = new Vector3(-1, -1, -1);
 		if (IsMouseOverUI())
 		{
 			//Object will be a UI Object
@@ -194,19 +217,19 @@ public partial class InputManager : Manager<InputManager>
 					gridObject = go;
 					break;
 				}
+
 				current = current.GetParent();
 			}
-			
+
 			if (gridObject != null)
 			{
 				currentGridCell = gridObject.GridPositionData?.AnchorCell;
 				if (mouseMarker != null && currentGridCell != null)
-					mouseMarker.GlobalPosition = currentGridCell.worldCenter;
+					mouseMarker.GlobalPosition = currentGridCell.WorldCenter;
 				return gridObject;
 			}
-			
-			
-			
+
+
 			return node;
 		}
 	}
@@ -236,14 +259,15 @@ public partial class InputManager : Manager<InputManager>
 		{
 			return result["position"].AsVector3();
 		}
+
 		return null;
 	}
-	
-	
+
+
 	public Vector2 GetLatLonFromPosition(Vector3 position)
 	{
 		float radius = position.Length();
-    
+
 		// Normalize coordinates for the trig functions
 		if (radius == 0) return Vector2.Zero;
 
@@ -256,27 +280,29 @@ public partial class InputManager : Manager<InputManager>
 		float longitude = Mathf.Atan2(position.X, position.Z);
 
 		// Return as Radians (or convert to degrees if preferred)
-		
+
 		return new Vector2(Mathf.RadToDeg(latitude), Mathf.RadToDeg(longitude));
 	}
 
 	#endregion
+
 	#region manager Data
-	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
+
+	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		base.Load(data);
-		if(!HasLoadedData) return;
+		if (!HasLoadedData) return;
 	}
 
-	public override Godot.Collections.Dictionary<string,Variant> Save()
+	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
 		return null;
 	}
+
 	#endregion
-	
+
 	public override void Deinitialize()
 	{
 		return;
 	}
-	
 }

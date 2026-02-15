@@ -14,8 +14,10 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	[Export]
 	protected Godot.Collections.Array<Enums.InventoryType> inventoryTypes = new();
 
-	private Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new();
-
+	public Dictionary<Enums.InventoryType, InventoryGrid> InventoryGrids { get; protected set; } = new();
+	
+	[Export] 
+	public Godot.Collections.Array<StartingInventoryConfig> startingItemsConfig = new();
 	protected override void Setup()
 	{
 		GD.Print("Inventory Setup");
@@ -26,26 +28,39 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 			return;
 		}
 
-		// Enums.InventoryType randomType = inventoryTypes.PickRandom();
 		foreach (Enums.InventoryType inventoryType in inventoryTypes)
 		{
 			InventoryGrid inventory = inventoryManager.GetInventoryGrid(inventoryType);
 			if (inventory == null)
 			{
-				GD.Print($"Error: inventory type {inventoryType}  not found");
+				GD.Print($"Error: inventory type {inventoryType} not found");
 				continue;
 			}
-			inventoryGrids.Add(inventoryType, inventory);
-			
-			
+        
+			InventoryGrids.Add(inventoryType, inventory);
 			inventory.ItemAdded += InventoryOnItemAdded;
 			inventory.ItemRemoved += InventoryOnItemRemoved;
-			// if (inventoryType == Enums.InventoryType.LeftHand)
-			// {
-			// 	GD.Print($" test adding Item to {Enum.GetName(typeof(Enums.InventoryType), Enums.InventoryType.LeftHand)}: " +
-			// 	         $"{inventory.TryAddItem(InventoryManager.Instance.GetRandomItem(),1)} ");
-			// }
-		}	
+		}
+
+		foreach (StartingInventoryConfig config in startingItemsConfig)
+		{
+			// Check if we actually have an inventory of this type initialized
+			if (InventoryGrids.TryGetValue(config.InventoryType, out InventoryGrid inventory))
+			{
+				foreach (ItemData itemData in config.Items)
+				{
+					if (itemData == null) continue;
+                
+					Item newItem = ItemData.CreateItem(itemData);
+					bool success = inventory.TryAddItem(newItem, 1);
+                
+					if (!success)
+					{
+						GD.Print($"Warning: Could not add starting item {itemData.ItemName} to {config.InventoryType} (Inventory full?)");
+					}
+				}
+			}
+		}
 	}
 
 	private void InventoryOnItemRemoved(InventoryGrid inventoryGrid, Item itemRemoved)
@@ -117,10 +132,10 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	public bool TryGetInventory(Enums.InventoryType inventoryType, out InventoryGrid inventory)
 	{
 		inventory = null;
-		if (inventoryGrids == null) return false;
-		if (!inventoryGrids.ContainsKey(inventoryType)) return false;
+		if (InventoryGrids == null) return false;
+		if (!InventoryGrids.ContainsKey(inventoryType)) return false;
 		
-		inventory = inventoryGrids[inventoryType];
+		inventory = InventoryGrids[inventoryType];
 		return true;
 		
 	}
@@ -128,7 +143,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	public Dictionary<string, Callable> GetContextActions()
 	{
 		Dictionary<string, Callable> actions = new Dictionary<string, Callable>();
-		foreach (var inventoryPair in inventoryGrids)
+		foreach (var inventoryPair in InventoryGrids)
 		{
 			if (inventoryPair.Value == null) continue;
 			if(!inventoryPair.Value.InventorySettings.HasFlag(Enums.InventorySettings.IsEquipmentinventory)) continue;
@@ -164,7 +179,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 		
 		// Save each inventory's contents
 		var inventoriesData = new Godot.Collections.Dictionary<string, Variant>();
-		foreach (var kvp in inventoryGrids)
+		foreach (var kvp in InventoryGrids)
 		{
 			var inventoryType = kvp.Key;
 			var inventoryGrid = kvp.Value;
@@ -202,7 +217,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		// Clear existing inventories
-		inventoryGrids.Clear();
+		InventoryGrids.Clear();
 		inventoryTypes.Clear();
 		
 		// Load inventory types
@@ -225,7 +240,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 				InventoryGrid inventory = inventoryManager.GetInventoryGrid(inventoryType);
 				if (inventory != null)
 				{
-					inventoryGrids.Add(inventoryType, inventory);
+					InventoryGrids.Add(inventoryType, inventory);
 				}
 			}
 		}
@@ -240,7 +255,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 				var inventoryType = (Enums.InventoryType)Enum.Parse(typeof(Enums.InventoryType), inventoryEntry.Key);
 				var inventoryData = (Godot.Collections.Dictionary<string, Variant>)inventoryEntry.Value;
 				
-				if (inventoryGrids.TryGetValue(inventoryType, out var inventoryGrid) && 
+				if (InventoryGrids.TryGetValue(inventoryType, out var inventoryGrid) && 
 				    inventoryData.ContainsKey("items"))
 				{
 					var itemsData = (Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>)inventoryData["items"];

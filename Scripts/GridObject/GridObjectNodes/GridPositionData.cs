@@ -1,354 +1,371 @@
 using System;
+using Godot;
 using System.Collections.Generic;
-using System.Linq;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
-using Godot;
-using Godot.Collections;
 
 [GlobalClass, Tool]
 public partial class GridPositionData : GridObjectNode
 {
-	[ExportGroup("Settings")]
-	[Export] public GridShape gridShape;
-	[Export] bool debugMode = false;
-	
-	[Export] public Vector3 CellSize { get; set; } = new Vector3(1, 1, 1);
-	[Export] public Vector3 GridWorldOrigin { get; set; } = Vector3.Zero;
-	
-	[ExportGroup("State")]
-	[Export] public Enums.Direction Direction { get; private set; } = Enums.Direction.North;
+	[ExportGroup("Shape Configuration")]
+	[Export]
+	public GridShape Shape { get; set; }
 
-	// The primary cell (pivot) this object is anchored to
+	[Export] public bool AutoCalculateShape { get; set; } = false;
+	[Export] public bool RecursiveShapeDetection { get; set; } = true;
+
+	[ExportGroup("Shape Configuration")]
+	[Export]
+	public bool GenerateShapeNow
+	{
+		get => false;
+		set
+		{
+			if (!Engine.IsEditorHint() || !value) return;
+			CallDeferred(nameof(EditorGenerateShape));
+		}
+	}
+
+	private void EditorGenerateShape()
+	{
+		_shapeCalculated = false;
+		CalculateShapeFromColliders();
+		NotifyPropertyListChanged();
+	}
+
+	[ExportGroup("Debug")] [Export] private bool _showDebugInEditor = true;
+	[Export] private Color _pivotColor = new Color(0, 1, 0, 0.6f);
+	[Export] private Color _occupiedColor = new Color(1, 0.5f, 0, 0.4f);
+
+	[ExportGroup("Runtime State (Read-Only)")]
+	[Export]
+	public Enums.Direction Direction { get; private set; } = Enums.Direction.North;
+
 	public GridCell AnchorCell { get; private set; }
-	
-	// A list of all cells currently occupied by this object
-	public List<GridCell> OccupiedCells { get; private set; } = new List<GridCell>();
+	public List<GridCell> OccupiedCells { get; private set; } = new();
 
-	[Signal] public delegate void GridPositionDataUpdatedEventHandler(GridPositionData gridPositionData);
-	[Signal] public delegate void GridCellPositionUpdatedEventHandler(Vector3I newGridCoordinates);
+	[Signal]
+	public delegate void PositionChangedEventHandler(GridPositionData data);
+
+	[Signal]
+	public delegate void DirectionChangedEventHandler(Enums.Direction newDirection);
+
+	private GridConfiguration _config;
+	private bool _shapeCalculated = false;
 
 	public override void _EnterTree()
 	{
 		base._EnterTree();
-		if (gridShape == null) gridShape = new GridShape();
+		Shape ??= new GridShape();
+
+		if (Engine.IsEditorHint() && AutoCalculateShape)
+			CallDeferred(nameof(EditorGenerateShape));
 	}
-	
+
+	public override void _Process(double delta)
+	{
+		base._Process(delta);
+
+		if (!Engine.IsEditorHint() || !_showDebugInEditor || Shape == null)
+			return;
+
+		_config = GridConfiguration.GetActive();
+		DrawEditorPreview();
+	}
+
 	protected override void Setup()
 	{
+		_config = GridConfiguration.GetActive();
+
 		if (parentGridObject == null)
-		{
-			parentGridObject = this.GetParent() as GridObject;
-		}
-		
-		// Attempt to sync settings from GridSystem if available
-		if (GridSystem.Instance != null)
-		{
-			var sysCellSize = GridSystem.Instance.CellSize;
-			CellSize = new Vector3(sysCellSize.X, sysCellSize.Y, sysCellSize.X);
-			GridWorldOrigin = GridSystem.Instance.GridWorldOrigin;
-		}
+			parentGridObject = GetParent() as GridObject;
 
-		if (!GridSystem.Instance.TryGetGridCellFromWorldPosition(this.Position, out GridCell gridCell, true))
-		{
+		Direction = GetDirectionFromRotation(GlobalRotation.Y);
+
+		if (Engine.IsEditorHint())
 			return;
-		}
-		
-		SetGridCell(gridCell);
+
+		if (AutoCalculateShape)
+			CalculateShapeFromColliders();
+
+		if (GridSystem.Instance == null || _config == null)
+			return;
+
+		var anchorCoords = _config.WorldToGrid(GlobalPosition);
+		var cell = GridSystem.Instance.GetGridCell(anchorCoords);
+		if (cell != null)
+			SetGridCell(cell);
 	}
 
-	#region Logic & State Management
-
-	/// <summary>
-	/// Places the object on the grid at the specified anchor cell.
-	/// Calculates all occupied cells based on Shape + Direction.
-	/// </summary>
-	public void SetGridCell(GridCell newAnchorCell)
+	public void CalculateShapeFromColliders()
 	{
-		//Clear previous occupation from the grid
-		ClearGridOccupation();
+		// Ensure config is fresh at runtime
+		if (!Engine.IsEditorHint() && GridSystem.Instance != null)
+			_config = GridConfiguration.GetActive();
+		else
+			_config ??= GridConfiguration.GetActive();
 
-		AnchorCell = newAnchorCell;
+		Node3D targetNode = parentGridObject ?? GetParent() as Node3D;
+		if (targetNode == null || _config == null)
+			return;
 
-		// If we aren't assigning a cell (just clearing), or system is missing, stop here.
-		if (AnchorCell == null) return;
-		if (GridSystem.Instance == null) return;
+		Shape = GridShape.CreateFromCollisionBounds(
+			targetNode,
+			_config,
+			GlobalPosition,
+			RecursiveShapeDetection
+		);
 
-		// 2. Calculate which coordinates are valid based on Anchor + Direction + Shape
-		List<Vector3I> targetCoords = CalculateOccupiedCoordinates(AnchorCell.gridCoordinates, Direction);
-		
-		bool isWalkThrough = parentGridObject.gridObjectSettings.HasFlag(Enums.GridObjectSettings.CanWalkThrough);
+		_shapeCalculated = true;
 
-		// 3. Occupy the new cells
-		foreach (Vector3I coord in targetCoords)
-		{
-			// Ask the system for the actual cell instance
-			GridCell cell = GridSystem.Instance.GetGridCell(coord);
-			
-			// If the shape extends off the map, ignore those cells
-			if (cell == null) continue;
-
-			OccupiedCells.Add(cell);
-
-			// Logic specific to the root cell vs other cells
-			bool isRoot = (coord == AnchorCell.gridCoordinates);
-
-			// Determine the State Mask
-			var tempNewState = cell.state;
-			
-			if (isWalkThrough)
-				tempNewState &= ~Enums.GridCellState.Obstructed;
-			else
-				tempNewState &= ~Enums.GridCellState.Empty;
-
-			if (!isRoot)
-				tempNewState &= ~Enums.GridCellState.Empty;
-
-			// Add the object to the cell
-			cell.AddGridObject(parentGridObject, tempNewState, rebuildConnections: !isWalkThrough);
-		}
-
-		parentGridObject.GlobalPosition = AnchorCell.worldCenter;
-		EmitSignal(SignalName.GridPositionDataUpdated, this);
-		EmitSignal(SignalName.GridCellPositionUpdated, AnchorCell.gridCoordinates);
-	}
-
-	/// <summary>
-	/// Updates the direction and refreshes the grid occupation if the object is already placed.
-	/// </summary>
-	public void SetDirection(Enums.Direction direction)
-	{
-		if (Direction == direction) return;
-		
-		Direction = direction;
-		
-		// If we are currently on the grid, we need to lift up and place down again
-		// because rotating changes which cells we occupy.
 		if (AnchorCell != null)
 		{
 			SetGridCell(AnchorCell);
 		}
 	}
 
-	/// <summary>
-	/// Removes this object from all currently occupied cells.
-	/// </summary>
-	private void ClearGridOccupation()
+	public void RecalculateShape()
 	{
-		if (OccupiedCells.Count == 0) return;
+		_shapeCalculated = false;
+		CalculateShapeFromColliders();
 
+		if (AnchorCell != null)
+			SetGridCell(AnchorCell);
+	}
+
+	#region Grid Placement
+
+	public void SetGridCell(GridCell newAnchor)
+	{
+		ClearOccupation();
+
+		AnchorCell = newAnchor;
+		if (AnchorCell == null) return;
+
+		_config ??= GridConfiguration.GetActive();
+
+		var worldCoords = Shape.GetWorldCoordinates(AnchorCell.GridCoordinates);
+		bool isWalkThrough = parentGridObject?.gridObjectSettings
+			.HasFlag(Enums.GridObjectSettings.CanWalkThrough) ?? false;
+
+		for (int i = 0; i < worldCoords.Count; i++)
+		{
+			var coord = worldCoords[i];
+			var cell = GridSystem.Instance?.GetGridCell(coord);
+			if (cell == null) continue;
+
+			OccupiedCells.Add(cell);
+
+			bool isAnchor = coord == AnchorCell.GridCoordinates;
+			var newState = cell.state;
+
+			if (!isWalkThrough)
+				newState |= Enums.GridCellState.Obstructed;
+
+			if (!isAnchor)
+				newState &= ~Enums.GridCellState.Empty;
+
+			cell.AddGridObject(parentGridObject, newState, rebuildConnections: !isWalkThrough);
+		}
+
+
+		EmitSignal(SignalName.PositionChanged, this);
+	}
+
+	public void SetDirection(Enums.Direction newDirection)
+	{
+		if (Direction == newDirection) return;
+
+		Direction = newDirection;
+
+		if (AutoCalculateShape)
+			RecalculateShape();
+		else if (AnchorCell != null)
+			SetGridCell(AnchorCell);
+
+		EmitSignal(SignalName.DirectionChanged, (int)newDirection);
+	}
+
+	private void ClearOccupation()
+	{
 		foreach (var cell in OccupiedCells)
 		{
-			if (cell == null) continue;
-			
-			// Logic to restore cell state
-			cell.RestoreOriginalState();
-			cell.RemoveGridObject(parentGridObject, cell.originalState, rebuildConnections: false);
+			cell?.RestoreOriginalState();
+			cell?.RemoveGridObject(parentGridObject, cell.originalState, rebuildConnections: false);
 		}
-		
+
 		OccupiedCells.Clear();
 	}
 
 	#endregion
 
-	#region Math & Coordinate Calculation
+	
+	#region Direction Utilities
 
-	/// <summary>
-	/// Returns the absolute Grid Coordinates this object occupies based on an anchor, rotation, and shape.
-	/// Used by both Logic (SetGridCell) and Visuals (_Process).
-	/// </summary>
-	public List<Vector3I> CalculateOccupiedCoordinates(Vector3I anchor, Enums.Direction dir)
+	public Enums.Direction GetDirectionFromRotation(float yRadians)
 	{
-		List<Vector3I> results = new List<Vector3I>();
-		if (gridShape == null) return results;
+		float angle = Mathf.PosMod(yRadians, Mathf.Tau);
+		float deg = Mathf.RadToDeg(angle);
 
-		// Iterate over the "Local" shape definition
-		int sizeX = gridShape.GridSizeX;
-		int sizeY = gridShape.GridSizeY;
-		int sizeZ = gridShape.GridSizeZ;
-
-		for (int y = 0; y < sizeY; y++)
-		{
-			for (int x = 0; x < sizeX; x++)
-			{
-				for (int z = 0; z < sizeZ; z++)
-				{
-					// If the shape doesn't exist at this local index, skip
-					if (!gridShape.GetGridShapeCell(x, y, z)) continue;
-
-					//Calculate offset relative to the Root Cell
-					int relX = x - gridShape.RootCellCoordinates.X;
-					int relZ = z - gridShape.RootCellCoordinates.Y; // Y in Vector2I is Z depth
-					
-					//Rotate that offset
-					Vector2I rotatedOffset = RotateOffset(relX, relZ, dir);
-
-					//Add to anchor
-					Vector3I finalCoord = new Vector3I(
-						anchor.X + rotatedOffset.X,
-						anchor.Y + y, // Vertical height usually doesn't rotate 
-						anchor.Z + rotatedOffset.Y  // 2D Y becomes 3D Z
-					);
-					
-					results.Add(finalCoord);
-				}
-			}
-		}
-		return results;
+		if (deg < 45 || deg >= 315) return Enums.Direction.South;
+		if (deg < 135) return Enums.Direction.West;
+		if (deg < 225) return Enums.Direction.North;
+		return Enums.Direction.East;
 	}
 
-	/// <summary>
-	/// Rotates a 2D vector (X, Z) by 90-degree increments.
-	/// </summary>
-	private Vector2I RotateOffset(int x, int z, Enums.Direction dir)
+	public static float DirectionToRadians(Enums.Direction dir)
 	{
-		// Standard 2D Rotation matrix for 90 degree steps
 		return dir switch
 		{
-			Enums.Direction.North => new Vector2I(x, z),
-			Enums.Direction.East  => new Vector2I(-z, x),
-			Enums.Direction.South => new Vector2I(-x, -z),
-			Enums.Direction.West  => new Vector2I(z, -x),
-			_ => new Vector2I(x, z)
+			Enums.Direction.South => 0f,
+			Enums.Direction.West => Mathf.Pi * 0.5f,
+			Enums.Direction.North => Mathf.Pi,
+			Enums.Direction.East => Mathf.Pi * 1.5f,
+			_ => 0f
 		};
 	}
 
-	public Enums.Direction GetNearestDirectionFromRotation(float rotationYRadians)
-	{
-		float angle = Mathf.PosMod(rotationYRadians, Mathf.Tau);
-		// 0 is North (-Z) usually.
-		// Ranges: 
-		// North: 315 - 45 (or roughly 5.5rad - 0.78rad)
-		// East:  45 - 135
-		// South: 135 - 225
-		// West:  225 - 315
-		
-		if (angle < Mathf.Pi * 0.25f || angle >= Mathf.Pi * 1.75f) return Enums.Direction.North;
-		if (angle < Mathf.Pi * 0.75f) return Enums.Direction.East;
-		if (angle < Mathf.Pi * 1.25f) return Enums.Direction.South;
-		return Enums.Direction.West;
-	}
-
 	#endregion
 
-	#region Editor Debugging
+	#region Editor Preview
 
-	public override void _Process(double delta)
+	private void DrawEditorPreview()
 	{
-		base._Process(delta);
-		if (!Engine.IsEditorHint() || !debugMode || gridShape == null) return;
+		if (AutoCalculateShape && !_shapeCalculated)
+			CalculateShapeFromColliders();
 
-		// 1. Update Direction automatically in Editor
-		Enums.Direction currentDir = GetNearestDirectionFromRotation(GlobalRotation.Y);
-		if (currentDir != Direction)
-		{
-			Direction = currentDir; 
-			// Note: We don't call SetGridCell here to avoid messing with actual game logic in Editor
-		}
+		var anchorCoords = _config.WorldToGrid(GlobalPosition);
 
-		// 2. Calculate where the Anchor IS based on world position
-		Vector3 worldPos = GlobalPosition;
-		Vector3 localPos = worldPos - GridWorldOrigin;
-		
-		// Align this math with how GridSystem determines cell coordinates
-		Vector3I calculatedAnchor = new Vector3I(
-			Mathf.FloorToInt(localPos.X / CellSize.X), 
-			Mathf.FloorToInt(localPos.Y / CellSize.Y), 
-			Mathf.FloorToInt(-localPos.Z / CellSize.Z) // Assuming Z is inverted in your grid system
+		Vector3 boundsSize = new Vector3(
+			_config.GridSize.X * _config.CellSize.X,
+			_config.GridSize.Y * _config.CellSize.Y,
+			_config.GridSize.Z * _config.CellSize.Z
 		);
+		Vector3 boundsCenter = _config.GridWorldOrigin + (boundsSize / 2.0f);
+		DebugDraw3D.DrawBox(boundsCenter, Quaternion.Identity, boundsSize, new Color(1, 1, 1, 0.1f), true);
 
-		// 3. Get Cells using the EXACT SAME function as logic
-		List<Vector3I> coordsToDraw = CalculateOccupiedCoordinates(calculatedAnchor, Direction);
+		var worldCoords = Shape.GetWorldCoordinates(anchorCoords);
 
-		// 4. Draw
-		foreach (var coord in coordsToDraw)
+		foreach (var coord in worldCoords)
 		{
-			// Convert Grid Coord back to World Center for drawing
-			// World = Origin + (Grid + 0.5) * Size
-			Vector3 drawPos = GridWorldOrigin + new Vector3(
-				(coord.X + 0.5f) * CellSize.X, 
-				(coord.Y + 0.5f) * CellSize.Y, 
-				-(coord.Z + 0.5f) * CellSize.Z 
-			); 
-			
-			bool isRoot = (coord == calculatedAnchor);
-			Color color = isRoot ? new Color(0, 1, 0, 0.5f) : new Color(1, 0, 0, 0.5f);
-			
-			// If we are strictly checking grid bounds (visualize valid vs invalid)
-			bool isValid = true; 
-			if (GridSystem.Instance != null && GridSystem.Instance.GetGridCell(coord) == null)
-			{
-				isValid = false;
-				color = new Color(0.2f, 0.2f, 0.2f, 0.5f); // Gray for out of bounds
-			}
-			
-			if (isValid)
-			{
-				DebugDraw3D.DrawBox(drawPos, Quaternion.Identity, CellSize * 0.9f, color, true);
-			}
+			Vector3 worldPos = _config.GridToWorld(coord, cellCenter: true);
+			bool isPivot = coord == anchorCoords;
+			bool isInBounds = _config.IsValidCoordinate(coord);
+
+			Color color;
+			if (!isInBounds)
+				color = new Color(1, 0, 0, 0.4f);
+			else if (isPivot)
+				color = _pivotColor;
+			else
+				color = _occupiedColor;
+
+			Vector3 boxSize = _config.CellSize * 0.9f;
+			DebugDraw3D.DrawBox(worldPos, Quaternion.Identity, boxSize, color, true);
 		}
+
+		Vector3 anchorWorld = _config.GridToWorld(anchorCoords, true);
+		Vector3 forward = Direction.GetAbsoluteDirectionVector() * _config.CellSize.X;
+		DebugDraw3D.DrawArrow(anchorWorld, anchorWorld + forward, Colors.Blue, 0.1f, true);
 	}
+
 	#endregion
 
-	#region Saving & Loading
+	#region Validation
+
+	public bool CanPlaceAt(Vector3I anchorCoords)
+	{
+		if (GridSystem.Instance == null) return false;
+
+		var worldCoords = Shape.GetWorldCoordinates(anchorCoords);
+
+		foreach (var coord in worldCoords)
+		{
+			var cell = GridSystem.Instance.GetGridCell(coord);
+			if (cell == null) return false;
+			if (cell.state.HasFlag(Enums.GridCellState.Obstructed)) return false;
+			if (!cell.state.HasFlag(Enums.GridCellState.Ground)) return false;
+		}
+
+		return true;
+	}
+
+	public List<Vector3I> GetInvalidCells(Vector3I anchorCoords)
+	{
+		var invalid = new List<Vector3I>();
+		var worldCoords = Shape.GetWorldCoordinates(anchorCoords);
+
+		foreach (var coord in worldCoords)
+		{
+			var cell = GridSystem.Instance?.GetGridCell(coord);
+			if (cell == null ||
+			    cell.state.HasFlag(Enums.GridCellState.Obstructed) ||
+			    !cell.state.HasFlag(Enums.GridCellState.Ground))
+			{
+				invalid.Add(coord);
+			}
+		}
+
+		return invalid;
+	}
+
+	#endregion
+
+	#region Save/Load
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
-		var data =  new Godot.Collections.Dictionary<string, Variant>();
+		var data = new Godot.Collections.Dictionary<string, Variant>();
+
+		data["AutoCalculateShape"] = AutoCalculateShape;
+		data["RecursiveShapeDetection"] = RecursiveShapeDetection;
+		data["Direction"] = (int)Direction;
 
 		if (AnchorCell != null)
 		{
 			data["HasPosition"] = true;
-			data["GridX"] = AnchorCell.gridCoordinates.X;
-			data["GridY"] = AnchorCell.gridCoordinates.Y;
-			data["GridZ"] = AnchorCell.gridCoordinates.Z;
-			data["Direction"] = (int)Direction;
+			data["AnchorX"] = AnchorCell.GridCoordinates.X;
+			data["AnchorY"] = AnchorCell.GridCoordinates.Y;
+			data["AnchorZ"] = AnchorCell.GridCoordinates.Z;
 		}
 		else
 		{
 			data["HasPosition"] = false;
 		}
 
-		if (gridShape != null)
-		{
-			data["GridShapePath"] = gridShape.ResourcePath;
-		}
+		if (!AutoCalculateShape && Shape != null && !string.IsNullOrEmpty(Shape.ResourcePath))
+			data["ShapePath"] = Shape.ResourcePath;
 
 		return data;
 	}
 
 	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
+		if (data.TryGetValue("AutoCalculateShape", out var autoCalcVar))
+			AutoCalculateShape = autoCalcVar.AsBool();
 
-		// Load shape first
-		if (data.ContainsKey("GridShapePath"))
+		if (data.TryGetValue("RecursiveShapeDetection", out var recursiveVar))
+			RecursiveShapeDetection = recursiveVar.AsBool();
+
+		if (data.TryGetValue("Direction", out var dirVar))
+			Direction = (Enums.Direction)dirVar.AsInt32();
+
+		if (!AutoCalculateShape && data.TryGetValue("ShapePath", out var pathVar))
 		{
-			string path = data["GridShapePath"].AsString();
-			var loadedShape = GD.Load<GridShape>(path);
-			if (loadedShape != null) gridShape = loadedShape;
+			var loaded = GD.Load<GridShape>(pathVar.AsString());
+			if (loaded != null) Shape = loaded;
 		}
 
-		// Load Position Data
-		if (data.ContainsKey("HasPosition") && data["HasPosition"].AsBool())
+		if (data.TryGetValue("HasPosition", out var hasPosVar) && hasPosVar.AsBool())
 		{
-			int x = (int)data["GridX"];
-			int y = (int)data["GridY"];
-			int z = (int)data["GridZ"];
+			int x = data["AnchorX"].AsInt32();
+			int y = data["AnchorY"].AsInt32();
+			int z = data["AnchorZ"].AsInt32();
 
-			if (data.ContainsKey("Direction"))
-			{
-				Direction = (Enums.Direction)(int)data["Direction"];
-			}
-
-			// We defer the actual SetGridCell call to the GridObject.Load 
-			// or we can attempt to fetch it here if GridSystem is ready.
 			if (GridSystem.Instance != null)
 			{
 				var cell = GridSystem.Instance.GetGridCell(new Vector3I(x, y, z));
-				if (cell != null)
-				{
-					SetGridCell(cell);
-				}
+				if (cell != null) SetGridCell(cell);
 			}
 		}
 	}

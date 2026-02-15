@@ -12,8 +12,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 {
 	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, int> spawnCounts = new Godot.Collections.Dictionary<Enums.UnitTeam, int>();
 	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> gridObjectTeams = new Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder>();
-
-	[Export] PackedScene gridObjectScene;
+	
 	public GridObject CurrentPlayerGridObject
 	{
 		get
@@ -51,16 +50,13 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		{
 			if (child is GridObjectTeamHolder teamHolder)
 			{
-				// If we have NO loaded data, we need to manually trigger the teamHolder setup
 				if (!HasLoadedData) teamHolder.Setup();
 				
 				if (!gridObjectTeams.ContainsKey(teamHolder.Team))
 					gridObjectTeams.Add(teamHolder.Team, teamHolder);
 			}
 		}
-
-		// Even if the global loadingData is true, if THIS manager has no data, 
-		// we treat it as a fresh initialization for this scene.
+		
 		if (!HasLoadedData)
 		{
 			GD.Print("GridObjectManager: No data found in save. Initializing fresh spawn counts.");
@@ -93,7 +89,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			foreach (KeyValuePair<Enums.UnitTeam, int> kvp in spawnCounts)
 			{
 				for (int i = 0; i < kvp.Value; i++)
-					await TrySpawnGridObject(gridObjectScene, kvp.Key);
+					await TrySpawnGridObject(GetGridObjectTeamHolder(kvp.Key).unitPrefab, kvp.Key);
 
 				if (gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active].Count > 0)
 				{
@@ -118,6 +114,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		bool success;
 		GridCell cell;
 
+		GD.Print("TrySpawnGridObject called");
 		if (team.HasFlag(Enums.UnitTeam.Player))
 		{
 			success = GridSystem.Instance.TryGetRandomGridCell(true, out cell, teamFilter: Enums.UnitTeam.Player);
@@ -142,8 +139,8 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 
 		gridObjectTeams[team].AddGridObject(gridObjectInstance);
 		gridObjectTeams[team].AddChild(gridObjectInstance);
-		gridObjectInstance.GlobalPosition = cell.worldCenter;
-		// Ensure unique naming for safety
+		gridObjectInstance.GlobalPosition = cell.WorldPosition;
+
 		gridObjectInstance.Name = $"{Enum.GetName(team)}_{GetGridObjectTeamHolder(team).GridObjects[Enums.GridObjectState.Active].Count}_{Guid.NewGuid().ToString().Substring(0,4)}";
 		await gridObjectInstance.Initialize(team, cell);
 	}

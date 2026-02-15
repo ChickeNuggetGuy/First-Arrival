@@ -266,7 +266,14 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (teamManager.shipContainer != null && shipNode.GetParent() != teamManager.shipContainer)
 			teamManager.shipContainer.AddChild(shipNode);
 		else
-			teamManager.AddChild(shipNode);
+		{
+			if (shipNode.GetParent() != null)
+			{
+				shipNode.Reparent(teamManager.shipContainer);
+			}
+			else
+				teamManager.AddChild(shipNode);
+		}
 
 		var startCell = manager.GetCellFromIndex(path[0]);
 		if (startCell.HasValue)

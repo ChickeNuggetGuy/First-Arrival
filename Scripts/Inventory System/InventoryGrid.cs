@@ -134,11 +134,11 @@ public partial class InventoryGrid : Resource
             return;
         }
 
-        Items = new (Item item, int count)[GridShape.GridSizeX, GridShape.GridSizeZ];
+        Items = new (Item item, int count)[GridShape.SizeX, GridShape.SizeZ];
 
-        for (int x = 0; x < GridShape.GridSizeX; x++)
+        for (int x = 0; x < GridShape.SizeX; x++)
         {
-            for (int y = 0; y < GridShape.GridSizeZ; y++)
+            for (int y = 0; y < GridShape.SizeZ; y++)
             {
                 Items[x, y] = (null, 0);
             }
@@ -149,15 +149,15 @@ public partial class InventoryGrid : Resource
 
     private bool IsValidCell(int x, int y)
     {
-        return x >= 0 && x < GridShape.GridSizeX &&
-               y >= 0 && y < GridShape.GridSizeZ &&
-               (!_inventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) || GridShape.GetGridShapeCell(x, 0, y));
+        return x >= 0 && x < GridShape.SizeX &&
+               y >= 0 && y < GridShape.SizeZ &&
+               (!_inventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) || GridShape.IsOccupied(x, 0, y));
     }
 
     private bool IsValidForPlacement(int x, int y)
     {
         // Basic rectangular boundary check
-        if (x < 0 || x >= GridShape.GridSizeX || y < 0 || y >= GridShape.GridSizeZ)
+        if (x < 0 || x >= GridShape.SizeX || y < 0 || y >= GridShape.SizeZ)
             return false;
 
         // If no shape logic enabled — any valid coordinate is usable
@@ -165,7 +165,7 @@ public partial class InventoryGrid : Resource
             return true;
 
         // Respect actual shape layout when using item shapes
-        return GridShape.GetGridShapeCell(x, 0, y);
+        return GridShape.IsOccupied(x, 0, y);
     }
 
     #endregion
@@ -221,11 +221,11 @@ public partial class InventoryGrid : Resource
                 Item existingItem = null;
                 
                 // Scan the shape to find an existing item to merge into
-                for (int relX = 0; relX < itemShape.GridSizeX; relX++)
+                for (int relX = 0; relX < itemShape.SizeX; relX++)
                 {
-                    for (int relY = 0; relY < itemShape.GridSizeZ; relY++)
+                    for (int relY = 0; relY < itemShape.SizeZ; relY++)
                     {
-                        if (!itemShape.GetGridShapeCell(relX, 0, relY)) continue;
+                        if (!itemShape.IsOccupied(relX, 0, relY)) continue;
                         int gridX = x + relX;
                         int gridY = y + relY;
                         
@@ -256,9 +256,6 @@ public partial class InventoryGrid : Resource
                     }
                     GD.Print($"AddItemAt: Merged into item '{existingItem.ItemData.ItemName}'. New Count: {newCount}");
                     
-                    // Since we merged 'item' into 'existingItem', 'item' is now redundant.
-                    // If 'item' is a Node/Object, we should free it to prevent leaks/confusion, 
-                    // UNLESS 'item' IS 'existingItem' (which implies we are adding to itself, should not happen in AddItemAt usually).
                     if (item != existingItem)
                     {
                         item.QueueFree();
@@ -267,11 +264,11 @@ public partial class InventoryGrid : Resource
                 else
                 {
                     // Normal Placement of NEW item
-                    for (int relX = 0; relX < itemShape.GridSizeX; relX++)
+                    for (int relX = 0; relX < itemShape.SizeX; relX++)
                     {
-                        for (int relY = 0; relY < itemShape.GridSizeZ; relY++)
+                        for (int relY = 0; relY < itemShape.SizeZ; relY++)
                         {
-                            if (!itemShape.GetGridShapeCell(relX, 0, relY)) continue;
+                            if (!itemShape.IsOccupied(relX, 0, relY)) continue;
 
                             int gridX = x + relX;
                             int gridY = y + relY;
@@ -344,13 +341,12 @@ public partial class InventoryGrid : Resource
         if (positions.Count == 0) return;
 
         // Determine the current stack size from the first found position
-        // All positions for the same item instance should ideally have the same count
         var firstPos = positions[0];
         int currentStackSize = Items[firstPos.X, firstPos.Y].count;
         
         int newStackSize = currentStackSize - count;
         
-        if (newStackSize < 0) newStackSize = 0; // Should not happen if logic is correct, but safety first
+        if (newStackSize < 0) newStackSize = 0;
 
         bool itemRemovedCompletely = (newStackSize == 0);
 
@@ -408,11 +404,11 @@ public partial class InventoryGrid : Resource
     {
         if (item == null || Items == null) return false;
 
-        for (int x = 0; x < GridShape.GridSizeX; x++)
+        for (int x = 0; x < GridShape.SizeX; x++)
         {
-            for (int y = 0; y < GridShape.GridSizeZ; y++)
+            for (int y = 0; y < GridShape.SizeZ; y++)
             {
-                if (Items[x, y].item == item) return true; // Check Reference Equality for Instance
+                if (Items[x, y].item == item) return true;
             }
         }
 
@@ -450,9 +446,9 @@ public partial class InventoryGrid : Resource
 
         if (item == null || Items == null) return result;
 
-        for (int x = 0; x < GridShape.GridSizeX; x++)
+        for (int x = 0; x < GridShape.SizeX; x++)
         {
-            for (int y = 0; y < GridShape.GridSizeZ; y++)
+            for (int y = 0; y < GridShape.SizeZ; y++)
             {
                 if (Items[x, y].item == item)
                 {
@@ -485,19 +481,17 @@ public partial class InventoryGrid : Resource
 
         GridShape itemShape = item.ItemData?.ItemShape;
 
-        int width = (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null) ? itemShape.GridSizeX : 1;
-        int height = (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null) ? itemShape.GridSizeZ : 1;
+        int width = (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null) ? itemShape.SizeX : 1;
+        int height = (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null) ? itemShape.SizeZ : 1;
         
-        GD.Print($"CanAddItem: Checking for '{item.ItemData?.ItemName}' (Size: {width}x{height}) in Grid ({GridShape.GridSizeX}x{GridShape.GridSizeZ})");
 
-        for (int x = 0; x <= GridShape.GridSizeX - width; x++)
+        for (int x = 0; x <= GridShape.SizeX - width; x++)
         {
-            for (int y = 0; y <= GridShape.GridSizeZ - height; y++)
+            for (int y = 0; y <= GridShape.SizeZ - height; y++)
             {
                 if (CanAddItemAt(x, y, item, count, out reason))
                 {
                     position = new Vector2I(x, y);
-                    GD.Print($"CanAddItem: Found valid position at {position}");
                     return true;
                 }
             }
@@ -527,11 +521,11 @@ public partial class InventoryGrid : Resource
                 return false;
             }
 
-            for (int relX = 0; relX < itemShape.GridSizeX; relX++)
+            for (int relX = 0; relX < itemShape.SizeX; relX++)
             {
-                for (int relY = 0; relY < itemShape.GridSizeZ; relY++)
+                for (int relY = 0; relY < itemShape.SizeZ; relY++)
                 {
-                    if (!itemShape.GetGridShapeCell(relX, 0, relY)) continue;
+                    if (!itemShape.IsOccupied(relX, 0, relY)) continue;
 
                     int gridX = x + relX;
                     int gridY = y + relY;
@@ -546,7 +540,6 @@ public partial class InventoryGrid : Resource
                     {
                         if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                         {
-                            // Check equality by ItemID (String), not Instance/Data Reference.
                             if (Items[gridX, gridY].item.ItemData.ItemID == item.ItemData.ItemID &&
                                 Items[gridX, gridY].count + count <= item.ItemData.MaxStackSize)
                                 continue;
@@ -567,7 +560,6 @@ public partial class InventoryGrid : Resource
         }
         else
         {
-            // Rectangular inventory — straightforward allocation without shape
             if (!IsValidForPlacement(x, y))
             {
                 reason = "Cell is outside boundaries or not part of inventory shape.";
@@ -627,16 +619,12 @@ public partial class InventoryGrid : Resource
         if (source.HasItem(item))
         {
             // The item still exists in source (partial removal/split).
-            // We MUST instantiate a NEW item for the destination to avoid sharing the same instance.
             Item newItem = Managers.InventoryManager.Instance.InstantiateItem(item.ItemData);
-            destination.AddItem(newItem, count);
-            GD.Print($"Transferred (Split) item '{item.ItemData?.ItemName}' x{count}. New Instance Created.");
-        }
+            destination.AddItem(newItem, count); }
         else
         {
             // Item fully removed from source, safe to move the instance.
             destination.AddItem(item, count);
-            GD.Print($"Transferred (Move) item '{item.ItemData?.ItemName}' x{count}.");
         }
         
         return true;
@@ -672,14 +660,12 @@ public partial class InventoryGrid : Resource
             Item newItem = Managers.InventoryManager.Instance.InstantiateItem(originalItem.ItemData);
             dest.AddItemAt(dstPos, newItem, data.count);
             item = newItem;
-            GD.Print($"TransferAt (Split) successful placed item at {dstPos}.");
         }
         else
         {
-            // Moved completely.
+            // Moved.
             dest.AddItemAt(dstPos, originalItem, data.count);
             item = originalItem;
-            GD.Print($"TransferAt (Move) successful placed item at {dstPos}.");
         }
 
         return true;
@@ -690,6 +676,15 @@ public partial class InventoryGrid : Resource
         InventoryGrid dest, Vector2I dstPos)
     {
         return TryTransferItemAt(source, srcPos, dest, dstPos, out _);
+    }
+    
+    
+    public Vector2I GetItemRootPos(Item item)
+    {
+	    if (item == null) return Vector2I.Zero;
+	    
+	    var positions = GetItemPositions(item);
+	    return positions.Count > 0 ? positions[0] : Vector2I.Zero;
     }
 
     #endregion

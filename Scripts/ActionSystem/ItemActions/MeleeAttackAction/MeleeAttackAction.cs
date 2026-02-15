@@ -35,7 +35,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectNodes)) return;
 
 		// Are we already adjacent?
-		bool isAdjacent = neighbors.Any(c => c.gridCoordinates == startingGridCell.gridCoordinates);
+		bool isAdjacent = neighbors.Any(c => c.GridCoordinates == startingGridCell.GridCoordinates);
 
 		if (isAdjacent)
 		{
@@ -51,7 +51,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			return;
 		}
 
-		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)).First();
+		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)).First();
 
 		MoveActionDefinition moveActionDefinition =
 			gridObjectNodes.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
@@ -94,16 +94,10 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			return;
 		}
 
-		int damage;
-		
-		MeleeAttackActionDefinition meleeAttackActionDefinition = parentActionDefinition as MeleeAttackActionDefinition;
+		Item.ItemData.TryGetItemActionDefinition<MeleeAttackActionDefinition>(out MeleeAttackActionDefinition meleeAttackActionDefinition);
 
-		if (meleeAttackActionDefinition != null)
-		{
-			damage = meleeAttackActionDefinition.damage;
-		}
-		else
-			damage = 10;
+
+		var damage = meleeAttackActionDefinition.damage;
 
 		if (Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanMelee))
 		{

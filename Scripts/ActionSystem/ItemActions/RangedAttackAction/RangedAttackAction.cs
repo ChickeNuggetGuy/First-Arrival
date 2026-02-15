@@ -56,7 +56,7 @@ public partial class RangedAttackAction : Action, IItemAction
         float tweenDuration = 0.5f;
         GridObject targetGridObject = null;
 
-        Vector3 direction = ((targetGridCell.worldCenter  + Vector3.Up) - parentGridObject.objectCenter.GlobalPosition).Normalized();
+        Vector3 direction = ((targetGridCell.WorldCenter  + Vector3.Up) - parentGridObject.objectCenter.GlobalPosition).Normalized();
         Vector2 deviationMax = mathUtils.GetMaxDeviation(rangedAccuracy.CurrentValue, 1, true);
         Vector3 newDirection = CalculateProjectileDirection(direction, deviationMax.X, deviationMax.Y);
 

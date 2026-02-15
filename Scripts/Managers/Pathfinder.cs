@@ -60,7 +60,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 		}
 
 		// If start and goal are the same cell, return just that
-		if (start == goal)
+		if (start.GridCoordinates == goal.GridCoordinates)
 		{
 			GD.Print("Start and goal are equal.");
 			return new List<GridCell> { start };
@@ -71,7 +71,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 		if (adjacentIsValid)
 		{
 			// Get all neighbors of the goal cell
-			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.gridCoordinates, 1);
+			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.GridCoordinates, 1);
 			
 			foreach (var neighbor in goalNeighbors)
 			{
@@ -284,7 +284,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 		if (adjacentIsValid)
 		{
 			// Get all neighbors of the goal within radius 1
-			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.gridCoordinates, 1);
+			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.GridCoordinates, 1);
 			
 			foreach (var neighbor in goalNeighbors)
 			{
@@ -434,9 +434,9 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 	private float Heuristic(GridCell a, GridCell b)
 	{
-		int dx = Mathf.Abs(a.gridCoordinates.X - b.gridCoordinates.X);
-		int dy = Mathf.Abs(a.gridCoordinates.Y - b.gridCoordinates.Y);
-		int dz = Mathf.Abs(a.gridCoordinates.Z - b.gridCoordinates.Z);
+		int dx = Mathf.Abs(a.GridCoordinates.X - b.GridCoordinates.X);
+		int dy = Mathf.Abs(a.GridCoordinates.Y - b.GridCoordinates.Y);
+		int dz = Mathf.Abs(a.GridCoordinates.Z - b.GridCoordinates.Z);
 
 		float D = 1f; // axis
 		float D2 = 1.4142136f; // sqrt(2), 2D diagonal
@@ -456,9 +456,9 @@ public partial class Pathfinder : Manager<Pathfinder>
 	/// </summary>
 	private float Cost(GridCell a, GridCell b)
 	{
-		int dx = Mathf.Abs(a.gridCoordinates.X - b.gridCoordinates.X);
-		int dy = Mathf.Abs(a.gridCoordinates.Y - b.gridCoordinates.Y);
-		int dz = Mathf.Abs(a.gridCoordinates.Z - b.gridCoordinates.Z);
+		int dx = Mathf.Abs(a.GridCoordinates.X - b.GridCoordinates.X);
+		int dy = Mathf.Abs(a.GridCoordinates.Y - b.GridCoordinates.Y);
+		int dz = Mathf.Abs(a.GridCoordinates.Z - b.GridCoordinates.Z);
 
 		int sum = dx + dy + dz;
 		if (sum == 1) return 1f; // axis-aligned
@@ -540,8 +540,8 @@ public partial class Pathfinder : Manager<Pathfinder>
 			return result;
 		}
 
-		Vector3 startPos = startCell.worldCenter;
-		Vector3 endPos = endCell.worldCenter;
+		Vector3 startPos = startCell.WorldCenter;
+		Vector3 endPos = endCell.WorldCenter;
 		Vector3 direction = endPos - startPos;
 		float distance = direction.Length();
 
@@ -605,7 +605,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 				// For arc paths, allow AIR spaces but block solid obstacles
 				if ((gridCell.state & Enums.GridCellState.Obstructed) != 0)
 				{
-					GD.Print($"Obstacle detected at: {gridCell.gridCoordinates}");
+					GD.Print($"Obstacle detected at: {gridCell.GridCoordinates}");
 					pathValid = false;
 					break;
 				}
@@ -638,7 +638,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 		if (cell1 == null || cell2 == null)
 			return cell1 == cell2;
 		
-		return cell1.gridCoordinates == cell2.gridCoordinates;
+		return cell1.GridCoordinates == cell2.GridCoordinates;
 	}
 
 	#endregion

@@ -15,7 +15,11 @@ public partial class SelectCraftUI : UIWindow
 	protected override Task _Setup()
 	{
 		treeUI.HideRoot = true;
-		AcceptButton.Pressed += AcceptButtonOnPressed;
+		if(!AcceptButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(AcceptButtonOnPressed)))
+		{
+			AcceptButton.Pressed += AcceptButtonOnPressed;
+		}
+		
 		treeUI.ButtonClicked += TreeUIOnButtonClicked;
 		return base._Setup();
 		

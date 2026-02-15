@@ -5,8 +5,9 @@
 
 [sub_resource type="Resource" id="Resource_51vov"]
 script = ExtResource("1_f21n0")
-GridSizeY = 1
-ShapeGrid = Array[bool]([true, true, true, true, true, true, true, true, true])
+SizeX = 3
+SizeZ = 3
+OccupiedCells = Array[bool]([true, true, true, true, true, true, true, true, true])
 metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]

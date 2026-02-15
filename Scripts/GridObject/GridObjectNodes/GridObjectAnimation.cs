@@ -33,12 +33,12 @@ public partial class GridObjectAnimation : GridObjectNode
 	{
 		if (data.TryGetValue("isIdle", out Variant locomotionType))
 		{
-			isIdle = Enum.Parse<bool>(locomotionType.ToString());
+			isIdle = locomotionType.AsBool();
 		}
 		
 		if (data.TryGetValue("isMoving", out Variant movingData))
 		{
-			isMoving = Enum.Parse<bool>(movingData.ToString());
+			isMoving = movingData.AsBool();
 		}
 	}
 

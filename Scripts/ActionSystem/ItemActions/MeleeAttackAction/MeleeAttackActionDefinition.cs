@@ -1,8 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
-using FirstArrival.Scripts.ActionSystem.ItemActions;
-using FirstArrival.Scripts.Inventory_System;
+
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
@@ -82,7 +81,7 @@ public partial class MeleeAttackActionDefinition
 		}
 
 		// Already adjacent?
-		if (neighbors.Any(gridCell => gridCell.gridCoordinates == startingGridCell.gridCoordinates))
+		if (neighbors.Any(gridCell => gridCell.GridCoordinates == startingGridCell.GridCoordinates))
 		{
 			// Face the target if needed
 			if (
@@ -113,7 +112,7 @@ public partial class MeleeAttackActionDefinition
 			}
 
 			var targetAdjacent = walkableNeighbors.OrderBy(n =>
-				startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)
+				startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)
 			).First();
 
 			var moveAction =

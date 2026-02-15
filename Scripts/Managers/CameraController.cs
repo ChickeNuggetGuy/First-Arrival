@@ -42,10 +42,17 @@ public partial class CameraController : Manager<CameraController>
         base._ExitTree();
     }
 
-    public void QuickSwitchTarget(Node3D target)
+    public void FocusOn(GridObject target)
     {
         if (target == null) return;
-        transposer.Position = target.Position;
+        if (target.GridPositionData.AnchorCell == null)
+        {
+	        transposer.Position = target.Position;
+        }
+		else
+        {
+	        transposer.Position = target.GridPositionData.AnchorCell.WorldCenter;
+        }
     }
     
     private void TransposerMovement(float delta)
@@ -133,7 +140,7 @@ public partial class CameraController : Manager<CameraController>
 	    if(UIManager.Instance.BlockingInput) return;
 	    if (@event is InputEventKey { Pressed: true, Keycode: Key.F })
 	    { 
-		    QuickSwitchTarget(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject);   
+		    FocusOn(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject);   
 	    }
 	    
         if (@event is not InputEventMouseButton mb || !mb.Pressed)
@@ -210,7 +217,7 @@ public partial class CameraController : Manager<CameraController>
     #region EventHandlers
     private void GridObjectTeam_GridObjectSelected( GridObject gridObject )
     {
-        QuickSwitchTarget(gridObject);
+	    FocusOn(gridObject);
     }
     #endregion
 
@@ -227,15 +234,14 @@ public partial class CameraController : Manager<CameraController>
 
     protected override Task _Setup(bool loadingData)
     {
-        GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
-        
-        playerTeamHolder.SelectedGridObjectChanged += GridObjectTeam_GridObjectSelected;
-            
         return Task.CompletedTask;
     }
 
     protected override Task _Execute(bool loadingData)
     {
+	    GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+        
+	    playerTeamHolder.SelectedGridObjectChanged += GridObjectTeam_GridObjectSelected;
         GD.Print("MainCamera:", MainCamera?.Name ?? "NULL");
 
         if (MainCamera != null)

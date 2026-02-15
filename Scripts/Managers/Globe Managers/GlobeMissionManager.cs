@@ -156,20 +156,19 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         MissionCellDefinition missionCellDefinition = new MissionCellDefinition(
             cell.Index,
             "New Mission",
-            mission
+            mission,
+          null
         );
+        
         _activeMissions.Add(cell.Index, missionCellDefinition);
-
         SpawnMissionVisual(cell, $"Mission_{cell.Index}");
+        
         EmitSignal(SignalName.MissionSpawned, mission);
         return true;
     }
 
-    public MissionBase GenerateRandomMission(
-        int cellIndex,
-        Enums.MissionType missionType = Enums.MissionType.None,
-        int difficulty = -1
-    )
+    public MissionBase GenerateRandomMission(int cellIndex, Enums.MissionType missionType = Enums.MissionType.None,
+        int difficulty = -1)
     {
         int enemyCount;
 
@@ -197,66 +196,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
         return new EliminateMission(missionType, enemyCount, cellIndex);
     }
-
-    public override void _Input(InputEvent @event)
-    {
-    }
-
-    // public async Task SendMission(MissionCellDefinition missionDefinition, Craft craft)
-    // {
-    //     GlobePathfinder pathfinder = GlobePathfinder.Instance;
-    //     GlobeHexGridManager manager = GlobeHexGridManager.Instance;
-    //
-    //     if (pathfinder == null || manager == null)
-    //         return;
-    //
-    //     List<int> path = pathfinder.GetPath(
-    //         craft.HomeBaseIndex,
-    //         missionDefinition.cellIndex
-    //     );
-    //
-    //     if (path == null || path.Count == 0)
-    //     {
-    //         GD.PrintErr("No path found for mission!");
-    //         return;
-    //     }
-    //
-    //     Node3D shipNode = shipScene.Instantiate<Node3D>();
-    //     if (missionContainer != null)
-    //         missionContainer.AddChild(shipNode);
-    //     else
-    //         AddChild(shipNode);
-    //
-    //     var startCell = manager.GetCellFromIndex(path[0]);
-    //     if (startCell.HasValue)
-    //         shipNode.GlobalPosition = startCell.Value.Center;
-    //
-    //     Tween shipTween = GetTree().CreateTween();
-    //
-    //     for (int i = 1; i < path.Count; i++)
-    //     {
-    //         HexCellData? cell = manager.GetCellFromIndex(path[i]);
-    //         if (!cell.HasValue)
-    //             continue;
-    //
-    //         Vector3 targetPos = cell.Value.Center;
-    //
-    //         shipTween.TweenCallback(
-    //             Callable.From(() =>
-    //             {
-    //                 Vector3 upDir = shipNode.GlobalPosition.Normalized();
-    //                 shipNode.LookAt(targetPos, upDir);
-    //             })
-    //         );
-    //
-    //         shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
-    //     }
-    //
-    //     await ToSignal(shipTween, Tween.SignalName.Finished);
-    //
-    //     shipNode.QueueFree();
-    //     LoadMissionScene(missionDefinition);
-    // }
+    
 
     public void LoadMissionScene(MissionCellDefinition missionDefinition)
     {
@@ -265,20 +205,23 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             missionDefinition.mission.EnemySpawnCount
         );
         GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene, null, true);
+        RemoveMissionDefinition(missionDefinition.cellIndex);
     }
 
 
 
-    private void SpawnMissionVisual(HexCellData cell, string name)
+    private Node3D SpawnMissionVisual(HexCellData cell, string name)
     {
         if (missionScene == null)
-            return;
+            return null;
 
         Node3D missionInstance = missionScene.Instantiate<Node3D>();
         if (missionContainer != null)
             missionContainer.AddChild(missionInstance);
         else
             AddChild(missionInstance);
+        
+        _activeMissions[cell.Index].missionVisual = missionInstance;
 
         missionInstance.GlobalPosition = cell.Center;
 
@@ -286,8 +229,37 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         Vector3 upDir = Mathf.Abs(surfaceNormal.Y) > 0.9f ? Vector3.Forward : Vector3.Up;
         missionInstance.LookAt(cell.Center + surfaceNormal, upDir);
         missionInstance.Name = name;
+        return missionInstance;
     }
 
+
+    private void RemoveMissionDefinition(int cellIndex)
+    {
+	    if (!_activeMissions.ContainsKey(cellIndex)) return;
+	    
+	    MissionCellDefinition missionDefinition = _activeMissions[cellIndex];
+	    DestroyMissionVisual(cellIndex);
+	    _activeMissions.Remove(cellIndex);
+    }
+
+    private void DestroyMissionVisual(int cellIndex)
+    {
+	    MissionCellDefinition missionDefinition = _activeMissions[cellIndex];
+	    
+	    if (missionDefinition == null) return;
+	    
+	    
+	    if (missionContainer != null)
+	    {
+		    missionContainer.RemoveChild(missionDefinition.missionVisual);
+
+	    }
+	    else
+	    {
+		    RemoveChild(missionDefinition.missionVisual);
+	    }
+	    missionDefinition.missionVisual.QueueFree();
+    }
     public override Godot.Collections.Dictionary<string, Variant> Save()
     {
         var data = new Godot.Collections.Dictionary<string, Variant>
@@ -334,6 +306,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         foreach (var kvp in missionListData)
         {
             int cellIdx = int.Parse(kvp.Key);
+
             var mDefData = kvp.Value.AsGodotDictionary<string, Variant>();
             var mData = mDefData["missionData"].AsGodotDictionary<string, Variant>();
             string className = mDefData["missionClass"].AsString();

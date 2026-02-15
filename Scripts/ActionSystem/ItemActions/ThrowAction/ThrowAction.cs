@@ -1,15 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.ActionSystem.ItemActions;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Utility;
 using Godot;
 
-namespace FirstArrival.Scripts.ActionSystem.ItemActions.ThrowAction;
 
 public class ThrowAction : Action, ICompositeAction, IItemAction
 {
-  // ICompositeAction bridge to base Parent
   public Action ParentAction
   {
     get => Parent;
@@ -17,8 +16,7 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
   }
 
   public List<Action> SubActions { get; set; } = new();
-
-  // IItemAction
+  
   public Item Item { get; set; }
 
   protected GridCell[] path;
@@ -69,8 +67,6 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
 
       if (rotateActionDefinition != null)
       {
-        // Important: sub-action must not deduct costs if the parent already
-        // charges aggregate costs — pass zero costs.
         var zeroCosts = new Dictionary<Enums.Stat, int>();
         var rotateAction =
           (RotateAction)rotateActionDefinition.InstantiateAction(
@@ -129,7 +125,7 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
     else
     {
       GD.Print(
-        $"Successfully transferred item to {targetGridCell.gridCoordinates} " +
+        $"Successfully transferred item to {targetGridCell.GridCoordinates} " +
         $"inventory {targetGridCell.InventoryGrid.ItemCount}"
       );
     }

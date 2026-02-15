@@ -1,11 +1,11 @@
 [gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://d2jrgtmu7gm88"]
 
 [ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_71kes"]
-[ext_resource type="Texture2D" uid="uid://chrus5spv2l8w" path="res://Third-Party Assets/Polygon Prototype/Textures/PolygonPrototype_Texture_Grid_07.png" id="1_b4ww0"]
 [ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_8w8pa"]
 [ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="2_e5pci"]
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_7w8sb"]
 [ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="3_lougv"]
+[ext_resource type="Texture2D" uid="uid://gvtufe7m6g40" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_01_Military_Side.png" id="4_71kes"]
 
 [sub_resource type="Resource" id="Resource_2jyhj"]
 script = ExtResource("1_71kes")
@@ -23,10 +23,9 @@ metadata/_custom_type_script = "uid://60yksynr5w30"
 
 [sub_resource type="Resource" id="Resource_uou2a"]
 script = ExtResource("2_8w8pa")
-GridSizeX = 2
-GridSizeY = 1
-GridSizeZ = 2
-ShapeGrid = Array[bool]([true, true, true, false])
+SizeX = 2
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, false])
 metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]
@@ -35,7 +34,7 @@ script = ExtResource("3_7w8sb")
 ItemID = 2
 ItemName = "Pistol"
 ItemDescription = "Standard issue pistol"
-ItemIcon = ExtResource("1_b4ww0")
+ItemIcon = ExtResource("4_71kes")
 ItemShape = SubResource("Resource_uou2a")
 weight = 10
 ActionDefinitions = [SubResource("Resource_2jyhj"), SubResource("Resource_wvx2b"), SubResource("Resource_fv7ql")]

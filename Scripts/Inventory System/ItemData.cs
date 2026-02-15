@@ -36,7 +36,7 @@ public partial class ItemData : Resource
 	[Export] public Vector3 RightHandItemPosition { get; protected set; }
 	[Export] public Vector3 RightHandItemRotation { get; protected set; }
 
-	[Export(PropertyHint.ResourceType, "ItemActionDefinition")]
+	[Export]
 	public Array<ActionDefinition> ActionDefinitions;
 	
 	[Export] public int MaxStackSize { get; protected set; } = 1;
@@ -50,7 +50,7 @@ public partial class ItemData : Resource
 		return retVal;
 	}
 	
-	public bool TryGetItemActionDefinition<T>(out ItemActionDefinition def) where T : ItemActionDefinition
+	public bool TryGetItemActionDefinition<T>(out T def) where T : ItemActionDefinition
 	{
 		def = null;
 		if (ActionDefinitions == null || ActionDefinitions.Count == 0)
@@ -70,4 +70,45 @@ public partial class ItemData : Resource
 		return false;
 	}
 	
+	
+	/// <summary>
+	/// Returns the pixel-space rectangle for a specific cell of the item icon.
+	/// Useful for AtlasTexture.Region.
+	/// </summary>
+	public Rect2 GetTextureRegionForCell(int localX, int localZ)
+	{
+		if (ItemIcon == null || ItemShape == null) return new Rect2();
+
+		Vector2 texSize = ItemIcon.GetSize();
+    
+		float cellW = texSize.X / Mathf.Max(1, ItemShape.SizeX);
+		float cellH = texSize.Y / Mathf.Max(1, ItemShape.SizeZ);
+
+		return new Rect2(
+			localX * cellW,
+			localZ * cellH,
+			cellW,
+			cellH
+		);
+	}
+
+	/// <summary>
+	/// Returns normalized UV bounds (0.0 to 1.0) for a specific cell.
+	/// Useful for custom shaders.
+	/// </summary>
+	public Rect2 GetUVBoundsForCell(int localX, int localY)
+	{
+		if (ItemShape == null) 
+			return new Rect2(0, 0, 1, 1);
+
+		float width = 1.0f / ItemShape.SizeX;
+		float height = 1.0f / ItemShape.SizeZ;
+
+		return new Rect2(
+			localX * width, 
+			localY * height, 
+			width, 
+			height
+		);
+	}
 }

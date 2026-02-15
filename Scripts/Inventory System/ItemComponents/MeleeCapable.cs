@@ -6,4 +6,8 @@ namespace FirstArrival.Scripts.Inventory_System;
 public partial class MeleeCapable : ItemComponent
 {
 	public int Damage { get; set; }
+	protected override void _setup()
+	{
+		return;
+	}
 }

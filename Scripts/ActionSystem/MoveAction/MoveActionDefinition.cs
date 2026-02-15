@@ -35,8 +35,8 @@ public partial class MoveActionDefinition : ActionDefinition
   }
 
   // Rebind to canonical instances in the grid
-  var start = gs.GetGridCell(startingGridCell.gridCoordinates);
-  var goal = gs.GetGridCell(targetGridCell.gridCoordinates);
+  var start = gs.GetGridCell(startingGridCell.GridCoordinates);
+  var goal = gs.GetGridCell(targetGridCell.GridCoordinates);
 
   if (start == null || goal == null)
   {
@@ -49,14 +49,7 @@ public partial class MoveActionDefinition : ActionDefinition
     reason = "Target grid cell is not walkable";
     return false;
   }
-
-  if (!start.IsWalkable)
-  {
-    reason = "Starting grid cell is not walkable";
-    GD.Print(
-    );
-    return false;
-  }
+  
 
   var tempPath = Pathfinder.Instance.FindPath(start, goal);
   if (tempPath == null || tempPath.Count == 0)
@@ -67,7 +60,7 @@ public partial class MoveActionDefinition : ActionDefinition
 
   // Cost simulation (same logic you already had)
   var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-    gridObject.Rotation.Y
+	  gridObject.visualMesh.Rotation.Y
   );
 
   for (int i = 0; i < tempPath.Count - 1; i++)
@@ -92,8 +85,8 @@ public partial class MoveActionDefinition : ActionDefinition
     }
 
     bool diagonal =
-      Mathf.Abs(current.gridCoordinates.X - next.gridCoordinates.X) == 1 &&
-      Mathf.Abs(current.gridCoordinates.Z - next.gridCoordinates.Z) == 1;
+      Mathf.Abs(current.GridCoordinates.X - next.GridCoordinates.X) == 1 &&
+      Mathf.Abs(current.GridCoordinates.Z - next.GridCoordinates.Z) == 1;
 
     if (diagonal)
     {
@@ -148,11 +141,11 @@ public partial class MoveActionDefinition : ActionDefinition
 	  if(sightArea.SeenGridObjects.Count > 0)
 	  {
 		  GD.Print("Can see grid objects");
-		  return (targetGridCell, 0);
+		  return (targetGridCell, 100 / sightArea.SeenGridObjects.Count);
 	  }
 
 	  
-	  float distance = startingCell.worldCenter.DistanceTo(targetGridCell.worldCenter);
+	  float distance = startingCell.WorldCenter.DistanceTo(targetGridCell.WorldCenter);
 	  
 	  float maxDistance = 40.0f;
 	  float normalizedScore = (distance / maxDistance) * 70.0f;

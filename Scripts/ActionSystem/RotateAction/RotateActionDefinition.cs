@@ -39,7 +39,7 @@ public partial class RotateActionDefinition : ActionDefinition
 
 		// Determine current facing from the actual transform (Rotation.Y)
 		var currentFacing = RotationHelperFunctions.GetDirectionFromRotation3D(
-			gridObject.Rotation.Y
+			gridObject.visualMesh.Rotation.Y
 		);
 
 		if (currentFacing == targetDirection)

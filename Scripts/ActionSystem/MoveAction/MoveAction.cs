@@ -31,6 +31,7 @@ public partial class MoveAction : Action, ICompositeAction
 		{
 			path = moveActionDefinition.path;
 		}
+
 		if (path.Count == 0)
 		{
 			GD.Print("Path not found!");
@@ -42,16 +43,19 @@ public partial class MoveAction : Action, ICompositeAction
 		ParentAction = this;
 		if (path == null || path.Count == 0)
 			return;
-		
+
 		if (!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
-		
+
 		var moveStepActionDefinition =
-			gridObjectActions.ActionDefinitions.FirstOrDefault(
-				a => a is MoveStepActionDefinition
+			gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveStepActionDefinition
 			) as MoveStepActionDefinition;
 
 		if (moveStepActionDefinition == null)
 			return;
+		
+		var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
+			parentGridObject.visualMesh.Rotation.Y
+		);
 
 		// Build step actions using the correct cell for each step
 		for (int i = 0; i < path.Count - 1; i++)
@@ -59,23 +63,42 @@ public partial class MoveAction : Action, ICompositeAction
 			GridCell stepStart = path[i];
 			GridCell stepEnd = path[i + 1];
 
+			moveStepActionDefinition.TryBuildCostsOnly(parentGridObject, stepStart, stepEnd, out var stepCosts, out _);
+
 			var moveStepAction =
 				moveStepActionDefinition.InstantiateAction(
 					parentGridObject,
 					stepStart,
 					stepEnd,
-					costs
+					stepCosts
 				) as MoveStepAction;
 
 			AddSubAction(moveStepAction);
 		}
 
+		costs.Clear();
 		await Task.CompletedTask;
 	}
+
 
 	protected override async Task Execute()
 	{
 		await Task.CompletedTask;
+	}
+
+	private static Vector2 GetBlendForDirection(Enums.Direction dir)
+	{
+		if (dir is Enums.Direction.North or Enums.Direction.South or
+		    Enums.Direction.East or Enums.Direction.West)
+			return new Vector2(0, 0);
+
+		if (dir is Enums.Direction.NorthEast or Enums.Direction.SouthEast)
+			return new Vector2(1, 0);
+
+		if (dir is Enums.Direction.NorthWest or Enums.Direction.SouthWest)
+			return new Vector2(-1, 0);
+
+		return Vector2.Zero;
 	}
 
 	protected override async Task ActionComplete()

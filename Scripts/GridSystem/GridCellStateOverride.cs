@@ -43,8 +43,24 @@ public partial class GridCellStateOverride : GridObject
 
 		if (this.GridPositionData == null)
 		{
-			GD.PrintErr($"GridCellStateOverride {Name} failed: GridPositionData is null. Ensure it is positioned correctly over a valid cell.");
+			GD.PrintErr($"GridCellStateOverride {Name} failed: GridPositionData is null.");
 			return;
+		}
+
+		// DEBUG: Check shape status
+		GridShape shape = this.GridPositionData.Shape;
+		GD.Print($"[{Name}] GridPositionData found: {GridPositionData != null}");
+		GD.Print($"[{Name}] Shape: {(shape != null ? $"Size({shape.SizeX}x{shape.SizeY}x{shape.SizeZ})" : "NULL")}");
+    
+		if (shape != null)
+		{
+			int occupiedCount = 0;
+			for (int y = 0; y < shape.SizeY; y++)
+				for (int x = 0; x < shape.SizeX; x++)
+					for (int z = 0; z < shape.SizeZ; z++)
+						if (shape.IsOccupied(x, y, z))
+							occupiedCount++;
+			GD.Print($"[{Name}] Occupied cells in shape: {occupiedCount}");
 		}
 		
 		GridCell rootCell = this.GridPositionData.AnchorCell;
@@ -53,7 +69,7 @@ public partial class GridCellStateOverride : GridObject
 			if (GridSystem.Instance.TryGetGridCellFromWorldPosition(this.GridPositionData.GlobalPosition, out GridCell nearest, true))
 			{
 				rootCell = nearest;
-				GD.Print($"GridCellStateOverride {Name}: Snapped to nearest cell {rootCell.gridCoordinates}");
+				GD.Print($"GridCellStateOverride {Name}: Snapped to nearest cell {rootCell.GridCoordinates}");
 			}
 		}
 
@@ -67,7 +83,7 @@ public partial class GridCellStateOverride : GridObject
 		{
 			for (int i = 1; i <= 10; i++)
 			{
-				GridCell below = GridSystem.Instance.GetGridCell(rootCell.gridCoordinates + new Vector3I(0, -i, 0));
+				GridCell below = GridSystem.Instance.GetGridCell(rootCell.GridCoordinates + new Vector3I(0, -i, 0));
 				if (below != null && below.state.HasFlag(Enums.GridCellState.Ground))
 				{ 
 					rootCell = below;
@@ -79,23 +95,22 @@ public partial class GridCellStateOverride : GridObject
 		if (!useGridCellStateOverride && !usefogStateOverride && !useUnitTeamSpawnOverride) return;
 		
 		List<GridCell> gridCells = new List<GridCell>();
-		GridShape shape = this.GridPositionData.gridShape;
-		Vector3I rootCoords = rootCell.gridCoordinates;
+		Vector3I rootCoords = rootCell.GridCoordinates;
 		Enums.Direction direction = this.GridPositionData.Direction;
 
 		if (shape != null)
 		{
-			for (int y = 0; y < shape.GridSizeY; y++)
+			for (int y = 0; y < shape.SizeY; y++)
 			{
-				for (int x = 0; x < shape.GridSizeX; x++)
+				for (int x = 0; x < shape.SizeX; x++)
 				{
-					for (int z = 0; z < shape.GridSizeZ; z++)
+					for (int z = 0; z < shape.SizeZ; z++)
 					{
-						if (!shape.GetGridShapeCell(x, y, z))
+						if (!shape.IsOccupied(x, y, z))
 							continue;
 
-						int relX = x - shape.RootCellCoordinates.X;
-						int relZ = z - shape.RootCellCoordinates.Y;
+						int relX = x - shape.PivotCell.X;
+						int relZ = z - shape.PivotCell.Y;
 						int offsetY = y;
 
 						int rotatedX = relX;
@@ -138,11 +153,11 @@ public partial class GridCellStateOverride : GridObject
 			gridCells.Add(rootCell);
 		}
 
-		GD.Print($"GridCellStateOverride {Name} applying to {gridCells.Count} cells.");
 
+		
+		List<GridCell> changedCells  = new List<GridCell>();
 		foreach (GridCell gridCell in gridCells)
 		{
-			//Grid Cell State Override
 			if (useGridCellStateOverride)
 			{
 				bool passFilter = cellStateOverrideFilter == Enums.GridCellState.None || 
@@ -150,7 +165,9 @@ public partial class GridCellStateOverride : GridObject
 
 				if (passFilter)
 				{
-					gridCell.SetState(gridCell.state | cellStateOverride);
+					if(!changedCells.Contains(gridCell))
+						changedCells.Add(gridCell);
+					gridCell.SetStateWithoutConnectionUpdate(gridCell.state | cellStateOverride);
 				}
 			}
 
@@ -162,6 +179,8 @@ public partial class GridCellStateOverride : GridObject
             
 				if (passFilter)
 				{
+					if(!changedCells.Contains(gridCell))
+						changedCells.Add(gridCell);
 					gridCell.SetFogState(fogState);
 				}
 			}
@@ -174,9 +193,15 @@ public partial class GridCellStateOverride : GridObject
 
 				if (passFilter)
 				{
+					if(!changedCells.Contains(gridCell))
+						changedCells.Add(gridCell);
 					gridCell.SetUnitSpawnState(unitTeamSpawn);
 				}
 			}
 		}
+		GD.Print($"GridCellStateOverride {Name} applied to {changedCells.Count} cells.");
 	}
+	
+	
+	
 }

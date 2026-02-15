@@ -20,12 +20,10 @@ public partial class GridObjectSight : GridObjectNode
 
     [ExportCategory("Line Of Sight")]
     [Export] private bool _useLosForGridObjects = true;
-
-    // Optional: if true, cells themselves must have LOS (affects fog/visibility)
+	
     [Export] private bool _useLosForCells = false;
 
-    // IMPORTANT: This mask should include things that BLOCK sight (walls, terrain, etc).
-    // Do NOT include unit layers here unless you want units to block vision.
+
     [Export(PropertyHint.Layers3DPhysics)]
     private uint _losBlockerMask = 0;
 
@@ -145,7 +143,7 @@ public partial class GridObjectSight : GridObjectNode
             // Optional: require LOS for the cell itself (affects fog/cell visibility)
             if (_useLosForCells && cell != startCell)
             {
-                Vector3 cellPoint = cell.worldCenter + Vector3.Up * _targetHeight;
+                Vector3 cellPoint = cell.WorldCenter + Vector3.Up * _targetHeight;
                 if (IsLineBlocked(eye, cellPoint))
                     continue;
             }

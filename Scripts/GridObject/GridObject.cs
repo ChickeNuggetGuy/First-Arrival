@@ -23,6 +23,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export] protected Node GridObjectNodeHolder;
 	[Export] public CollisionObject3D collisionShape;
 	[Export] public Node3D objectCenter;
+	[Export] public Node3D visualMesh;
 	[Export] public Enums.Stance CurrentStance = Enums.Stance.Normal;
 	[Export] public BoneAttachment3D LeftHandBoneAttachment;
 	[Export] public BoneAttachment3D RightHandBoneAttachment;
@@ -32,6 +33,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export] public Enums.GridObjectSettings gridObjectSettings = Enums.GridObjectSettings.None;
 	
 	[Export] public GridObjectAnimation animationNode;
+	[Export] public bool scenery = false;
 
 	public bool IsInitialized { get; protected set; } = false;
 	[Export] public bool IsActive { get; protected set; } = true;
@@ -48,11 +50,18 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		Team = team;
 
 		GridPositionData ??= GetNodeOrNull<GridPositionData>("GridPositionData") ??
-		                     GridObjectNodeHolder?.GetNodeOrNull<GridPositionData>("GridPositionData");
+		                     GridObjectNodeHolder?.GetNodeOrNull<GridPositionData>(
+			                     "GridPositionData"
+		                     );
+
+		if (GridObjectNodeHolder == null)
+		{
+			GridObjectNodeHolder = new Node3D();
+			AddChild(GridObjectNodeHolder);
+		}
 
 		if (GridPositionData == null)
 		{
-			// If not found, create it
 			GridPositionData = new GridPositionData();
 			GridPositionData.Name = "GridPositionData";
 			GridObjectNodeHolder.AddChild(GridPositionData);
@@ -60,20 +69,25 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 
 		if (gridCell == null)
 		{
-			GridSystem.Instance.TryGetGridCellFromWorldPosition(GridPositionData.Position, out gridCell, true);
+			GridSystem.Instance.TryGetGridCellFromWorldPosition(
+				GridPositionData.GlobalPosition,
+				out gridCell,
+				true
+			);
 		}
 
 		InitializeGridObjectNodes();
 		GridPositionData.SetupCall(this);
-		
-		var dir = GridPositionData.GetNearestDirectionFromRotation(GlobalRotation.Y);
-		GridPositionData.SetDirection(dir);
 
+		if (GridPositionData.AutoCalculateShape)
+			GridPositionData.CalculateShapeFromColliders();
 		
-		GridPositionData.SetGridCell(gridCell);
+		if (gridCell != null)
+			GridPositionData.SetGridCell(gridCell);
+		else
+			GD.PrintErr($"GridObject {Name}: Initialize called but GridCell is null (could not find cell at {GridPositionData.GlobalPosition})");
 
 		await Task.Yield();
-
 		IsInitialized = true;
 	}
 
@@ -165,9 +179,9 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		if (GridPositionData.AnchorCell != null)
 		{
 			data["HasPosition"] = true;
-			data["GridX"] = GridPositionData.AnchorCell.gridCoordinates.X;
-			data["GridY"] = GridPositionData.AnchorCell.gridCoordinates.Y;
-			data["GridZ"] = GridPositionData.AnchorCell.gridCoordinates.Z;
+			data["GridX"] = GridPositionData.AnchorCell.GridCoordinates.X;
+			data["GridY"] = GridPositionData.AnchorCell.GridCoordinates.Y;
+			data["GridZ"] = GridPositionData.AnchorCell.GridCoordinates.Z;
 			data["Direction"] = (int)GridPositionData.Direction;
 		}
 		else

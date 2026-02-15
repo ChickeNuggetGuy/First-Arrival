@@ -1,0 +1,7 @@
+[gd_resource type="StyleBoxTexture" format=3 uid="uid://hafhu05qok5r"]
+
+[ext_resource type="Texture2D" uid="uid://bygkvygfufs10" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/HUD/SPR_HUD_MilitaryCombat_Bar_Trapezoid_01_Clean.png" id="1_ciuvq"]
+
+[resource]
+texture = ExtResource("1_ciuvq")
+modulate_color = Color(0.17254902, 0.17254902, 0.17254902, 1)

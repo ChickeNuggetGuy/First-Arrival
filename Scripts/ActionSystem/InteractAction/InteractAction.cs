@@ -32,7 +32,7 @@ public partial class InteractAction : Action, ICompositeAction
 		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
 
 		// Are we already adjacent?
-		bool isAdjacent = neighbors.Any(c => c.gridCoordinates == startingGridCell.gridCoordinates);
+		bool isAdjacent = neighbors.Any(c => c.GridCoordinates == startingGridCell.GridCoordinates);
 
 		if (isAdjacent)
 		{
@@ -48,7 +48,7 @@ public partial class InteractAction : Action, ICompositeAction
 			return;
 		}
 
-		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)).First();
+		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)).First();
 
 		MoveActionDefinition moveActionDefinition =
 			gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;

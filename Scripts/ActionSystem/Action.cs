@@ -89,7 +89,7 @@ public abstract partial class Action
 
   protected abstract Task Execute();
 
-  protected virtual bool ShouldDeductCosts() => Parent == null;
+  protected virtual bool ShouldDeductCosts() => true;
 
   public async Task ActionCompleteCall()
   {

@@ -70,7 +70,7 @@ public static class NodeExtensions
 
 	public static Vector3 GetCellCenter(this GridCell gridCell)
 	{
-		return gridCell.worldCenter;
+		return gridCell.WorldCenter;
 	}
 	
 	public static void ChangeParent(this Node3D node, Node3D newParent)
@@ -303,6 +303,47 @@ public static class NodeExtensions
         }
 
         return files;
+    }
+    
+    
+    /// <summary>
+    /// Collects all CollisionShape3D nodes from a node's children.
+    /// </summary>
+    /// <param name="node">The root node to search from.</param>
+    /// <param name="collisionShapes">Output list of found collision shapes.</param>
+    /// <param name="recursive">If true, searches all descendants. If false, only immediate children.</param>
+    /// <param name="includeDisabled">If true, includes disabled collision shapes.</param>
+    /// <returns>True if any collision shapes were found.</returns>
+    public static bool TryGetCollisionShapes(
+	    this Node node,
+	    out List<CollisionShape3D> collisionShapes,
+	    bool recursive = true,
+	    bool includeDisabled = false)
+    {
+	    collisionShapes = new List<CollisionShape3D>();
+    
+	    if (node is CollisionShape3D rootCs && rootCs.Shape != null && (includeDisabled || !rootCs.Disabled))
+		    collisionShapes.Add(rootCs);
+    
+	    CollectCollisionShapesInternal(node, collisionShapes, recursive, includeDisabled);
+    
+	    return collisionShapes.Count > 0;
+    }
+
+    private static void CollectCollisionShapesInternal(
+	    Node node,
+	    List<CollisionShape3D> output,
+	    bool recursive,
+	    bool includeDisabled)
+    {
+	    foreach (Node child in node.GetChildren())
+	    {
+		    if (child is CollisionShape3D cs && cs.Shape != null && (includeDisabled || !cs.Disabled))
+			    output.Add(cs);
+
+		    if (recursive && child.GetChildCount() > 0)
+			    CollectCollisionShapesInternal(child, output, recursive, includeDisabled);
+	    }
     }
     
 }

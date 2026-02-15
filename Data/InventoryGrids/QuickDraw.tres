@@ -5,10 +5,8 @@
 
 [sub_resource type="Resource" id="Resource_sbows"]
 script = ExtResource("1_to3sr")
-GridSizeX = 1
-GridSizeY = 1
-GridSizeZ = 2
-ShapeGrid = Array[bool]([true, true])
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true])
 metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]

@@ -52,13 +52,13 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
         foreach (var doorCell in _doorCells)
         {
             var oldState = doorCell.state;
-            var connectionsBeforeInit = gridSystem.GetConnections(doorCell.gridCoordinates);
+            var connectionsBeforeInit = gridSystem.GetConnections(doorCell.GridCoordinates);
 
             Enums.GridCellState newState = doorCell.state | Enums.GridCellState.Obstructed;
             doorCell.ModifyOriginalState(newState);
             doorCell.SetState(newState);
 
-            var connectionsAfterInit = gridSystem.GetConnections(doorCell.gridCoordinates);
+            var connectionsAfterInit = gridSystem.GetConnections(doorCell.GridCoordinates);
             
             if (connectionsAfterInit.Count > 0)
             {
@@ -84,7 +84,7 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
         foreach (var doorCell in _doorCells)
         {
             var oldState = doorCell.state;
-            var oldConnections = GridSystem.Instance.GetConnections(doorCell.gridCoordinates);
+            var oldConnections = GridSystem.Instance.GetConnections(doorCell.GridCoordinates);
 
             Enums.GridCellState newState;
             if (isOpen)
@@ -95,7 +95,7 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
             doorCell.ModifyOriginalState(newState);
             doorCell.SetState(newState);
 
-            var newConnections = GridSystem.Instance.GetConnections(doorCell.gridCoordinates);
+            var newConnections = GridSystem.Instance.GetConnections(doorCell.GridCoordinates);
 
             if (!isOpen && newConnections.Count > 0)
             {
@@ -126,7 +126,7 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
 	    base._Process(delta);
 	    foreach (var doorCell in _doorCells)
 	    {
-		    DebugDraw3D.DrawBox(doorCell.worldCenter, Quaternion.Identity, Vector3.One, Colors.Red, true);
+		    DebugDraw3D.DrawBox(doorCell.WorldCenter, Quaternion.Identity, Vector3.One, Colors.Red, true);
 	    }
     }
 

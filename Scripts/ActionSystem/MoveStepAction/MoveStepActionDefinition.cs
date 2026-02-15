@@ -45,8 +45,9 @@ public partial class MoveStepActionDefinition : ActionDefinition
 
     // Determine rotation cost based on actual transform-facing
     var currentFacing = RotationHelperFunctions.GetDirectionFromRotation3D(
-      gridObject.Rotation.Y
+	    gridObject.visualMesh.Rotation.Y
     );
+    
     var targetFacing = RotationHelperFunctions.GetDirectionBetweenCells(
       startingGridCell,
       targetGridCell
@@ -62,10 +63,10 @@ public partial class MoveStepActionDefinition : ActionDefinition
 
     bool diagonal =
       Mathf.Abs(
-        startingGridCell.gridCoordinates.X - targetGridCell.gridCoordinates.X
+        startingGridCell.GridCoordinates.X - targetGridCell.GridCoordinates.X
       ) == 1
       && Mathf.Abs(
-        startingGridCell.gridCoordinates.Z - targetGridCell.gridCoordinates.Z
+        startingGridCell.GridCoordinates.Z - targetGridCell.GridCoordinates.Z
       ) == 1;
 
     if (diagonal)

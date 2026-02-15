@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="GridConfiguration" format=3 uid="uid://bosu3vpfk4e77"]
+
+[sub_resource type="CSharpScript" id="CSharpScript_husae"]
+
+[resource]
+script = SubResource("CSharpScript_husae")
+GridWorldOrigin = Vector3(0, 0, 0)
+GridSize = Vector3i(100, 25, 100)

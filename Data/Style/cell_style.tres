@@ -1,0 +1,9 @@
+[gd_resource type="StyleBoxTexture" format=3 uid="uid://fcfrc5u0af56"]
+
+[ext_resource type="Texture2D" uid="uid://2w2d4a76pnic" path="res://Third-Party Assets/UIDifferentFree03Wenrexa/PNG/Cell01.png" id="1_n2sfi"]
+
+[resource]
+texture = ExtResource("1_n2sfi")
+axis_stretch_horizontal = 2
+axis_stretch_vertical = 2
+modulate_color = Color(0.5033745, 0.5033746, 0.5033746, 1)

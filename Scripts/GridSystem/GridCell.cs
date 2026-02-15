@@ -16,11 +16,11 @@ public partial class GridCell
         null
     );
 
-    public Vector3I gridCoordinates { get; protected set; }
-    public Vector3 worldCenter { get; protected set; }
-    public Vector3 trueCenter { get; protected set; }
+    public Vector3I GridCoordinates { get; protected set; }
+    public Vector3 WorldCenter { get; protected set; }
+    public Vector3 WorldPosition { get; protected set; }
     
-    public List<Vector3I> Connections => GridSystem.Instance?.GetConnections(gridCoordinates);
+    public List<Vector3I> Connections => GridSystem.Instance?.GetConnections(GridCoordinates);
 
     public Enums.GridCellState originalState { get; protected set; }
     public Enums.GridCellState state { get; protected set; }
@@ -32,15 +32,15 @@ public partial class GridCell
 
     public InventoryGrid InventoryGrid { get; protected set; }
 	
-    public bool IsWalkable => state.HasFlag(Enums.GridCellState.Ground) && !state.HasFlag(Enums.GridCellState.Obstructed) && (GridSystem.Instance?.HasConnections(gridCoordinates) ?? false);
+    public bool IsWalkable => state.HasFlag(Enums.GridCellState.Ground) && !state.HasFlag(Enums.GridCellState.Obstructed) && (GridSystem.Instance?.HasConnections(GridCoordinates) ?? false);
 
-    public GridCell(Vector3I gridCoordinates, Vector3 worldCenter, Vector3 trueCenter, Enums.GridCellState state,
+    public GridCell(Vector3I gridCoordinates, Vector3 worldCenter, Vector3 worldPosition, Enums.GridCellState state,
         Enums.FogState fogState, InventoryGrid inventory, Enums.UnitTeam unitTeamSpawn = Enums.UnitTeam.All
     )
     {
-        this.gridCoordinates = gridCoordinates;
-        this.worldCenter = worldCenter;
-        this.trueCenter = trueCenter;
+        this.GridCoordinates = gridCoordinates;
+        this.WorldCenter = worldCenter;
+        this.WorldPosition = worldPosition;
         this.state = state;
         this.originalState = state;
         SetFogState(fogState);
@@ -61,26 +61,52 @@ public partial class GridCell
     public void SetFogState(Enums.FogState state)
     {
         this.fogState = state;
-        if (HasGridObject())
-        {
-	        switch (this.fogState)
-	        {
-		        case Enums.FogState.Unseen:
-			        foreach (var gridObject in gridObjects)
-				        gridObject.Hide();
-			        break;
-		        case Enums.FogState.PreviouslySeen:
-			        foreach (var gridObject in gridObjects)
-				        gridObject.Show();
-			        break;
-		        case Enums.FogState.Visible:
-			        foreach (var gridObject in gridObjects)
-				        gridObject.Show();
-			        break;
-		        default:
-			        throw new ArgumentOutOfRangeException();
-	        }
-        }
+       UpdateGridObjectVisibility();
+    }
+
+    public void UpdateGridObjectVisibility()
+    {
+	    if (HasGridObject())
+	    {
+		    switch (this.fogState)
+		    {
+			    case Enums.FogState.Unseen:
+				    foreach (var gridObject in gridObjects)
+				    {
+					    if (gridObject.scenery || gridObject.Team == Enums.UnitTeam.Player)
+					    {
+						    continue;
+					    }
+
+					    gridObject.Hide();
+				    }
+				    break;
+			    case Enums.FogState.PreviouslySeen:
+				    foreach (var gridObject in gridObjects)
+				    {
+					    if (gridObject.scenery || gridObject.Team == Enums.UnitTeam.Player)
+					    {
+						    continue;
+					    }
+
+					    gridObject.Show();
+				    }
+				    break;
+			    case Enums.FogState.Visible:
+				    foreach (var gridObject in gridObjects)
+				    {
+					    if (gridObject.scenery || gridObject.Team == Enums.UnitTeam.Player)
+					    {
+						    continue;
+					    }
+
+					    gridObject.Show();
+				    }
+				    break;
+			    default:
+				    throw new ArgumentOutOfRangeException();
+		    }
+	    }
     }
 
     public void SetUnitSpawnState(Enums.UnitTeam state)
@@ -90,7 +116,7 @@ public partial class GridCell
 
     public void SetWorldCenter(Vector3 worldCenter)
     {
-        this.worldCenter = worldCenter;
+        this.WorldCenter = worldCenter;
     }
 
     public void SetState(Enums.GridCellState state)
@@ -100,8 +126,13 @@ public partial class GridCell
 
         this.state = state;
 
-        GridSystem.Instance.UpdateGridCell(gridCoordinates);
-        GridSystem.Instance.UpdateNeighborsConnections(this.gridCoordinates);
+        GridSystem.Instance.UpdateGridCell(GridCoordinates);
+        GridSystem.Instance.UpdateNeighborsConnections(this.GridCoordinates);
+    }
+    
+    public void SetStateWithoutConnectionUpdate(Enums.GridCellState newState)
+    {
+	    this.state = newState;
     }
 
     public void AddGridObject(GridObject gridObject, Enums.GridCellState newState, bool rebuildConnections)
@@ -112,13 +143,7 @@ public partial class GridCell
         bool stateChanged = this.state != newState;
         if (stateChanged)
             this.state = newState;
-
-        // Optionally rebuild connections if needed
-        // if (rebuildConnections)
-        // {
-        //     GridSystem.Instance.UpdateGridCell(gridCoordinates);
-        //     GridSystem.Instance.UpdateNeighborsConnections(this.gridCoordinates);
-        // }
+        UpdateGridObjectVisibility();
     }
 
     public void RemoveGridObject(GridObject gridObject, Enums.GridCellState newState, bool rebuildConnections)
@@ -134,27 +159,10 @@ public partial class GridCell
 
         if (rebuildConnections)
         {
-            GridSystem.Instance.UpdateGridCell(gridCoordinates);
-            GridSystem.Instance.UpdateNeighborsConnections(this.gridCoordinates);
+            GridSystem.Instance.UpdateGridCell(GridCoordinates);
+            GridSystem.Instance.UpdateNeighborsConnections(this.GridCoordinates);
         }
-    }
-
-    public void RemoveGridObject(GridObject gridObject, Enums.GridCellState newState)
-    {
-        if (!gridObjects.Contains(gridObject))
-            return;
-
-        this.gridObjects.Remove(gridObject);
-
-        if (this.state != newState)
-        {
-            SetState(newState);
-        }
-        else
-        {
-            GridSystem.Instance.UpdateGridCell(gridCoordinates);
-            GridSystem.Instance.UpdateNeighborsConnections(this.gridCoordinates);
-        }
+        UpdateGridObjectVisibility();
     }
 
     public void RestoreOriginalState()

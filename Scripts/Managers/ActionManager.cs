@@ -14,13 +14,17 @@ public partial class ActionManager : Manager<ActionManager>
 {
 	public ActionDefinition SelectedAction { get; private set; }
 
+	private GridCell currentGridCell;
+
+	private List<(Action action, GridObject gridObject)> delayedActions = new();
+
 	[Signal]
 	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
-	
-	
-	public override string GetManagerName() =>  "ActionManager";
-	
-	
+
+
+	public override string GetManagerName() => "ActionManager";
+
+
 	protected override async Task _Setup(bool loadingData)
 	{
 		await Task.CompletedTask;
@@ -34,7 +38,7 @@ public partial class ActionManager : Manager<ActionManager>
 	public override void _Input(InputEvent @event)
 	{
 		if (IsBusy) return;
-		if(TurnManager.Instance.CurrentTurn.team != Enums.UnitTeam.Player) return;
+		if (TurnManager.Instance.CurrentTurn.team != Enums.UnitTeam.Player) return;
 		if (InputManager.Instance.MouseOverUI) return;
 
 		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
@@ -69,7 +73,8 @@ public partial class ActionManager : Manager<ActionManager>
 					return;
 				}
 			}
-			if(!selectedGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))return;
+
+			if (!selectedGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode)) return;
 			ActionDefinition[] actions = gridObjectActionsNode.ActionDefinitions
 				.Where(action => action.GetIsAlwaysActive())
 				.ToArray();
@@ -115,7 +120,7 @@ public partial class ActionManager : Manager<ActionManager>
 			GD.Print("ActionManager.RunTryTakeActionAsync: start or target is null");
 			return;
 		}
-		
+
 		try
 		{
 			await TryTakeAction(action, gridObject, start, target, null);
@@ -157,19 +162,18 @@ public partial class ActionManager : Manager<ActionManager>
 			GD.Print("TryTakeAction: action is null");
 			return false;
 		}
-	
+
 		if (gridObject == null)
 		{
 			GD.Print("TryTakeAction: gridObject is null");
 			return false;
 		}
-		
+
 		if (startingGridCell == null)
 		{
 			GD.Print("TryTakeAction: startingGridCell is null");
 			return false;
 		}
-
 
 		if (targetGridCell == null)
 		{
@@ -191,26 +195,50 @@ public partial class ActionManager : Manager<ActionManager>
 			out string reason
 		);
 
+		if (action.confirmClick)
+		{
+			if (currentGridCell == null)
+			{
+				currentGridCell = targetGridCell;
+				return false;
+			}
+			else if (targetGridCell == currentGridCell)
+			{
+				currentGridCell = null;
+			}
+			else
+			{
+				currentGridCell = targetGridCell;
+				return false;
+			}
+		}
+
 		if (result)
 		{
-			GD.Print(
-				$"action: {action.GetActionName()} can be taken, starting execution"
-			);
+			GD.Print($"action: {action.GetActionName()} can be taken, starting execution");
 			SetIsBusy(true);
 			try
 			{
-				await action.InstantiateActionCall(
+				var actionInstance = action.InstantiateAction(
 					gridObject,
 					startingGridCell,
 					targetGridCell,
 					costs
 				);
+
+				if (actionInstance is IDelayedAction delayedAction)
+				{
+					await actionInstance.ExecuteCall();
+					RegisterDelayedAction(actionInstance, gridObject);
+				}
+				else
+				{
+					await actionInstance.ExecuteCall();
+				}
 			}
 			catch (Exception e)
 			{
-				GD.PushError(
-					$"Exception during action '{action.GetActionName()}': {e}"
-				);
+				GD.PushError($"Exception during action '{action.GetActionName()}': {e}");
 				SetIsBusy(false);
 			}
 
@@ -225,12 +253,35 @@ public partial class ActionManager : Manager<ActionManager>
 
 	public void ActionCompleteCall(ActionDefinition actionDef)
 	{
-		
 		ActionCompleteCall(actionDef, null);
 		EmitSignal(SignalName.ActionCompleted, actionDef, SelectedAction);
 	}
 
-	// New API: only clear IsBusy if the completed action is the root (no parent)
+
+	public void ProcessDelayedActions()
+	{
+		for (int i = delayedActions.Count - 1; i >= 0; i--)
+		{
+			var (action, gridObject) = delayedActions[i];
+
+			if (action is IDelayedAction delayed)
+			{
+				bool shouldRemove = delayed.OnTurnTick();
+
+				if (shouldRemove)
+				{
+					delayedActions.RemoveAt(i);
+					delayed.OnDelayComplete();
+				}
+			}
+		}
+	}
+
+	public void RegisterDelayedAction(Action action, GridObject gridObject)
+	{
+		delayedActions.Add((action, gridObject));
+	}
+
 	public void ActionCompleteCall(ActionDefinition actionDef, global::Action actionInst)
 	{
 		if (actionDef?.parentGridObject != null)
@@ -241,7 +292,7 @@ public partial class ActionManager : Manager<ActionManager>
 				teamHolder.UpdateGridObjects(actionDef, SelectedAction);
 			}
 		}
-		
+
 		EmitSignal(SignalName.ActionCompleted, actionDef, SelectedAction);
 		switch (actionDef)
 		{
@@ -249,11 +300,11 @@ public partial class ActionManager : Manager<ActionManager>
 				GD.Print("Action is null");
 				return;
 			case ItemActionDefinition itemActionDefinition:
-				if(!actionDef.GetRemainSelected())
+				if (!actionDef.GetRemainSelected())
 					itemActionDefinition.Item = null;
 				break;
 			case MoveActionDefinition moveActionDefinition:
-				if(!actionDef.GetRemainSelected())
+				if (!actionDef.GetRemainSelected())
 					moveActionDefinition.path = null;
 				break;
 		}
@@ -263,33 +314,36 @@ public partial class ActionManager : Manager<ActionManager>
 		if (isRoot)
 		{
 			GD.Print($"{actionDef.GetActionName()} complete");
-			
+
 			SetIsBusy(false);
 
 			if (TurnManager.Instance.CurrentTurn.team == Enums.UnitTeam.Player)
 			{
 				if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
 				{
-					if(!GridObjectManager.Instance.CurrentPlayerGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))
-					SetSelectedAction(gridObjectActionsNode
-						.ActionDefinitions
-						.First());
+					if (!GridObjectManager.Instance.CurrentPlayerGridObject.TryGetGridObjectNode<GridObjectActions>(
+						    out var gridObjectActionsNode))
+						SetSelectedAction(gridObjectActionsNode
+							.ActionDefinitions
+							.First());
 				}
 			}
 		}
 	}
 
 	#region manager Data
-	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
+
+	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		base.Load(data);
-		if(!HasLoadedData) return;
+		if (!HasLoadedData) return;
 	}
 
-	public override Godot.Collections.Dictionary<string,Variant> Save()
+	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
 		return null;
 	}
+
 	#endregion
 
 	public override void Deinitialize()

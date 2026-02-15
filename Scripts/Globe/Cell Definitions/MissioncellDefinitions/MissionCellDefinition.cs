@@ -4,10 +4,16 @@ public partial class MissionCellDefinition : HexCellDefinition
 {
 	public MissionBase mission;
 
-	public MissionCellDefinition(int cellIndex, string name, MissionBase mission) : base(cellIndex, name)
+	public Node3D missionVisual = null;
+
+	public MissionCellDefinition(int cellIndex, string name, MissionBase mission, Node3D missionVisual = null) : base(cellIndex, name)
 	{
 		this.mission = mission;
+		if (missionVisual != null)
+			this.missionVisual = missionVisual;
 	}
+	
+	
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{

@@ -1,5 +1,6 @@
 [gd_resource type="Resource" script_class="Craft" format=3 uid="uid://b307r1871vdqi"]
 
+[ext_resource type="Texture2D" uid="uid://c53tofvq62o2d" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Preset_A_Rifle_01_Military_Side.png" id="1_46n6x"]
 [ext_resource type="Script" uid="uid://duqdmmi83ptnx" path="res://Scripts/Globe/Craft.cs" id="1_myolf"]
 
 [resource]
@@ -7,6 +8,7 @@ resource_name = "Troop Transport _Item"
 script = ExtResource("1_myolf")
 ItemID = 4
 ItemName = "Troop Transport "
+ItemIcon = ExtResource("1_46n6x")
 globeOnly = true
 weight = 9999
 ActionDefinitions = []

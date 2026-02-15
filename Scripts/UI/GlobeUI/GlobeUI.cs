@@ -32,7 +32,9 @@ public partial class GlobeUI : UIWindow
 		
 		GlobeTimeManager.Instance.DateChanged += TimeManagerOnDateChanged;
 		
-		buyCraftButton.Pressed += BuyCraftButtonOnPressed;
+		
+		if(!buyCraftButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(BuyCraftButtonOnPressed)))
+			buyCraftButton.Pressed += BuyCraftButtonOnPressed;
 		
 		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
 		if (teamManager != null)

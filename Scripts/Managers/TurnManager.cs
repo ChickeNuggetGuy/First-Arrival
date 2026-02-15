@@ -11,7 +11,7 @@ public partial class TurnManager : Manager<TurnManager>
 {
 	[Export] protected Turn[] turns = new Turn[0];
 
-	private int _currentTurnIndex = 0;
+	public int CurrentTurnIndex { get; protected set; } = 0;
 
 	public Turn CurrentTurn
 	{
@@ -23,7 +23,7 @@ public partial class TurnManager : Manager<TurnManager>
 				return null;
 			}
 
-			int clampedIndex = Mathf.Clamp(_currentTurnIndex, 0, turns.Length - 1);
+			int clampedIndex = Mathf.Clamp(CurrentTurnIndex, 0, turns.Length - 1);
 			return turns[clampedIndex];
 		}
 	}
@@ -35,8 +35,6 @@ public partial class TurnManager : Manager<TurnManager>
 
 	protected override async Task _Setup(bool loadingData)
 	{
-		
-		
 		if (turns == null || turns.Length == 0)
 		{
 			GD.PushWarning("TurnManager: No turns defined. Setup complete.");
@@ -103,6 +101,7 @@ public partial class TurnManager : Manager<TurnManager>
 	private void EndTurn()
 	{
 		GD.Print("---> Ending Turn");
+		ActionManager.Instance?.ProcessDelayedActions();
 		ChangeCurrentTurn();
 		SetIsBusy(false);
 	}
@@ -112,11 +111,11 @@ public partial class TurnManager : Manager<TurnManager>
 		if (turns == null || turns.Length == 0)
 		{
 			GD.PushWarning("TurnManager: Cannot set current turn, 'turns' array is empty.");
-			_currentTurnIndex = 0;
+			CurrentTurnIndex = 0;
 			return;
 		}
 
-		_currentTurnIndex = Mathf.Clamp(turnIndex, 0, turns.Length - 1);
+		CurrentTurnIndex = Mathf.Clamp(turnIndex, 0, turns.Length - 1);
 		EmitSignal(SignalName.TurnStarted, CurrentTurn);
 
 		GD.Print("<--- Turn Started: ", CurrentTurn?.ResourceName ?? "NULL");
@@ -144,7 +143,7 @@ public partial class TurnManager : Manager<TurnManager>
 
 		for (int i = 1; i <= turns.Length; i++)
 		{
-			int nextIndex = (_currentTurnIndex + i) % turns.Length;
+			int nextIndex = (CurrentTurnIndex + i) % turns.Length;
 
 			var turn = turns[nextIndex];
 			if (turn != null && (turn.repeatable || turn.timesExectuted == 0))

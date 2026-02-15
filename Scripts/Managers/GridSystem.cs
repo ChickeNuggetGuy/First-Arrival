@@ -8,6 +8,7 @@ using Godot;
 
 namespace FirstArrival.Scripts.Managers;
 
+[Tool]
 [GlobalClass]
 public partial class GridSystem : Manager<GridSystem>
 {
@@ -73,6 +74,20 @@ public partial class GridSystem : Manager<GridSystem>
 
 	[Export] private bool _blockDiagonalCornerCutting = true;
 
+
+	/// <summary>
+	/// Toggle this in the inspector to export the configuration.
+	/// </summary>
+	[Export]
+	public bool ExportConfiguration
+	{
+		get => false;
+		set
+		{
+			if (value) ExportEditorConfiguration();
+		}
+	}
+
 	private Dictionary<Vector3I, HashSet<Vector3I>> _adj;
 	private BoxShape3D _corridorBox;
 	private PhysicsShapeQueryParameters3D _corridorParams;
@@ -115,6 +130,9 @@ public partial class GridSystem : Manager<GridSystem>
 
 	public override void _Process(double delta)
 	{
+		if (Engine.IsEditorHint())
+			return;
+
 		base._Process(delta);
 		if (DebugMode && GridCells != null)
 		{
@@ -147,9 +165,7 @@ public partial class GridSystem : Manager<GridSystem>
 			// 1. Setup Grid Cells
 			var foundGridObjects = await SetupGrid();
 
-			// 2. Setup Connections
-			await SetupCellConnections();
-
+			// 2. Gather all grid objects (including obstacles)
 			var allGridObjectsInScene = GetTree()
 				.GetNodesInGroup("GridObjects")
 				.OfType<GridObject>()
@@ -158,24 +174,28 @@ public partial class GridSystem : Manager<GridSystem>
 			foreach (var go in allGridObjectsInScene)
 			{
 				if (!foundGridObjects.Contains(go))
-				{
 					foundGridObjects.Add(go);
-				}
 			}
 
+			// 3. Initialize GridObjects FIRST (so they have valid AnchorCells)
 			if (foundGridObjects != null && foundGridObjects.Count > 0)
 				await InitializeGridObjects(foundGridObjects);
 
-			// 5. Apply Overrides
+			// 4. Apply State Overrides BEFORE building connections
 			var gridCellStateOverrides = GetTree()
 				.GetNodesInGroup("GridCellOverride")
 				.OfType<GridCellStateOverride>()
 				.ToArray();
 
-			for (int i = 0; i < gridCellStateOverrides.Length; i++)
+			GD.Print($"Found {gridCellStateOverrides.Length} GridCellStateOverrides");
+
+			foreach (var stateOverride in gridCellStateOverrides)
 			{
-				gridCellStateOverrides[i].InitializeGridCellOverride();
+				stateOverride.InitializeGridCellOverride();
 			}
+
+			// 5. NOW setup connections (after cells are marked obstructed)
+			await SetupCellConnections();
 
 			GD.Print("GridSystem: Initialization Complete.");
 			EmitSignal(SignalName.GridSystemInitialized);
@@ -183,7 +203,27 @@ public partial class GridSystem : Manager<GridSystem>
 		catch (Exception ex)
 		{
 			GD.PrintErr($"CRITICAL ERROR in GridSystem Execute: {ex.Message}\n{ex.StackTrace}");
-			// Optional: throw ex; if you want to stop the game manager chain
+		}
+
+
+		if (DebugMode)
+		{
+			int obstructedCount = 0;
+			int obstructedWithNoConnections = 0;
+
+			foreach (var cell in AllGridCells)
+			{
+				if (cell.state.HasFlag(Enums.GridCellState.Obstructed))
+				{
+					obstructedCount++;
+					if (!HasConnections(cell.GridCoordinates))
+						obstructedWithNoConnections++;
+				}
+			}
+
+			GD.Print($"=== OBSTACLE DEBUG ===");
+			GD.Print($"Obstructed cells: {obstructedCount}");
+			GD.Print($"Obstructed cells with no connections: {obstructedWithNoConnections}");
 		}
 
 		await Task.CompletedTask;
@@ -260,13 +300,14 @@ public partial class GridSystem : Manager<GridSystem>
 				{
 					Vector3I coords = new Vector3I(x, y, z);
 
+					// CHANGED: Removed negation from Z coordinate
 					Vector3 trueCenter = _gridWorldOrigin + new Vector3(
 						(x + 0.5f) * _cellSize.X,
 						(y + 0.5f) * _cellSize.Y,
-						-(z + 0.5f) * _cellSize.X
+						(z + 0.5f) * _cellSize.X
 					);
 
-					Vector3 worldCenter = trueCenter;
+					Vector3 WorldCenter = trueCenter;
 
 					bool hasGround = true;
 
@@ -329,7 +370,7 @@ public partial class GridSystem : Manager<GridSystem>
 									// Update Y if it's the center ray, OR if we haven't found ground yet (fallback to corner height)
 									if (offset == Vector3.Zero || !hasGround)
 									{
-										worldCenter.Y = hitPos.Y; // keep center at ground height
+										WorldCenter.Y = hitPos.Y; // keep center at ground height
 									}
 
 									hasGround = true;
@@ -355,7 +396,7 @@ public partial class GridSystem : Manager<GridSystem>
 						state |= Enums.GridCellState.Air;
 					}
 
-					CreateOrUpdateCell(coords, worldCenter, trueCenter, state,
+					CreateOrUpdateCell(coords, WorldCenter, trueCenter, state,
 						(InventoryGrid)groundInv.Duplicate(true));
 				}
 			}
@@ -415,7 +456,7 @@ public partial class GridSystem : Manager<GridSystem>
 			GridCells[coords.Y][coords.X, coords.Z] = new GridCell(
 				coords,
 				position,
-				trueCenter,
+				new Vector3(coords.X, coords.Y, coords.Z) * new Vector3(_cellSize.X, _cellSize.Y, _cellSize.X),
 				state,
 				Enums.FogState.Unseen,
 				groundInventory
@@ -426,10 +467,8 @@ public partial class GridSystem : Manager<GridSystem>
 			GridCell cell = GridCells[coords.Y][coords.X, coords.Z];
 			cell.SetState(state);
 			cell.SetWorldCenter(position);
-			// Optionally update inventory if it was missing before
 			if (cell.InventoryGrid == null && groundInventory != null)
 			{
-				// You might need a setter on GridCell for this, or just leave as is
 				cell.SetInventory(groundInventory);
 			}
 		}
@@ -570,12 +609,8 @@ public partial class GridSystem : Manager<GridSystem>
 
 	#endregion
 
-	private (int tests, int blockedHits) BuildConnectionsForCell(
-		PhysicsDirectSpaceState3D space,
-		GridCell cell,
-		uint obstacleMask,
-		float halfY,
-		List<Vector3I> outNeighbors
+	private (int tests, int blockedHits) BuildConnectionsForCell(PhysicsDirectSpaceState3D space, GridCell cell,
+		uint obstacleMask, float halfY, List<Vector3I> outNeighbors
 	)
 	{
 		outNeighbors.Clear();
@@ -586,7 +621,7 @@ public partial class GridSystem : Manager<GridSystem>
 
 		int tests = 0;
 		int blockedHits = 0;
-		Vector3I coords = cell.gridCoordinates;
+		Vector3I coords = cell.GridCoordinates;
 
 		for (int dy = -1; dy <= 1; dy++)
 		{
@@ -685,7 +720,7 @@ public partial class GridSystem : Manager<GridSystem>
 
 	private void ApplyConnectionsSymmetric(GridCell cell, List<Vector3I> newNeighbors)
 	{
-		Vector3I cellCoords = cell.gridCoordinates;
+		Vector3I cellCoords = cell.GridCoordinates;
 
 		var oldSet = GetAdjSet(cellCoords, create: false);
 		var newSet = newNeighbors.Count > 0
@@ -718,16 +753,12 @@ public partial class GridSystem : Manager<GridSystem>
 		}
 	}
 
-	private bool IsPassageClearBox(
-		PhysicsDirectSpaceState3D space,
-		uint obstacleMask,
-		GridCell a,
-		GridCell b,
-		float halfY
+	private bool IsPassageClearBox(PhysicsDirectSpaceState3D space, uint obstacleMask,
+		GridCell a, GridCell b, float halfY
 	)
 	{
-		Vector3 centerA = a.worldCenter;
-		Vector3 centerB = b.worldCenter;
+		Vector3 centerA = a.WorldCenter;
+		Vector3 centerB = b.WorldCenter;
 
 		float verticalOffset = _cellSize.Y * 0.35f;
 		centerA.Y += verticalOffset;
@@ -783,7 +814,7 @@ public partial class GridSystem : Manager<GridSystem>
 					if (cell == null)
 						continue;
 
-					if (!HasConnections(cell.gridCoordinates))
+					if (!HasConnections(cell.GridCoordinates))
 					{
 						isolatedCells++;
 					}
@@ -942,10 +973,9 @@ public partial class GridSystem : Manager<GridSystem>
 
 		Vector3 localPos = worldPosition - _gridWorldOrigin;
 
-		// Use FloorToInt for accurate grid cell selection as cells map to [x, x+1)
 		int X = Mathf.FloorToInt(localPos.X / _cellSize.X);
 		int Y = Mathf.FloorToInt(localPos.Y / _cellSize.Y);
-		int Z = Mathf.FloorToInt(-localPos.Z / _cellSize.X); // Note: Z is negated
+		int Z = Mathf.FloorToInt(localPos.Z / _cellSize.X);
 
 		Y = Mathf.Clamp(Y, 0, GridCells.Length - 1);
 		if (Y < 0 || Y >= GridCells.Length)
@@ -973,7 +1003,7 @@ public partial class GridSystem : Manager<GridSystem>
 				GridCell candidate = GridCells[Y][i, j];
 				if (candidate != null)
 				{
-					float distSq = (candidate.worldCenter - worldPosition)
+					float distSq = (candidate.WorldCenter - worldPosition)
 						.LengthSquared();
 					if (distSq < minDistance)
 					{
@@ -1089,18 +1119,18 @@ public partial class GridSystem : Manager<GridSystem>
 		}
 
 		// Draw connections
-		var connections = GetConnections(gridCell.gridCoordinates);
+		var connections = GetConnections(gridCell.GridCoordinates);
 		foreach (var neighborCoords in connections)
 		{
 			GridCell neighbor = GetGridCell(neighborCoords);
 			if (neighbor == null)
 				continue;
 
-			DebugDraw3D.DrawLine(gridCell.worldCenter, neighbor.worldCenter, color);
+			DebugDraw3D.DrawLine(gridCell.WorldCenter, neighbor.WorldCenter, color);
 		}
 
 		DebugDraw3D.DrawBox(
-			gridCell.worldCenter - new Vector3(0, .5f, 0),
+			gridCell.WorldCenter - new Vector3(0, .5f, 0),
 			Quaternion.Identity,
 			new Vector3(_cellSize.X, _cellSize.Y, _cellSize.X),
 			color,
@@ -1122,10 +1152,10 @@ public partial class GridSystem : Manager<GridSystem>
 
 		if (onlyWalkable)
 		{
-			var connectedCoords = GetConnections(startingGridCell.gridCoordinates);
+			var connectedCoords = GetConnections(startingGridCell.GridCoordinates);
 			foreach (var coords in connectedCoords)
 			{
-				if (sameLevelOnly && coords.Y != startingGridCell.gridCoordinates.Y)
+				if (sameLevelOnly && coords.Y != startingGridCell.GridCoordinates.Y)
 					continue;
 
 				var n = GetGridCell(coords);
@@ -1145,7 +1175,7 @@ public partial class GridSystem : Manager<GridSystem>
 						if (x == 0 && y == 0 && z == 0) continue;
 
 						GridCell tempCell = GetGridCell(
-							new Vector3I(x, y, z) + startingGridCell.gridCoordinates
+							new Vector3I(x, y, z) + startingGridCell.GridCoordinates
 						);
 						if (tempCell == null) continue;
 
@@ -1174,10 +1204,10 @@ public partial class GridSystem : Manager<GridSystem>
 		{
 			if (onlyWalkable)
 			{
-				var connectedCoords = GetConnections(startingGridCell.gridCoordinates);
+				var connectedCoords = GetConnections(startingGridCell.GridCoordinates);
 				foreach (var coords in connectedCoords)
 				{
-					if (sameLevelOnly && coords.Y != startingGridCell.gridCoordinates.Y)
+					if (sameLevelOnly && coords.Y != startingGridCell.GridCoordinates.Y)
 						continue;
 
 					var n = GetGridCell(coords);
@@ -1197,7 +1227,7 @@ public partial class GridSystem : Manager<GridSystem>
 							if (x == 0 && y == 0 && z == 0) continue;
 
 							GridCell tempCell = GetGridCell(
-								new Vector3I(x, y, z) + startingGridCell.gridCoordinates
+								new Vector3I(x, y, z) + startingGridCell.GridCoordinates
 							);
 							if (tempCell == null) continue;
 
@@ -1240,13 +1270,13 @@ public partial class GridSystem : Manager<GridSystem>
 		Vector3 coneRight = direction.Cross(upRef).Normalized();
 		Vector3 coneUp = coneRight.Cross(direction).Normalized();
 
-		Vector3 originPos = startCell.worldCenter;
+		Vector3 originPos = startCell.WorldCenter;
 
 		// 3. Optimization: Bounds Check
 		float minCellDim = Mathf.Min(_cellSize.X, _cellSize.Y);
 		int cellRange = Mathf.CeilToInt(maxDistance / minCellDim);
 
-		Vector3I startCoords = startCell.gridCoordinates;
+		Vector3I startCoords = startCell.GridCoordinates;
 
 		int minX = Mathf.Max(0, startCoords.X - cellRange);
 		int maxX = Mathf.Min(_gridSize.X - 1, startCoords.X + cellRange);
@@ -1268,7 +1298,7 @@ public partial class GridSystem : Manager<GridSystem>
 					GridCell candidate = GridCells[y][x, z];
 					if (candidate == null) continue;
 
-					Vector3 toCandidate = candidate.worldCenter - originPos;
+					Vector3 toCandidate = candidate.WorldCenter - originPos;
 
 					// A. Forward Distance Check (Project onto Direction)
 					float distForward = toCandidate.Dot(direction);
@@ -1318,13 +1348,13 @@ public partial class GridSystem : Manager<GridSystem>
 			case Enums.Direction.West: dirVec = Vector3.Left; break;
 			default:
 				Vector3I offset = GetDirectionOffset(direction);
-				if (offset != Vector3I.Zero) dirVec = new Vector3(offset.X, offset.Y, -offset.Z).Normalized();
+				// CHANGED: Removed negation of offset.Z
+				if (offset != Vector3I.Zero) dirVec = new Vector3(offset.X, offset.Y, offset.Z).Normalized();
 				break;
 		}
 
 		return GetGridCellsInCone(startCell, dirVec, maxDistance, angles, includeOrigin);
 	}
-
 
 	public bool TryGetGridCellsInRange(
 		GridCell startingGridCell,
@@ -1346,7 +1376,7 @@ public partial class GridSystem : Manager<GridSystem>
 			{
 				for (int z = Mathf.RoundToInt(-range.X / 2.0); z < Mathf.RoundToInt(range.X / 2.0); z++)
 				{
-					Vector3I gridCellCoords = startingGridCell.gridCoordinates + new Vector3I(x, y, z);
+					Vector3I gridCellCoords = startingGridCell.GridCoordinates + new Vector3I(x, y, z);
 					GridCell gridCell = GetGridCell(gridCellCoords);
 					if (gridCell == null)
 						continue;
@@ -1381,15 +1411,9 @@ public partial class GridSystem : Manager<GridSystem>
 		int minX = Mathf.FloorToInt(min.X / _cellSize.X);
 		int maxX = Mathf.FloorToInt((max.X - EPS) / _cellSize.X);
 
-		// Negative Z forward mapping
-		int minZ = Mathf.FloorToInt((-(max.Z - EPS)) / _cellSize.X);
-		int maxZ = Mathf.FloorToInt((-min.Z) / _cellSize.X);
-		if (minZ > maxZ)
-		{
-			int tmpZ = minZ;
-			minZ = maxZ;
-			maxZ = tmpZ;
-		}
+		// CHANGED: Removed negative Z mapping
+		int minZ = Mathf.FloorToInt(min.Z / _cellSize.X);
+		int maxZ = Mathf.FloorToInt((max.Z - EPS) / _cellSize.X);
 
 		int minY = Mathf.FloorToInt(min.Y / _cellSize.Y);
 		int maxY = Mathf.FloorToInt((max.Y - EPS) / _cellSize.Y);
@@ -1429,7 +1453,7 @@ public partial class GridSystem : Manager<GridSystem>
 						halfY,
 						_cellSize.X * 0.5f
 					);
-					Vector3 aabbMin = cell.worldCenter - half;
+					Vector3 aabbMin = cell.WorldCenter - half;
 					Vector3 aabbSize = new Vector3(_cellSize.X, _cellSize.Y, _cellSize.X);
 					var cellAabb = new Aabb(aabbMin, aabbSize);
 
@@ -1437,7 +1461,7 @@ public partial class GridSystem : Manager<GridSystem>
 						continue;
 
 					// Sample at cell center
-					pointParams.Position = cell.worldCenter;
+					pointParams.Position = cell.WorldCenter;
 
 					var hits = space.IntersectPoint(pointParams, 8);
 					bool inside = false;
@@ -1529,69 +1553,20 @@ public partial class GridSystem : Manager<GridSystem>
 	{
 		List<GridCell> occupiedCells = new List<GridCell>();
 
-		if (positionData == null || positionData.gridShape == null)
-		{
-			GD.Print($"Position data is null");
+		if (positionData == null || positionData.Shape == null)
 			return occupiedCells;
-		}
 
 		GridCell rootCell = positionData.AnchorCell;
-
 		if (rootCell == null)
-		{
-			GD.Print($"Root cell is null");
 			return occupiedCells;
-		}
 
-		Vector3I rootCoords = rootCell.gridCoordinates;
-		GridShape shape = positionData.gridShape;
+		var worldCoords = positionData.Shape.GetWorldCoordinates(rootCell.GridCoordinates);
 
-		for (int y = 0; y < shape.GridSizeY; y++)
+		foreach (var coord in worldCoords)
 		{
-			for (int x = 0; x < shape.GridSizeX; x++)
-			{
-				for (int z = 0; z < shape.GridSizeZ; z++)
-				{
-					if (!shape.GetGridShapeCell(x, y, z))
-						continue;
-
-					int relX = x - shape.RootCellCoordinates.X;
-					int relZ = z - shape.RootCellCoordinates.Y;
-					int offsetY = y;
-
-					int rotatedX = relX;
-					int rotatedZ = relZ;
-
-					switch (positionData.Direction)
-					{
-						case Enums.Direction.North:
-							rotatedX = relX;
-							rotatedZ = relZ;
-							break;
-						case Enums.Direction.East:
-							rotatedX = -relZ;
-							rotatedZ = relX;
-							break;
-						case Enums.Direction.South:
-							rotatedX = -relX;
-							rotatedZ = -relZ;
-							break;
-						case Enums.Direction.West:
-							rotatedX = relZ;
-							rotatedZ = -relX;
-							break;
-					}
-
-					Vector3I targetCoords = rootCoords + new Vector3I(rotatedX, offsetY, rotatedZ);
-
-					GridCell cell = GetGridCell(targetCoords);
-
-					if (cell != null)
-					{
-						occupiedCells.Add(cell);
-					}
-				}
-			}
+			GridCell cell = GetGridCell(coord);
+			if (cell != null)
+				occupiedCells.Add(cell);
 		}
 
 		return occupiedCells;
@@ -1672,7 +1647,7 @@ public partial class GridSystem : Manager<GridSystem>
 		}
 
 		Vector3I offset = GetDirectionOffset(direction);
-		Vector3I targetCoords = startCell.gridCoordinates + offset;
+		Vector3I targetCoords = startCell.GridCoordinates + offset;
 
 		return GetGridCell(targetCoords);
 	}
@@ -1702,6 +1677,38 @@ public partial class GridSystem : Manager<GridSystem>
 		}
 	}
 
+
+	/// <summary>
+	/// Creates and saves the editor configuration resource based on current settings.
+	/// Call this from an editor tool or manually.
+	/// </summary>
+	public void ExportEditorConfiguration()
+	{
+		var config = new GridConfiguration
+		{
+			CellSize = new Vector3(_cellSize.X, _cellSize.Y, _cellSize.X),
+			GridWorldOrigin = _gridWorldOrigin,
+			GridSize = _gridSize
+		};
+
+		const string path = "res://Resources/GridConfiguration.tres";
+
+		var dir = DirAccess.Open("res://");
+		if (!dir.DirExists("Resources"))
+		{
+			dir.MakeDir("Resources");
+		}
+
+		var error = ResourceSaver.Save(config, path);
+		if (error == Error.Ok)
+		{
+			GD.Print($"Grid configuration exported to {path}");
+		}
+		else
+		{
+			GD.PrintErr($"Failed to save grid configuration: {error}");
+		}
+	}
 
 	#region manager Data
 

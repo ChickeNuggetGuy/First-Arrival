@@ -64,7 +64,7 @@ public partial class interactActionDefinition : ActionDefinition
 		
 
 		// Already adjacent?
-		if (neighbors.Any(gridCell => gridCell.gridCoordinates == startingGridCell.gridCoordinates))
+		if (neighbors.Any(gridCell => gridCell.GridCoordinates == startingGridCell.GridCoordinates))
 		{
 			// Face the target if needed
 			if (
@@ -85,7 +85,7 @@ public partial class interactActionDefinition : ActionDefinition
 		{
 			// Need to move to an adjacent tile first
 			var walkableNeighbors = neighbors.Where(n =>
-				n.IsWalkable && Pathfinder.Instance.IsPathPossible(startingGridCell.gridCoordinates, n.gridCoordinates)
+				n.IsWalkable && Pathfinder.Instance.IsPathPossible(startingGridCell.GridCoordinates, n.GridCoordinates)
 			).ToList();
 
 			if (walkableNeighbors.Count == 0)
@@ -95,7 +95,7 @@ public partial class interactActionDefinition : ActionDefinition
 			}
 
 			var targetAdjacent = walkableNeighbors.OrderBy(n =>
-				startingGridCell.gridCoordinates.DistanceSquaredTo(n.gridCoordinates)
+				startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)
 			).First();
 
 			var moveAction =

@@ -13,7 +13,15 @@ public partial class SpeedButtonUI : UIElement
 			return;
 		
 		Button.Text = timeSpeed.ToString() + "x";
+		if(!Button.IsConnected(BaseButton.SignalName.Pressed, Callable.From(ButtonOnPressed)))
 		Button.Pressed += ButtonOnPressed; 
+	}
+
+	public override void _ExitTree()
+	{
+		Button.Pressed -= ButtonOnPressed; 
+		base._ExitTree();
+		
 	}
 
 	private void ButtonOnPressed()

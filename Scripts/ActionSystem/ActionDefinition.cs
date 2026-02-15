@@ -9,6 +9,7 @@ using FirstArrival.Scripts.Utility;
 public abstract partial class ActionDefinition : Resource
 {
   public GridObject parentGridObject { get; set; }
+  [Export] public bool confirmClick = false;
 
   public List<GridCell> ValidGridCells { get; protected set; } =
     new List<GridCell>();
@@ -94,8 +95,7 @@ public abstract partial class ActionDefinition : Resource
     if (string.IsNullOrWhiteSpace(reason)) reason = "Success!";
     return true;
   }
-
-  // For composite costing (build costs without final affordability check).
+  
   public bool TryBuildCostsOnly(
     GridObject gridObject,
     GridCell startingGridCell,
@@ -126,9 +126,7 @@ public abstract partial class ActionDefinition : Resource
       out reason
     );
   }
-
-  // Subclasses implement their own validation and cost accumulation here.
-  // Do not check affordability here.
+  
   protected abstract bool OnValidateAndBuildCosts(
     GridObject gridObject,
     GridCell startingGridCell,
@@ -152,7 +150,7 @@ public abstract partial class ActionDefinition : Resource
   {
 	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.AnchorCell);
 	  GD.Print($"{GetActionName()}: Possible grid cells: {possibleGridCells.Count}");
-	  if (possibleGridCells == null)
+	  if (possibleGridCells.Count == 0)
 	  {
 		  return (null, int.MinValue, null);
 	  }
@@ -183,7 +181,6 @@ public abstract partial class ActionDefinition : Resource
 		  return (null, int.MinValue, null);
 	  }
 
-	  // Sort descending to get the highest score first.
 	  gridCellScores.Sort((a, b) => b.score.CompareTo(a.score));
 	  return gridCellScores.First();
   }
@@ -198,8 +195,7 @@ public abstract partial class ActionDefinition : Resource
 
   public abstract bool GetRemainSelected();
 
-
-  // ---------- Helpers ----------
+  
 
   protected Dictionary<Enums.Stat, int> CreateCostContainer()
   {
@@ -242,8 +238,7 @@ public abstract partial class ActionDefinition : Resource
   }
 
   // Adds default rotate costs if direction differs. Returns false if rotation
-  // isn't possible (e.g., rotate action missing), true otherwise.
-  // Costs are added to 'costs'.
+  // isn't possible
   protected bool AddRotateCostsIfNeeded(
     GridObject gridObject,
     GridCell startingGridCell,

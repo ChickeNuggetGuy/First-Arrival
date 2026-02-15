@@ -61,20 +61,18 @@ public partial class Chunk : Node3D
         int startX = chunkIndexX * chunkSize;
         int startY = chunkIndexY * chunkSize;
 
-        // NOTE: With -Z forward, chunk node is placed at Z = -(startY * chunkSize * cellSize).
-        // Local Z is computed relative to that node, so localZ = worldZ - nodeZ = worldZ + startY*cellSize.
         int i = 0;
         for (int y = 0; y <= chunkSize; y++)
         {
-            for (int x = 0; x <= chunkSize; x++)
-            {
-                Vector3 worldPos = globalVertices[startX + x, startY + y];
-                float localX = worldPos.X - (startX * this.cellSize);
-                float localY = worldPos.Y;
-                float localZ = worldPos.Z + (startY * this.cellSize);
+	        for (int x = 0; x <= chunkSize; x++)
+	        {
+		        Vector3 worldPos = globalVertices[startX + x, startY + y];
+		        float localX = worldPos.X - (startX * this.cellSize);
+		        float localY = worldPos.Y;
+		        float localZ = worldPos.Z - (startY * this.cellSize); 
 
-                localVertices[i++] = new Vector3(localX, localY, localZ);
-            }
+		        localVertices[i++] = new Vector3(localX, localY, localZ);
+	        }
         }
 
         GD.Print(
@@ -82,7 +80,7 @@ public partial class Chunk : Node3D
         );
     }
 
-    public void Generate(ShaderMaterial material)
+    public void Generate(Material material)
     {
         if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
             return;
@@ -93,42 +91,39 @@ public partial class Chunk : Node3D
         triangles = new List<int>();
         uv = new List<Vector2>();
 
-        // Build two triangles per cell in local space
-        // localVertices is indexed row-major: idx = y*(chunkSize+1) + x
-        // IMPORTANT: Because -Z is forward (a reflection on Z), flip triangle winding
-        // so top faces remain front-facing with back-face culling.
         for (int y = 0; y < chunkSize; y++)
         {
-            for (int x = 0; x < chunkSize; x++)
-            {
-                int bottomLeftIndex = (y) * (chunkSize + 1) + x;
-                int bottomRightIndex = (y) * (chunkSize + 1) + (x + 1);
-                int topLeftIndex = (y + 1) * (chunkSize + 1) + x;
-                int topRightIndex = (y + 1) * (chunkSize + 1) + (x + 1);
+	        for (int x = 0; x < chunkSize; x++)
+	        {
+		        int bottomLeftIndex = (y) * (chunkSize + 1) + x;
+		        int bottomRightIndex = (y) * (chunkSize + 1) + (x + 1);
+		        int topLeftIndex = (y + 1) * (chunkSize + 1) + x;
+		        int topRightIndex = (y + 1) * (chunkSize + 1) + (x + 1);
 
-                Vector3 bottomLeft = localVertices[bottomLeftIndex];
-                Vector3 bottomRight = localVertices[bottomRightIndex];
-                Vector3 topLeft = localVertices[topLeftIndex];
-                Vector3 topRight = localVertices[topRightIndex];
+		        Vector3 bottomLeft = localVertices[bottomLeftIndex];
+		        Vector3 bottomRight = localVertices[bottomRightIndex];
+		        Vector3 topLeft = localVertices[topLeftIndex];
+		        Vector3 topRight = localVertices[topRightIndex];
 
-                // Add vertices (same order), but reverse the index order to flip the winding
-                int v0 = meshVerts.Count;
-                meshVerts.Add(bottomLeft);
-                meshVerts.Add(bottomRight);
-                meshVerts.Add(topLeft);
-                // Flipped winding
-                triangles.Add(v0 + 2);
-                triangles.Add(v0 + 1);
-                triangles.Add(v0);
+				// First triangle
+		        int v0 = meshVerts.Count;
+		        meshVerts.Add(bottomLeft);
+		        meshVerts.Add(bottomRight);
+		        meshVerts.Add(topLeft);
+		        triangles.Add(v0);
+		        triangles.Add(v0 + 1);
+		        triangles.Add(v0 + 2);
 
-                int v1 = meshVerts.Count;
-                meshVerts.Add(bottomRight);
-                meshVerts.Add(topRight);
-                meshVerts.Add(topLeft);
-                // Flipped winding
-                triangles.Add(v1 + 2);
-                triangles.Add(v1 + 1);
-                triangles.Add(v1);
+				// Second triangle
+		        int v1 = meshVerts.Count;
+		        meshVerts.Add(bottomRight);
+		        meshVerts.Add(topRight);
+		        meshVerts.Add(topLeft);
+		        triangles.Add(v1);
+		        triangles.Add(v1 + 1);
+		        triangles.Add(v1 + 2);
+		        
+		        
 
                 // UVs (0..1 per chunk) – in the same vertex order as added above
                 uv.Add(new Vector2((float)x / chunkSize, (float)y / chunkSize));

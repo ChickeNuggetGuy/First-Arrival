@@ -2,7 +2,6 @@ using Godot;
 using System.Collections.Generic;
 using System.Linq;
 using FirstArrival.Scripts.ActionSystem.ItemActions;
-using FirstArrival.Scripts.ActionSystem.ItemActions.ThrowAction;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
@@ -23,8 +22,6 @@ public partial class ThrowActionDefinition : ItemActionDefinition
   )
   {
     GD.Print($"Vector path {(_vectorPath?.Length ?? 0)} path: {(_path?.Count ?? 0)}");
-    // If your ThrowAction constructor accepts Item, keep this.
-    // If not, remove Item here and set the action.Item manually after instantiation.
     return new ThrowAction(parent, startGridCell, targetGridCell, this, Item, _path, _vectorPath, costs);
   }
 

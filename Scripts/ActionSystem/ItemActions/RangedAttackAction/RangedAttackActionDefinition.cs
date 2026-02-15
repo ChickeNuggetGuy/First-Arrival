@@ -65,7 +65,7 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
-		float distance = startingGridCell.gridCoordinates.DistanceTo(targetGridCell.gridCoordinates);
+		float distance = startingGridCell.GridCoordinates.DistanceTo(targetGridCell.GridCoordinates);
 		if (distance > range)
 		{
 			reason = "Target is out of range";

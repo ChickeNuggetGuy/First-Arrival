@@ -139,15 +139,13 @@ public partial class GameManager : Manager<GameManager>
 	public bool TryChangeScene(
 		GameScene sceneName,
 		Callable? callback,
-		bool saveManagerData = true 
+		bool saveManagerData = true
 	)
 	{
 		if (!scenePaths.ContainsKey(sceneName)) return false;
 
-		// 1. Update destination state
 		currentScene = sceneName;
 
-		// 2. Autosave before transition
 		if (saveManagerData)
 		{
 			if (currentSavename.Contains("quickplay_internal"))
@@ -160,19 +158,18 @@ public partial class GameManager : Manager<GameManager>
 				TryCreateSaveGame(AutosaveName, sceneName);
 				_loadFromAutosave = true;
 			}
-			
+
+			_pendingSaveData = null;
 		}
 		else
 		{
 			_loadFromAutosave = false;
+			_pendingSaveData = PackageCurrentStateAsDictionary();
+			_pendingSaveName = currentSavename;
 		}
-		
-		_pendingSaveData = null; // Ensure no stale memory data
 
-		// 3. CLEANUP: Deinitialize all managers before leaving the scene
 		CleanupManagers();
 
-		// 4. Change Scene
 		if (GetTree().ChangeSceneToFile(scenePaths[sceneName]) != Error.Ok)
 		{
 			return false;
