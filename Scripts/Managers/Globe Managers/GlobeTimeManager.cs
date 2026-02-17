@@ -257,7 +257,7 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		if (sunLight == null) return;
 
 		float day01 = secondsOfDay / (float)SecondsPerDay;
-		float targetY = (day01 * Mathf.Tau) + Mathf.DegToRad(sunTimeOffsetDegrees);
+		float targetY = -(day01 * Mathf.Tau) + Mathf.DegToRad(sunTimeOffsetDegrees);
 
 		float speed = sunFollow * Mathf.Max(1, timeSpeed);
 		float t = 1f - Mathf.Exp(-speed * (float)delta);

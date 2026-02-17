@@ -15,48 +15,60 @@ public partial class QuickSelectUI : UIWindow
 	[Export] private PackedScene quickSelectButtonScene;
 	private List<QuickSelectButtonUI> quickSelectButtons = new List<QuickSelectButtonUI>();
 	
-	protected override Task _Setup()
+	protected override async Task _Setup()
 	{
-		base._Setup();
+		await base._Setup();
+
 		GridObjectTeamHolder playerTeamHolder =
 			GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 
-
-		foreach (var gridObject in playerTeamHolder.GridObjects[Enums.GridObjectState.Active])
+		if (playerTeamHolder == null)
 		{
-			if (gridObject != null)
+			GD.PrintErr("QuickSelectUI: playerTeamHolder is null!");
+			return;
+		}
+
+		UpdateButtons(playerTeamHolder);
+		playerTeamHolder.GridObjectListChanged += UpdateButtons;
+	}
+
+	private void UpdateButtons(GridObjectTeamHolder gridObjectTeamHolder)
+	{
+		// Remove buttons for units that are no longer active
+		for (var index = quickSelectButtons.Count - 1; index >= 0; index--)
+		{
+			var button = quickSelectButtons[index];
+			if (button == null || !IsInstanceValid(button) || !gridObjectTeamHolder.GridObjects[Enums.GridObjectState.Active].Contains(button.TargetGridObject))
+			{
+				RemoveQuickSelectButonn(button);
+			}
+		}
+
+		// Add buttons for active units that don't have one yet
+		foreach (var gridObject in gridObjectTeamHolder.GridObjects[Enums.GridObjectState.Active])
+		{
+			if (gridObject == null) continue;
+			
+			if (quickSelectButtons.All(b => b.TargetGridObject != gridObject))
 			{
 				quickSelectButtons.Add(InstantiateQuickSelectBtoon(gridObject));
 			}
 		}
-		playerTeamHolder.GridObjectListChanged += PlayerTeamHolderOnGridObjectListChanged;
-		return base._Setup();
 	}
 
-	private void PlayerTeamHolderOnGridObjectListChanged(GridObjectTeamHolder gridObjectTeamHolder)
+	private void RemoveQuickSelectButonn(QuickSelectButtonUI button)
 	{
-		for (var index = quickSelectButtons.Count -1; index > 0; index--)
-		{
-			var button = quickSelectButtons[index];
-			if (gridObjectTeamHolder.GridObjects[Enums.GridObjectState.Inactive].Contains(button.TargetGridObject))
-			{
-				RemoveQuickSelectBtoon(button);
-			}
-			else
-			{
-				GD.Print("Unit stll active");
-			}
-		}
-	}
-
-	private void RemoveQuickSelectBtoon(QuickSelectButtonUI button)
-	{
+		if (button == null) return;
 		quickSelectButtons.Remove(button);
-		button.QueueFree();
+		if (IsInstanceValid(button))
+		{
+			button.QueueFree();
+		}
 	}
 	private QuickSelectButtonUI InstantiateQuickSelectBtoon(GridObject gridObject)
 	{
 		QuickSelectButtonUI instantiateButton = quickSelectButtonScene.Instantiate() as  QuickSelectButtonUI;
+		instantiateButton.SetupCall();
 		quickSelectHolder.AddChild(instantiateButton);
 		instantiateButton.SetTargetGridObject(gridObject);
 		

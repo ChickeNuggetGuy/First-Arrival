@@ -57,6 +57,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 	public void TeamHolderOnSelectedGridObjectChanged(GridObject gridObject)
 	{
 		if (!gridObject.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory)) return;
+		
 		//Refresh all Grid objects inventories
 		foreach (var runtimeInventoryGridUI in runtimeInventoryGridUIs)
 		{

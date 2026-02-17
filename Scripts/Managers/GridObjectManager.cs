@@ -69,9 +69,10 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		// Case A: We loaded specifically saved units for this scene
+
 		if (HasLoadedData)
 		{
+			//loaded saved units for this scene
 			GridObjectTeamHolder teamHolder = GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 			if (teamHolder != null)
 			{
@@ -82,10 +83,10 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			return;
 		}
 
-		// Case B: Either New Game OR we loaded a Globe save and entered a new Battle.
-		// Since HasLoadedData is false, we run the procedural generation.
+		
 		try
 		{
+			// Either New Game or  loaded a Globe save and entered a new Battle.
 			foreach (KeyValuePair<Enums.UnitTeam, int> kvp in spawnCounts)
 			{
 				for (int i = 0; i < kvp.Value; i++)
@@ -158,6 +159,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			return null;
 		if (gridObject == null)
 			return null;
+		
 
 		gridObjectTeams[team].SetSelectedGridObject(gridObject);
 		return null;
@@ -168,7 +170,6 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	#region Manager Data
 	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		// 1. Call base to set HasLoadedData = true
 		base.Load(data);
 
 		gridObjectTeams.Clear();

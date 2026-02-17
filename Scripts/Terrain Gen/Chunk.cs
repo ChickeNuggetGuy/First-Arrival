@@ -87,84 +87,44 @@ public partial class Chunk : Node3D
 
         mesh = new ArrayMesh();
 
-        List<Vector3> meshVerts = new List<Vector3>();
         triangles = new List<int>();
         uv = new List<Vector2>();
 
+        // 1. Pre-calculate UVs for the shared vertex grid
+        for (int y = 0; y <= chunkSize; y++)
+        {
+            for (int x = 0; x <= chunkSize; x++)
+            {
+                uv.Add(new Vector2((float)x / chunkSize, (float)y / chunkSize));
+            }
+        }
+
+        // 2. Create triangles using the winding order that was previously visible
         for (int y = 0; y < chunkSize; y++)
         {
-	        for (int x = 0; x < chunkSize; x++)
-	        {
-		        int bottomLeftIndex = (y) * (chunkSize + 1) + x;
-		        int bottomRightIndex = (y) * (chunkSize + 1) + (x + 1);
-		        int topLeftIndex = (y + 1) * (chunkSize + 1) + x;
-		        int topRightIndex = (y + 1) * (chunkSize + 1) + (x + 1);
+            for (int x = 0; x < chunkSize; x++)
+            {
+                int bottomLeftIndex = y * (chunkSize + 1) + x;
+                int bottomRightIndex = y * (chunkSize + 1) + (x + 1);
+                int topLeftIndex = (y + 1) * (chunkSize + 1) + x;
+                int topRightIndex = (y + 1) * (chunkSize + 1) + (x + 1);
 
-		        Vector3 bottomLeft = localVertices[bottomLeftIndex];
-		        Vector3 bottomRight = localVertices[bottomRightIndex];
-		        Vector3 topLeft = localVertices[topLeftIndex];
-		        Vector3 topRight = localVertices[topRightIndex];
+                // First triangle: BL -> BR -> TL
+                triangles.Add(bottomLeftIndex);
+                triangles.Add(bottomRightIndex);
+                triangles.Add(topLeftIndex);
 
-				// First triangle
-		        int v0 = meshVerts.Count;
-		        meshVerts.Add(bottomLeft);
-		        meshVerts.Add(bottomRight);
-		        meshVerts.Add(topLeft);
-		        triangles.Add(v0);
-		        triangles.Add(v0 + 1);
-		        triangles.Add(v0 + 2);
-
-				// Second triangle
-		        int v1 = meshVerts.Count;
-		        meshVerts.Add(bottomRight);
-		        meshVerts.Add(topRight);
-		        meshVerts.Add(topLeft);
-		        triangles.Add(v1);
-		        triangles.Add(v1 + 1);
-		        triangles.Add(v1 + 2);
-		        
-		        
-
-                // UVs (0..1 per chunk) – in the same vertex order as added above
-                uv.Add(new Vector2((float)x / chunkSize, (float)y / chunkSize));
-                uv.Add(
-                    new Vector2(
-                        (float)(x + 1) / chunkSize,
-                        (float)y / chunkSize
-                    )
-                );
-                uv.Add(
-                    new Vector2(
-                        (float)x / chunkSize,
-                        (float)(y + 1) / chunkSize
-                    )
-                );
-
-                uv.Add(
-                    new Vector2(
-                        (float)(x + 1) / chunkSize,
-                        (float)y / chunkSize
-                    )
-                );
-                uv.Add(
-                    new Vector2(
-                        (float)(x + 1) / chunkSize,
-                        (float)(y + 1) / chunkSize
-                    )
-                );
-                uv.Add(
-                    new Vector2(
-                        (float)x / chunkSize,
-                        (float)(y + 1) / chunkSize
-                    )
-                );
+                // Second triangle: BR -> TR -> TL
+                triangles.Add(bottomRightIndex);
+                triangles.Add(topRightIndex);
+                triangles.Add(topLeftIndex);
             }
         }
 
         var meshArrays = new Godot.Collections.Array();
         meshArrays.Resize((int)Mesh.ArrayType.Max);
 
-        meshArrays[(int)Mesh.ArrayType.Vertex] = meshVerts.ToArray();
+        meshArrays[(int)Mesh.ArrayType.Vertex] = localVertices;
         meshArrays[(int)Mesh.ArrayType.Index] = triangles.ToArray();
         meshArrays[(int)Mesh.ArrayType.TexUV] = uv.ToArray();
 
@@ -173,7 +133,6 @@ public partial class Chunk : Node3D
         CalculateSmoothNormals(mesh);
 
         meshInstance.Mesh = mesh;
-        
         meshInstance.MaterialOverride = material;
 
         meshInstance.CreateTrimeshCollision();
@@ -215,8 +174,8 @@ public partial class Chunk : Node3D
             Vector3 edge1 = vertices[i1] - vertices[i0];
             Vector3 edge2 = vertices[i2] - vertices[i0];
 
-            // Use standard winding: edge1 x edge2
-            Vector3 faceNormal = edge1.Cross(edge2);
+            // Use edge2 x edge1 so the normal points UP for winding (BL -> BR -> TL)
+            Vector3 faceNormal = edge2.Cross(edge1);
             if (faceNormal.LengthSquared() < Mathf.Epsilon)
                 continue;
 
@@ -259,7 +218,7 @@ public partial class Chunk : Node3D
 
             Vector3 edge1 = vertices[i1] - vertices[i0];
             Vector3 edge2 = vertices[i2] - vertices[i0];
-            Vector3 faceNormal = edge1.Cross(edge2);
+            Vector3 faceNormal = edge2.Cross(edge1);
 
             float area = faceNormal.Length();
             if (area < Mathf.Epsilon)
@@ -304,7 +263,7 @@ public partial class Chunk : Node3D
             Vector3 v1 = vertices[i1];
             Vector3 v2 = vertices[i2];
 
-            Vector3 faceNormal = (v1 - v0).Cross(v2 - v0);
+            Vector3 faceNormal = (v2 - v0).Cross(v1 - v0);
             if (faceNormal.LengthSquared() < Mathf.Epsilon)
                 faceNormal = Vector3.Up;
             else

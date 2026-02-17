@@ -204,6 +204,11 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             2,
             missionDefinition.mission.EnemySpawnCount
         );
+        
+        GameManager.Instance.mapSize = new Vector2I(
+	        GD.RandRange(2,4),
+	        GD.RandRange(2,4)
+        );
         GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene, null, true);
         RemoveMissionDefinition(missionDefinition.cellIndex);
     }

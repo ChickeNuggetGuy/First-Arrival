@@ -19,17 +19,17 @@ public partial class GridObjectTeamHolder : Node
     public int VisibilityMinX { get; private set; }
     public int VisibilityMinZ { get; private set; }
     public int VisibilityWidth { get; private set; }
-    public int VisibilityHeight { get; private set; } // This is World Z size
-    public int VisibilityDepth { get; private set; } // This is World Y (Vertical) size
+    public int VisibilityHeight { get; private set; } 
+    public int VisibilityDepth { get; private set; } 
     
     public System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>> GridObjects { get; protected set; }
     public GridObject CurrentGridObject { get; protected set; }
 
-    // Stores 2D slices for debug or logic (Key = Y Level)
+    // Stores 2D slices for debug
     [Export] public Godot.Collections.Dictionary<int, ImageTexture> VisibilityTextures = new();
     private readonly Godot.Collections.Dictionary<int, Image> _visibilityImages = new();
     
-    // The final 3D texture used by the shader
+    //used by visibility Shader
     public ImageTexture3D VisibilityTexture3D { get; private set; } = new ImageTexture3D();
 
     [Export] public Godot.Collections.Array<ImageTexture> VisibilityTexturesForDebug { get; private set; } = new();
@@ -71,7 +71,6 @@ public partial class GridObjectTeamHolder : Node
         if(MeshTerrainGenerator.Instance != null)
         {
             Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
-            // Assuming mapSize Y is vertical levels
             VisibilityDepth = mapSize.Y; 
         }
     }
@@ -129,11 +128,9 @@ public partial class GridObjectTeamHolder : Node
         VisibilityMinX = minX;
         VisibilityMinZ = minZ;
         VisibilityWidth = maxX - minX + 1;
-        VisibilityHeight = maxZ - minZ + 1; // In Godot Texture3D, this maps to 'Height'
+        VisibilityHeight = maxZ - minZ + 1; 
         
-        // 1. Prepare data for 3D Texture
-        // We need a list of Images, one for each Y level.
-        // Assuming Y starts at 0 and goes to VisibilityDepth.
+        //  data for 3D Texture
         Godot.Collections.Array<Image> allSlices = new Godot.Collections.Array<Image>();
 
         VisibilityTexturesForDebug ??= new Godot.Collections.Array<ImageTexture>();
@@ -153,11 +150,10 @@ public partial class GridObjectTeamHolder : Node
                 VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
             }
 
-            // Fill black (Fog)
+            // Fill black 
             image.Fill(Colors.Black);
 
-            // 2. Paint pixels on this slice
-            // Note: Optimizing this to only iterate cells in this Y level would be faster than xy loops
+            // Paint pixels on this slice
             for (int x = 0; x < VisibilityWidth; x++)
             {
                 for (int z = 0; z < VisibilityHeight; z++)
@@ -175,7 +171,7 @@ public partial class GridObjectTeamHolder : Node
                         if (isVisible)
                             pixelColor = Colors.White;
                         else if (isExplored)
-                            pixelColor = new Color(0.5f, 0.5f, 0.5f); // Grey
+                            pixelColor = new Color(0.5f, 0.5f, 0.5f);
 
                         // Logic to update Cell state for gameplay logic
                         if (Team == Enums.UnitTeam.Player)
@@ -203,8 +199,7 @@ public partial class GridObjectTeamHolder : Node
             allSlices.Add(image);
         }
 
-        // 3. Create or Update ImageTexture3D
-        // Format, Width(X), Height(Z), Depth(Y), UseMipmaps, Data
+        //Create or Update ImageTexture3D
         VisibilityTexture3D.Create(Image.Format.Rgba8, VisibilityWidth, VisibilityHeight, VisibilityDepth, false, allSlices);
     }
 
@@ -252,8 +247,7 @@ public partial class GridObjectTeamHolder : Node
             gridObject.GetParent()?.RemoveChild(gridObject);
             _activeUnitsHolder.AddChild(gridObject);
         }
-
-        // Stat logic correction
+        
         if(gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder))
         {
             if (statHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat health))
@@ -288,8 +282,7 @@ public partial class GridObjectTeamHolder : Node
     }
 
     public bool IsGridObjectActive(GridObject gridObject) => GridObjects[Enums.GridObjectState.Active].Contains(gridObject);
-
-    // Save/Load Logic
+	
     public Godot.Collections.Dictionary<string, Variant> Save()
     {
         var data = new Godot.Collections.Dictionary<string, Variant>();

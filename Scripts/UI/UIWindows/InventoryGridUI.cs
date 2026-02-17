@@ -102,6 +102,8 @@ public partial class InventoryGridUI : UIWindow
 
 
 		slotHolder.Columns = InventoryGrid.GridShape.SizeX;
+		
+		
 
 		slotUIs = new ItemSlotUI[inventory.Items.GetLength(0), inventory.Items.GetLength(1)];
 		GenerateGridSlots();

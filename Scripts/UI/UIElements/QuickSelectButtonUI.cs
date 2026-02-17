@@ -34,6 +34,7 @@ public partial class QuickSelectButtonUI : UIElement
 			return;
 
 		GridObjectManager.Instance.SetCurrentGridObject(TargetGridObject.Team, TargetGridObject);
+		CameraController.Instance.FocusOn(TargetGridObject);
 	}
 
 	protected override async Task _Setup()

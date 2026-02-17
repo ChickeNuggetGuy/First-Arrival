@@ -15,7 +15,7 @@ public partial class GridSystem : Manager<GridSystem>
 	#region Variables
 
 	[ExportCategory("Grid Alignment")] [Export]
-	private Vector3 _gridWorldOrigin = Vector3.Zero; // Offset to align grid [0,0,0] with world map
+	private Vector3 _gridWorldOrigin = Vector3.Zero;
 
 	public Vector3 GridWorldOrigin => _gridWorldOrigin;
 
@@ -56,28 +56,24 @@ public partial class GridSystem : Manager<GridSystem>
 
 	[Export(PropertyHint.Range, "0,90,0.1")]
 	private float _maxWalkableSlopeAngle = 45.0f;
-
-	[Export] private float _raycastDistance; // kept for compatibility
+	
 	[Export] private Vector3 _raycastOffset;
 
 
 	[ExportCategory("Connections"), Export(PropertyHint.Range, "0.1,1.0,0.05")]
-	private float _connectionBoxWidthFactor = 0.6f; // fraction of cell X
+	private float _connectionBoxWidthFactor = 0.6f;
 
 	[Export(PropertyHint.Range, "0.1,1.0,0.05")]
-	private float _connectionBoxHeightFactor = 0.9f; // fraction of cell Y
+	private float _connectionBoxHeightFactor = 0.9f; 
 
 	[Export(PropertyHint.Range, "0.0,0.25,0.01")]
-	private float _connectionBoxEndClearance = 0.05f; // trim at ends (world units)
+	private float _connectionBoxEndClearance = 0.05f; 
 
 	[Export] private bool _allowDiagonalConnections = true;
 
 	[Export] private bool _blockDiagonalCornerCutting = true;
 
-
-	/// <summary>
-	/// Toggle this in the inspector to export the configuration.
-	/// </summary>
+	
 	[Export]
 	public bool ExportConfiguration
 	{
@@ -91,15 +87,14 @@ public partial class GridSystem : Manager<GridSystem>
 	private Dictionary<Vector3I, HashSet<Vector3I>> _adj;
 	private BoxShape3D _corridorBox;
 	private PhysicsShapeQueryParameters3D _corridorParams;
-
-	// Scratch containers to reduce allocations
+	
+	
 	private readonly List<Vector3I> _tmpNeighbors = new(32);
 	private readonly List<Vector3I> _tmpRemovals = new(32);
 
 	#endregion
 
 	#region Signals
-
 	[Signal]
 	public delegate void GridSystemInitializedEventHandler();
 
@@ -113,7 +108,7 @@ public partial class GridSystem : Manager<GridSystem>
 
 	protected override async Task _Setup(bool loadingData)
 	{
-		// Safety check for MeshTerrainGenerator
+		
 		if (MeshTerrainGenerator.Instance != null)
 		{
 			var gen = MeshTerrainGenerator.Instance;
@@ -162,10 +157,9 @@ public partial class GridSystem : Manager<GridSystem>
 				CollideWithAreas = false
 			};
 
-			// 1. Setup Grid Cells
 			var foundGridObjects = await SetupGrid();
 
-			// 2. Gather all grid objects (including obstacles)
+			// Gather all grid objects
 			var allGridObjectsInScene = GetTree()
 				.GetNodesInGroup("GridObjects")
 				.OfType<GridObject>()
@@ -177,11 +171,11 @@ public partial class GridSystem : Manager<GridSystem>
 					foundGridObjects.Add(go);
 			}
 
-			// 3. Initialize GridObjects FIRST (so they have valid AnchorCells)
+			// Initialize GridObjects 
 			if (foundGridObjects != null && foundGridObjects.Count > 0)
 				await InitializeGridObjects(foundGridObjects);
 
-			// 4. Apply State Overrides BEFORE building connections
+			// Apply State Overrides before building connections
 			var gridCellStateOverrides = GetTree()
 				.GetNodesInGroup("GridCellOverride")
 				.OfType<GridCellStateOverride>()
@@ -194,7 +188,7 @@ public partial class GridSystem : Manager<GridSystem>
 				stateOverride.InitializeGridCellOverride();
 			}
 
-			// 5. NOW setup connections (after cells are marked obstructed)
+			//setup connections
 			await SetupCellConnections();
 
 			GD.Print("GridSystem: Initialization Complete.");
@@ -202,7 +196,7 @@ public partial class GridSystem : Manager<GridSystem>
 		}
 		catch (Exception ex)
 		{
-			GD.PrintErr($"CRITICAL ERROR in GridSystem Execute: {ex.Message}\n{ex.StackTrace}");
+			GD.PrintErr($"ERROR in GridSystem Execute: {ex.Message}\n{ex.StackTrace}");
 		}
 
 
@@ -237,7 +231,6 @@ public partial class GridSystem : Manager<GridSystem>
 
 			if (TryGetGridCellFromWorldPosition(gridObject.GlobalPosition, out GridCell gridCell, true))
 			{
-				// Await this to ensure object is actually ready before moving to next
 				await gridObject.Initialize(gridObject.Team, gridCell);
 			}
 			else
@@ -255,8 +248,7 @@ public partial class GridSystem : Manager<GridSystem>
 	{
 		GridCells = new GridCell[_gridSize.Y][,];
 		var space = GetTree().Root.GetWorld3D().DirectSpaceState;
-
-		// Ensure InventoryManager is ready
+		
 		InventoryManager inventoryManager = InventoryManager.Instance;
 		if (inventoryManager == null)
 		{
@@ -264,17 +256,11 @@ public partial class GridSystem : Manager<GridSystem>
 				"GridSystem: InventoryManager is NULL inside SetupGrid. Ensure InventoryManager runs Setup/Execute before GridSystem.");
 		}
 
-		if (DebugMode)
-		{
-			DiagnoseSceneObjects();
-		}
-
 		uint groundMask = (uint)PhysicsLayer.TERRAIN;
 		float maxSlopeDot = Mathf.Cos(Mathf.DegToRad(_maxWalkableSlopeAngle));
 
 		float halfY = _cellSize.Y * 0.5f;
 
-		// Use a small epsilon for the bottom, but the logic below changes the "from" behavior
 		float surfEps = Mathf.Max(0.001f, _cellSize.Y * 0.01f);
 
 		InventoryGrid groundInv = null;
@@ -300,7 +286,6 @@ public partial class GridSystem : Manager<GridSystem>
 				{
 					Vector3I coords = new Vector3I(x, y, z);
 
-					// CHANGED: Removed negation from Z coordinate
 					Vector3 trueCenter = _gridWorldOrigin + new Vector3(
 						(x + 0.5f) * _cellSize.X,
 						(y + 0.5f) * _cellSize.Y,
@@ -316,7 +301,6 @@ public partial class GridSystem : Manager<GridSystem>
 						hasGround = false;
 						bool walkableGroundFound = false;
 
-						// Center-only ray first, then corners only if needed
 						var rayOffsets = new List<Vector3> { Vector3.Zero };
 
 						var rayParams = new PhysicsRayQueryParameters3D
@@ -340,14 +324,11 @@ public partial class GridSystem : Manager<GridSystem>
 
 							foreach (var offset in rayOffsets)
 							{
-								// FIX: Start just above the cell top (halfY + margin) to avoid hitting floors from the cell above
-								// while still being high enough to catch floors aligned with the top.
 								Vector3 from = trueCenter
 								               + _raycastOffset
 								               + offset
 								               + Vector3.Up * (halfY + _cellSize.Y * 0.1f);
 
-								// End slightly below the cell to catch floors aligned with the bottom
 								Vector3 to = trueCenter
 								             + _raycastOffset
 								             + offset
@@ -360,17 +341,14 @@ public partial class GridSystem : Manager<GridSystem>
 								if (hit.Count > 0)
 								{
 									var hitPos = hit["position"].As<Vector3>();
-
-									// VALIDATION: Ensure the hit is actually INSIDE this cell's vertical bounds.
-									// If we hit something too high (belonging to the cell above), ignore it.
+									
 									float cellTopY = trueCenter.Y + halfY + 0.01f;
 									if (hitPos.Y > cellTopY)
 										continue;
 
-									// Update Y if it's the center ray, OR if we haven't found ground yet (fallback to corner height)
 									if (offset == Vector3.Zero || !hasGround)
 									{
-										WorldCenter.Y = hitPos.Y; // keep center at ground height
+										WorldCenter.Y = hitPos.Y;
 									}
 
 									hasGround = true;
@@ -615,7 +593,6 @@ public partial class GridSystem : Manager<GridSystem>
 	{
 		outNeighbors.Clear();
 
-		// Treat obstructed cells as non-walkable for graph purposes
 		if (!cell.state.HasFlag(Enums.GridCellState.Ground) || cell.state.HasFlag(Enums.GridCellState.Obstructed))
 			return (0, 0);
 
@@ -768,7 +745,6 @@ public partial class GridSystem : Manager<GridSystem>
 		float dist = delta.Length();
 		if (dist <= 1e-4f) return true;
 
-		// FIX 2: Reduce box size slightly to prevent "grazing" walls or floors
 		float width = Mathf.Max(0.05f, _cellSize.X * _connectionBoxWidthFactor * 0.8f);
 		float height = Mathf.Max(0.05f, _cellSize.Y * _connectionBoxHeightFactor * 0.8f);
 
@@ -778,7 +754,6 @@ public partial class GridSystem : Manager<GridSystem>
 		Vector3 fwd = delta / dist;
 		Vector3 zAxis = -fwd;
 
-		// Stabilize Up vector logic
 		Vector3 refUp = Vector3.Up;
 		if (Mathf.Abs(fwd.Dot(Vector3.Up)) > 0.95f)
 			refUp = Vector3.Forward;
@@ -878,50 +853,7 @@ public partial class GridSystem : Manager<GridSystem>
 		MarkIsolatedCellsUnwalkable();
 		await Task.CompletedTask;
 	}
-
-	private void DiagnoseSceneObjects()
-	{
-		GD.Print("\n=== SCENE OBJECT DIAGNOSIS ===");
-
-		var staticBodies = GetTree().GetNodesInGroup("all").OfType<StaticBody3D>().ToList();
-		if (staticBodies.Count == 0)
-		{
-			staticBodies = FindAllNodesOfType<StaticBody3D>(GetTree().Root);
-		}
-
-		GD.Print($"Found {staticBodies.Count} StaticBody3D objects in scene");
-
-		foreach (var body in staticBodies.Take(5))
-		{
-			GD.Print($"  - {body.Name}");
-			GD.Print($"    Position: {body.GlobalPosition}");
-			GD.Print(
-				$"    Collision Layer: {body.CollisionLayer} (binary: {Convert.ToString(body.CollisionLayer, 2).PadLeft(32, '0')})");
-			GD.Print($"    Collision Mask: {body.CollisionMask}");
-
-			var shapes = body.GetChildren().OfType<CollisionShape3D>().ToList();
-			GD.Print($"    Has {shapes.Count} CollisionShape3D children");
-		}
-
-		var allCollisionObjects = FindAllNodesOfType<CollisionObject3D>(GetTree().Root);
-		GD.Print($"\nTotal CollisionObject3D in scene: {allCollisionObjects.Count}");
-
-		var layerGroups = allCollisionObjects
-			.GroupBy(obj => obj.CollisionLayer)
-			.OrderBy(g => g.Key);
-
-		foreach (var group in layerGroups)
-		{
-			GD.Print(
-				$"  Layer {group.Key} (binary: {Convert.ToString(group.Key, 2).PadLeft(8, '0')}): {group.Count()} objects");
-			foreach (var obj in group.Take(3))
-			{
-				GD.Print($"    - {obj.Name} ({obj.GetType().Name})");
-			}
-		}
-
-		GD.Print("=== END DIAGNOSIS ===\n");
-	}
+	
 
 	private List<T> FindAllNodesOfType<T>(Node root) where T : Node
 	{
@@ -1254,25 +1186,20 @@ public partial class GridSystem : Manager<GridSystem>
 		if (startCell == null || maxDistance <= 0) return result;
 
 		direction = direction.Normalized();
-
-		// 1. Pre-calculate Trigonometry
-		// We use the Tangent of half the angle to determine the expansion rate.
-		// tan(theta) = Opposite / Adjacent -> Opposite = Adjacent * tan(theta)
-		// Opposite is the allowable width/height, Adjacent is the distance forward.
+		
 		float halfAngleRadX = Mathf.DegToRad(angles.X * 0.5f);
 		float halfAngleRadY = Mathf.DegToRad(angles.Y * 0.5f);
 
 		float tanX = Mathf.Tan(halfAngleRadX);
 		float tanY = Mathf.Tan(halfAngleRadY);
 
-		// 2. Calculate Basis Vectors
+		// Calculate Basis Vectors
 		Vector3 upRef = Mathf.Abs(direction.Dot(Vector3.Up)) > 0.95f ? Vector3.Forward : Vector3.Up;
 		Vector3 coneRight = direction.Cross(upRef).Normalized();
 		Vector3 coneUp = coneRight.Cross(direction).Normalized();
 
 		Vector3 originPos = startCell.WorldCenter;
-
-		// 3. Optimization: Bounds Check
+		
 		float minCellDim = Mathf.Min(_cellSize.X, _cellSize.Y);
 		int cellRange = Mathf.CeilToInt(maxDistance / minCellDim);
 
@@ -1285,7 +1212,6 @@ public partial class GridSystem : Manager<GridSystem>
 		int minZ = Mathf.Max(0, startCoords.Z - cellRange);
 		int maxZ = Mathf.Min(_gridSize.Z - 1, startCoords.Z + cellRange);
 
-		// 4. Iterate and Test
 		for (int y = minY; y <= maxY; y++)
 		{
 			for (int x = minX; x <= maxX; x++)
@@ -1300,23 +1226,17 @@ public partial class GridSystem : Manager<GridSystem>
 
 					Vector3 toCandidate = candidate.WorldCenter - originPos;
 
-					// A. Forward Distance Check (Project onto Direction)
 					float distForward = toCandidate.Dot(direction);
 
 					if (distForward < 0.001f || distForward > maxDistance)
-						continue; // Behind us or too far
-
-					// B. Calculate allowed spread at this distance
-					// If we are 5m away, and tan(angle) is 1, allowed width is 5m.
+						continue; 
+					
 					float allowedDistX = distForward * tanX;
 					float allowedDistY = distForward * tanY;
 
-					// C. Calculate actual offset from center line
 					float offsetX = Mathf.Abs(toCandidate.Dot(coneRight));
 					float offsetY = Mathf.Abs(toCandidate.Dot(coneUp));
-
-					// D. Angle Check
-					// If the offset is within the triangle formed by the angle at this distance
+					
 					if (offsetX <= allowedDistX && offsetY <= allowedDistY)
 					{
 						result.Add(candidate);
@@ -1328,7 +1248,6 @@ public partial class GridSystem : Manager<GridSystem>
 		return result;
 	}
 
-	// Helper overload for Enum Direction
 	public List<GridCell> GetGridCellsInCone(
 		GridCell startCell,
 		Enums.Direction direction,
@@ -1339,7 +1258,6 @@ public partial class GridSystem : Manager<GridSystem>
 	{
 		Vector3 dirVec = Vector3.Forward;
 
-		// Quick lookup based on your specific coordinate setup
 		switch (direction)
 		{
 			case Enums.Direction.North: dirVec = Vector3.Back; break;
@@ -1348,7 +1266,6 @@ public partial class GridSystem : Manager<GridSystem>
 			case Enums.Direction.West: dirVec = Vector3.Left; break;
 			default:
 				Vector3I offset = GetDirectionOffset(direction);
-				// CHANGED: Removed negation of offset.Z
 				if (offset != Vector3I.Zero) dirVec = new Vector3(offset.X, offset.Y, offset.Z).Normalized();
 				break;
 		}
@@ -1411,7 +1328,6 @@ public partial class GridSystem : Manager<GridSystem>
 		int minX = Mathf.FloorToInt(min.X / _cellSize.X);
 		int maxX = Mathf.FloorToInt((max.X - EPS) / _cellSize.X);
 
-		// CHANGED: Removed negative Z mapping
 		int minZ = Mathf.FloorToInt(min.Z / _cellSize.X);
 		int maxZ = Mathf.FloorToInt((max.Z - EPS) / _cellSize.X);
 
@@ -1680,7 +1596,6 @@ public partial class GridSystem : Manager<GridSystem>
 
 	/// <summary>
 	/// Creates and saves the editor configuration resource based on current settings.
-	/// Call this from an editor tool or manually.
 	/// </summary>
 	public void ExportEditorConfiguration()
 	{

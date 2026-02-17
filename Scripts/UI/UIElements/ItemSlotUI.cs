@@ -76,11 +76,19 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 		itemCountLabel.Text = (isRoot && count > 1) ? count.ToString() : "";
 
 		// Texture Slicing Logic
-		AtlasTexture atlasTex = new AtlasTexture();
-		atlasTex.Atlas = item.ItemData.ItemIcon;
-		atlasTex.Region = item.ItemData.GetTextureRegionForCell(localCoords.X, localCoords.Y);
+		if (parentGridUI.InventoryGrid.InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes))
+		{
+			AtlasTexture atlasTex = new AtlasTexture();
+			atlasTex.Atlas = item.ItemData.ItemIcon;
+			atlasTex.Region = item.ItemData.GetTextureRegionForCell(localCoords.X, localCoords.Y);
 
-		Icon = atlasTex;
+			Icon = atlasTex;
+		}
+		else
+		{
+			//Use full texture
+			Icon = item.ItemData.ItemIcon;
+		}
 	}
 
 	public Dictionary<string, Callable> GetContextActions()

@@ -72,7 +72,7 @@ public partial class InputManager : Manager<InputManager>
 			int maxParentChecks = 3;
 			int parentLevel = 0;
 
-			// Traverse up to 3 parents to find a GridObject
+			// Check up to 3 parents to find a GridObject
 			Node currentNode = node;
 			if (node.IsInGroup("GridObjects"))
 			{
@@ -108,7 +108,7 @@ public partial class InputManager : Manager<InputManager>
 				}
 			}
 
-			// Fall back to position-based lookup
+			// Fall back to position based lookup
 			if (gridSystem != null
 			    && gridSystem.TryGetGridCellFromWorldPosition(
 				    hitPosition,
@@ -161,8 +161,8 @@ public partial class InputManager : Manager<InputManager>
 					return;
 				}
 			}
-
-			// No hit / no cell: clear hover + highlight
+			
+			//No cell found, clear visual 
 			CurrentCell = null;
 			GlobeHexGridManager.Instance.SetDebugHighlightedCountryFromIndex(-1);
 
@@ -176,7 +176,6 @@ public partial class InputManager : Manager<InputManager>
 		worldPosition = new Vector3(-1, -1, -1);
 		if (IsMouseOverUI())
 		{
-			//Object will be a UI Object
 			return GetViewport()?.GuiGetHoveredControl();
 		}
 		else
@@ -268,19 +267,14 @@ public partial class InputManager : Manager<InputManager>
 	{
 		float radius = position.Length();
 
-		// Normalize coordinates for the trig functions
 		if (radius == 0) return Vector2.Zero;
 
-		// 2. Calculate Latitude
-		// Range: -PI/2 to PI/2 (-90 to +90 degrees)
+		//Calculate Latitude
 		float latitude = Mathf.Asin(position.Y / radius);
 
-		// 3. Calculate Longitude
-		// Range: -PI to PI (-180 to +180 degrees)
+		// Calculate Longitude
 		float longitude = Mathf.Atan2(position.X, position.Z);
-
-		// Return as Radians (or convert to degrees if preferred)
-
+		
 		return new Vector2(Mathf.RadToDeg(latitude), Mathf.RadToDeg(longitude));
 	}
 

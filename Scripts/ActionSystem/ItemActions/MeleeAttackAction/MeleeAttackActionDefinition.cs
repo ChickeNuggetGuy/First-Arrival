@@ -80,7 +80,7 @@ public partial class MeleeAttackActionDefinition
 			return false;
 		}
 
-		// Already adjacent?
+		// Already adjacent
 		if (neighbors.Any(gridCell => gridCell.GridCoordinates == startingGridCell.GridCoordinates))
 		{
 			// Face the target if needed
@@ -156,8 +156,8 @@ public partial class MeleeAttackActionDefinition
 			}
 		}
 
-		AddCost(costs, Enums.Stat.TimeUnits, 6 * Item.ItemData.weight);
-		AddCost(costs, Enums.Stat.Stamina, 8 * Item.ItemData.weight);
+		AddCost(costs, Enums.Stat.TimeUnits, 4 * Item.ItemData.weight);
+		AddCost(costs, Enums.Stat.Stamina, 4 * Item.ItemData.weight);
 
 		reason = "success";
 		return true;

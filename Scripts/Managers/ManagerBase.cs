@@ -6,6 +6,7 @@ namespace FirstArrival.Scripts.Managers;
 public abstract partial class ManagerBase : Node
 {
 	[Export] protected bool DebugMode = false;
+	[Export] public bool includeInLoadingCalculation = true;
 	public bool SetupComplete { get; protected set; }
 	public bool ExecuteComplete { get; protected set; }
 	

@@ -99,7 +99,6 @@ public partial class GridPositionData : GridObjectNode
 
 	public void CalculateShapeFromColliders()
 	{
-		// Ensure config is fresh at runtime
 		if (!Engine.IsEditorHint() && GridSystem.Instance != null)
 			_config = GridConfiguration.GetActive();
 		else

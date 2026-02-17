@@ -8,10 +8,22 @@ using Godot.Collections;
 
 namespace FirstArrival.Scripts.Managers;
 
+/// <summary>
+/// The central orchestrator for the game's lifecycle, managing scene transitions, 
+/// state persistence (saving/loading), and the initialization/execution of all sub-managers.
+/// It acts as the root of the manager hierarchy and ensures data consistency across scene swaps.
+/// </summary>
 [GlobalClass]
 public partial class GameManager : Manager<GameManager>
 {
+
+	#region variables / Properties
+
+
+	/// <summary> List of sub-managers that this GameManager is responsible for initializing and executing. </summary>
 	[Export] public Array<ManagerBase> managers = new();
+
+	/// <summary> Mapping of GameScene enum values to their respective scene file paths on disk. </summary>
 	static Godot.Collections.Dictionary<GameScene, string> scenePaths = new()
 	{
 		{ GameScene.BattleScene, "res://Scenes/GameScenes/BattleScene.tscn" },
@@ -20,10 +32,10 @@ public partial class GameManager : Manager<GameManager>
 	};
 	
 	[Export] protected string saveDir = "user://saves/";
-
+	
 	public Vector2I mapSize = new Vector2I(1, 1);
 	public Vector2I unitCounts = new Vector2I(2, 2);
-
+	
 	public enum GameScene
 	{
 		NONE,
@@ -31,36 +43,71 @@ public partial class GameManager : Manager<GameManager>
 		BattleScene,
 		GlobeScene
 	}
-
+	
+	public enum LoadingState
+	{
+		NONE,
+		CHANGINGSCENES,
+		SETTINGUPMANAGERS,
+		EXECUTINGMANAGERS
+	}
+	
 	[Export] public GameScene currentScene;
 
 	private string currentSavename = "new SaveGame";
 	private const string SaveExt = ".sav";
 	private const string AutosaveName = "autosave";
 
-	private static Godot.Collections.Dictionary<string, Variant> _pendingSaveData =
-		null;
+	/// Temporary storage for game state data during a scene transition when not saving to disk. </summary>
+	private static Godot.Collections.Dictionary<string, Variant> _pendingSaveData = null;
+	
 	private static bool _loadFromAutosave = false;
-
+	
 	private static string _pendingSaveName = "";
 
+	/// <summary>
+	/// value from 0 to 1 representing current load progress
+	/// </summary>
+	public float loadingPercent = 0;
+	public LoadingState loadingState = LoadingState.NONE;	
+
+	#endregion
+
+
+	#region Signals
+	
+	/// Emitted when the list of available save games changes (e.g., after a save or delete). </summary>
 	[Signal]
 	public delegate void GameSavesChangedEventHandler();
 
+	/// <summary> Emitted when all core managers have finished setup and execution. </summary>
+	[Signal]
+	public delegate void CoreManagersLoadedEventHandler();
+	#endregion
+
+	#region Functions
 	public override string GetManagerName() => "GameManager";
 
+	/// <summary>
+	/// Entry point for the GameManager. handles the initial state setup, 
+	/// determining whether to load from an autosave, pending data, or start a fresh session.
+	/// </summary>
 	public override async void _Ready()
 	{
 		base._Ready();
+
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
 		if (_loadFromAutosave)
 		{
+			// Load state from the physical autosave file if flagged.
 			_loadFromAutosave = false;
 			await LoadAutosaveInternal();
 		}
 		else if (_pendingSaveData != null)
 		{
+			// Load state from static pending data when transitioning between scenes 
+			// without saving to disk.
 			currentSavename = _pendingSaveName;
 			var data = _pendingSaveData;
 			_pendingSaveData = null;
@@ -69,10 +116,15 @@ public partial class GameManager : Manager<GameManager>
 		}
 		else
 		{
+			// Standard fresh setup of the current scene and managers.
 			await SetupCall(false);
 		}
 	}
 
+	/// <summary>
+	/// Opens and reads the autosave file from the save directory, 
+	/// then initiates the internal loading sequence with its contents.
+	/// </summary>
 	private async Task LoadAutosaveInternal()
 	{
 		string fullName = AutosaveName + SaveExt;
@@ -95,12 +147,18 @@ public partial class GameManager : Manager<GameManager>
 				}
 			}
 		}
-		// Fallback if autosave fails
+		// Fallback if autosave fails or doesn't exist.
 		await SetupCall(false);
 	}
 
+	/// <summary>
+	/// manages the initial setup of all child managers. 
+	/// </summary>
 	protected override async Task _Setup(bool loadingData)
 	{
+		loadingState = LoadingState.SETTINGUPMANAGERS;
+		loadingPercent = 0;
+
 		managers ??= new Array<ManagerBase>();
 		foreach (Node child in GetChildren())
 		{
@@ -110,6 +168,12 @@ public partial class GameManager : Manager<GameManager>
 			}
 		}
 
+		int coreManagersCount = 0;
+		foreach (var m in managers) if (m.includeInLoadingCalculation) coreManagersCount++;
+		int totalSteps = coreManagersCount * 2;
+		int completedSteps = 0;
+
+		// Initialize each sub-manager.
 		foreach (ManagerBase manager in managers)
 		{
 			if (DebugMode)
@@ -117,13 +181,30 @@ public partial class GameManager : Manager<GameManager>
 				GD.Print($"Setting up manager: {manager.GetManagerName()}");
 			}
 			await manager.SetupCall(loadingData);
+			if (manager.includeInLoadingCalculation)
+			{
+				completedSteps++;
+				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
+			}
+			// Yield to main thread to allow UI to update
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		}
 
 		await ExecuteCall(loadingData);
 	}
 
+	/// <summary>
+	/// Runs the execution phase for all  sub-managers, 
+	/// </summary>
 	protected override async Task _Execute(bool loadingData)
 	{
+		loadingState = LoadingState.EXECUTINGMANAGERS;
+
+		int coreManagersCount = 0;
+		foreach (var m in managers) if (m.includeInLoadingCalculation) coreManagersCount++;
+		int totalSteps = coreManagersCount * 2;
+		int completedSteps = coreManagersCount; // Setup is already done
+
 		foreach (ManagerBase manager in managers)
 		{
 			if (DebugMode)
@@ -131,11 +212,26 @@ public partial class GameManager : Manager<GameManager>
 				GD.Print($"Executing manager: {manager.GetManagerName()}");
 			}
 			await manager.ExecuteCall(loadingData);
+			if (manager.includeInLoadingCalculation)
+			{
+				completedSteps++;
+				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
+			}
+			// Yield to main thread to allow UI to update
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		}
+		
+		loadingState = LoadingState.NONE;
+		loadingPercent = 1.0f;
+		EmitSignal(SignalName.CoreManagersLoaded);
 	}
 
 	#region Scene Management
 
+	/// <summary>
+	/// Attempts to change the current game scene, optionally saving state 
+	/// and invoking a callback after the transition.
+	/// </summary>
 	public bool TryChangeScene(
 		GameScene sceneName,
 		Callable? callback,
@@ -144,10 +240,14 @@ public partial class GameManager : Manager<GameManager>
 	{
 		if (!scenePaths.ContainsKey(sceneName)) return false;
 
+		loadingState = LoadingState.CHANGINGSCENES;
+		loadingPercent = 0;
+		UIManager.Instance?.ShowLoadingScreen();
 		currentScene = sceneName;
 
 		if (saveManagerData)
 		{
+			// handle autosaving state based on current session type.
 			if (currentSavename.Contains("quickplay_internal"))
 			{
 				TryCreateSaveGame("quickplay_internal", sceneName);
@@ -163,6 +263,7 @@ public partial class GameManager : Manager<GameManager>
 		}
 		else
 		{
+			// Store the current state in memory for the next scene instance to inherit.
 			_loadFromAutosave = false;
 			_pendingSaveData = PackageCurrentStateAsDictionary();
 			_pendingSaveName = currentSavename;
@@ -202,9 +303,10 @@ public partial class GameManager : Manager<GameManager>
 	{
 		GD.Print("[Cleanup] GameManager Deinitialized.");
 	}
+
+
 	private Godot.Collections.Dictionary<string, Variant> PackageCurrentStateAsDictionary()
 	{
-		// Find all managers that are children of THIS manager instance
 		List<ManagerBase> saveList = new();
 		foreach (Node child in GetChildren())
 		{
@@ -226,6 +328,7 @@ public partial class GameManager : Manager<GameManager>
 		};
 	}
 
+
 	public void CheckGameState(Turn currentTurn)
 	{
 		var teamHolders = GridObjectManager.Instance.GetGridObjectTeamHolders();
@@ -240,6 +343,7 @@ public partial class GameManager : Manager<GameManager>
 				kvp.Key == Enums.UnitTeam.Enemy || kvp.Key == Enums.UnitTeam.Player
 			)
 			{
+				// Check if any active units remain for the player or enemy team.
 				if (kvp.Value.GridObjects[Enums.GridObjectState.Active].Count < 1)
 				{
 					EndGame();
@@ -248,6 +352,9 @@ public partial class GameManager : Manager<GameManager>
 		}
 	}
 
+	/// <summary>
+	/// Handles scene transition when a game session ends
+	/// </summary>
 	private void EndGame()
 	{
 		if (currentSavename.Contains("quickplay_internal"))
@@ -265,6 +372,10 @@ public partial class GameManager : Manager<GameManager>
 
 	#region Data Handling
 
+	/// <summary>
+	/// Initiates an asynchronous load of a specific game save file from disk.
+	/// Prepares the pending data and triggers the scene change to the saved scene.
+	/// </summary>
 	public async Task<bool> TryLoadGameSaveAsync(string saveName)
 	{
 		string fullName = saveName.EndsWith(SaveExt) ? saveName : saveName + SaveExt;
@@ -279,6 +390,7 @@ public partial class GameManager : Manager<GameManager>
 		{
 			var root = file.GetVar().AsGodotDictionary<string, Variant>();
 			
+			// Store the loaded data to be injected into the new scene's managers.
 			_pendingSaveData = root;
 			_loadFromAutosave = false;
 			_pendingSaveName = saveName.Replace(SaveExt, "");
@@ -289,10 +401,10 @@ public partial class GameManager : Manager<GameManager>
 				currentScene = scene;
 				currentSavename = _pendingSaveName;
 
-				// 1. CLEANUP: We are about to swap scenes, clean up current nodes
 				CleanupManagers();
 
 				GD.Print($"Loading Save: {saveName} | Targeted Scene: {scene}");
+				UIManager.Instance?.ShowLoadingScreen();
 				Error err = GetTree().ChangeSceneToFile(scenePaths[scene]);
 				return err == Error.Ok;
 			}
@@ -305,6 +417,10 @@ public partial class GameManager : Manager<GameManager>
 		return false;
 	}
 
+	/// <summary>
+	/// Injects loaded data into the current scene's sub-manager hierarchy.
+	/// Ensures correct initialization order and data hand-off.
+	/// </summary>
 	private async Task PerformInternalLoadSequence(Godot.Collections.Dictionary<string, Variant> root)
 	{
 		GD.Print($"[Load] New GameManager instance detected static data. Injecting...");
@@ -313,29 +429,27 @@ public partial class GameManager : Manager<GameManager>
 		if (!root.ContainsKey("managers")) return;
 		var managersDict = root["managers"].AsGodotDictionary<string, Variant>();
 		
-		// Load this GameManager's data first
+		// Load this GameManager's data first to establish base state.
 		string myKey = GetManagerName();
 		if (managersDict.ContainsKey(myKey))
 		{
 			this.Load(managersDict[myKey].AsGodotDictionary<string, Variant>());
 		}
 
-		// 2. Identify managers in the NEW scene (children of this new GameManager)
+		// Identify managers in the new scene 
 		List<ManagerBase> managersNow = new();
 		foreach (Node child in GetChildren())
 		{
 			if (child is ManagerBase mb) managersNow.Add(mb);
 		}
 
-		// 3. Critical: Load Order Sorting
-		// Re-adding the sort to ensure Grid/Data managers initialize before logic managers
+
 		managersNow.Sort((a, b) => {
 			if (a is GlobeHexGridManager) return -1;
 			if (b is GlobeHexGridManager) return 1;
 			return 0;
 		});
 
-		// 4. Inject the passed-down data into the new nodes
 		foreach (var m in managersNow)
 		{
 			string key = m.GetManagerName();
@@ -345,14 +459,44 @@ public partial class GameManager : Manager<GameManager>
 			}
 			else
 			{
-				m.Load(null); // Explicitly clear if no data passed
+				// clear if no data was found for this manager.
+				m.Load(null); 
 			}
 		}
     
-		// 5. Run standard lifecycle (Setup -> Execute)
-		foreach (var m in managersNow) await m.SetupCall(globalLoadingProcess);
-		foreach (var m in managersNow) await m.ExecuteCall(globalLoadingProcess);
+		// 5. Run standard lifecycle (Setup -> Execute) for all managers in the new scene.
+		loadingState = LoadingState.SETTINGUPMANAGERS;
+		int coreManagersCount = 0;
+		foreach (var m in managersNow) if (m.includeInLoadingCalculation) coreManagersCount++;
+		int totalSteps = coreManagersCount * 2;
+		int completedSteps = 0;
+
+		foreach (var m in managersNow)
+		{
+			await m.SetupCall(globalLoadingProcess);
+			if (m.includeInLoadingCalculation)
+			{
+				completedSteps++;
+				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
+			}
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		}
+
+		loadingState = LoadingState.EXECUTINGMANAGERS;
+		foreach (var m in managersNow)
+		{
+			await m.ExecuteCall(globalLoadingProcess);
+			if (m.includeInLoadingCalculation)
+			{
+				completedSteps++;
+				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
+			}
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		}
 		
+		loadingState = LoadingState.NONE;
+		loadingPercent = 1.0f;
+		EmitSignal(SignalName.CoreManagersLoaded);
 		GD.Print("[Load] Data hand-off complete.");
 	}
 
@@ -409,7 +553,7 @@ public partial class GameManager : Manager<GameManager>
 		var root = new Godot.Collections.Dictionary<string, Variant>
 		{
 			["version"] = 1,
-			["isNewGame"] = isNewGame, // Store the flag
+			["isNewGame"] = isNewGame,
 			["scene"] = scene.ToString(),
 			["managers"] = managersDict,
 		};
@@ -449,11 +593,7 @@ public partial class GameManager : Manager<GameManager>
 		{
 			unitCounts = (Vector2I)data["unitCounts"];
 		}
-
-		// if (data.ContainsKey("currentScene"))
-		// {
-		// 	currentScene = (GameScene)data["currentScene"].AsInt32();
-		// }
+		
 	}
 
 	#endregion
@@ -513,6 +653,10 @@ public partial class GameManager : Manager<GameManager>
 	public string GetCurrentSaveName() => currentSavename;
 	
 	public void SetCurrentSaveName(string saveName) => currentSavename = saveName;
+
+	#endregion
+	
+		
 
 	#endregion
 }

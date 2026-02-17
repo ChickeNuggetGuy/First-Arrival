@@ -155,15 +155,6 @@ public abstract partial class ActionDefinition : Resource
 		  return (null, int.MinValue, null);
 	  }
 
-	  // // --- Optimization: If there are too many cells, only check a random sample. ---
-	  // const int maxCellsToCheck = 50; // This value can be tweaked for performance vs. AI quality.
-	  // if (possibleGridCells.Count > maxCellsToCheck)
-	  // {
-		 //  // Simple random sampling. A more sophisticated approach could prioritize cells
-		 //  // (e.g., closer to enemies), but this is a good starting point for performance.
-		 //  possibleGridCells = possibleGridCells.OrderBy(c => Guid.NewGuid()).Take(maxCellsToCheck).ToList();
-	  // }
-
 	  var gridCellScores = new List<(GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs)>();
 
 	  foreach (var possibleGridCell in possibleGridCells)

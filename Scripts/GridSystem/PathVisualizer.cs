@@ -10,7 +10,7 @@ public partial class PathVisualizer : Node3D
     [Export] private PackedScene gridPathVisualScene;
 
     /// <summary>
-    /// Maximum arrows to pre-allocate.
+    /// Maximum arrows to pre load.
     /// </summary>
     [Export] private int poolSize = 64;
 
@@ -175,13 +175,13 @@ public partial class PathVisualizer : Node3D
     {
         // TODO: return TU cost per cell from the action definition
         // e.g. return moveAction.timeUnitCost;
-        return 1;
+        return 4;
     }
 
     private int GetStaminaCostPerStep(MoveActionDefinition moveAction)
     {
         // TODO: return stamina cost per cell from the action definition
         // e.g. return moveAction.staminaCost;
-        return 1;
+        return 2;
     }
 }

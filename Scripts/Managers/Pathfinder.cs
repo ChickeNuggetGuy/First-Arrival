@@ -38,7 +38,6 @@ public partial class Pathfinder : Manager<Pathfinder>
 		bool adjacentIsValid = false
 	)
 	{
-		// Quick check for invalid inputs
 		if (start == null || goal == null)
 		{
 			GD.Print("Either start or goal is null.");
@@ -52,7 +51,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 			return new List<GridCell>();
 		}
 
-		// If adjacentIsValid is false, the goal must be walkable (have connections)
+		// If adjacentIsValid is false, the goal must be walkable
 		if (!adjacentIsValid && !goal.IsWalkable)
 		{
 			GD.Print("Goal is not walkable (no connections).");
@@ -65,12 +64,11 @@ public partial class Pathfinder : Manager<Pathfinder>
 			GD.Print("Start and goal are equal.");
 			return new List<GridCell> { start };
 		}
-
-		// For adjacentIsValid, collect all "walkable" cells adjacent to the goal
+		
 		HashSet<GridCell> validTargets = new HashSet<GridCell>();
 		if (adjacentIsValid)
 		{
-			// Get all neighbors of the goal cell
+			// Get all neighbors of the goal cell is adjacent is valid
 			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.GridCoordinates, 1);
 			
 			foreach (var neighbor in goalNeighbors)
@@ -81,8 +79,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 					validTargets.Add(neighbor);
 				}
 			}
-
-			// If there are no "walkable" cells adjacent to the goal, return empty
+			
 			if (validTargets.Count == 0)
 			{
 				GD.Print("No valid walkable targets adjacent to goal.");
@@ -102,7 +99,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 			validTargets.Add(goal);
 		}
 
-		// Our node record used during the A* search.
+		// node record
 		var openList = new List<NodeRecord>();
 		var closedSet = new HashSet<GridCell>();
 
@@ -123,7 +120,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 		while (openList.Count > 0)
 		{
-			// Select the node with the lowest estimated total cost (f = g + h)
+			// f = g + h
 			current = openList.OrderBy(n => n.EstimatedTotalCost).First();
 
 			// If we've reached any valid target, we're done.
@@ -144,7 +141,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 				float cost = current.CostSoFar + Cost(current.Cell, neighbor);
 
-				// Try to find an existing record for this neighbor.
+
 				NodeRecord neighborRecord =
 					openList.FirstOrDefault(n => n.Cell == neighbor);
 
@@ -262,7 +259,6 @@ public partial class Pathfinder : Manager<Pathfinder>
 		bool adjacentIsValid = false
 	)
 	{
-		// Quick check for invalid inputs
 		if ((start == null || start == GridCell.Null) || (goal == null || goal == GridCell.Null))
 			return false;
 
@@ -277,13 +273,11 @@ public partial class Pathfinder : Manager<Pathfinder>
 		// If start and goal are the same cell, require it to be walkable
 		if (start == goal)
 			return start.IsWalkable;
-
-		// For adjacentIsValid, collect all walkable cells adjacent to the goal
+		
 		HashSet<GridCell> validTargets = new HashSet<GridCell>();
 
 		if (adjacentIsValid)
 		{
-			// Get all neighbors of the goal within radius 1
 			var goalNeighbors = GetNeighborsInRadius(gridSystem, goal.GridCoordinates, 1);
 			
 			foreach (var neighbor in goalNeighbors)
@@ -308,12 +302,11 @@ public partial class Pathfinder : Manager<Pathfinder>
 			validTargets.Add(goal);
 		}
 
-		// Our node record used during the search
+		//  node record 
 		var openSet = new HashSet<GridCell>();
 		var closedSet = new HashSet<GridCell>();
 		var openList = new List<NodeRecord>();
-
-		// Create the start record
+		
 		NodeRecord startRecord = new NodeRecord
 		{
 			Cell = start,
@@ -376,8 +369,7 @@ public partial class Pathfinder : Manager<Pathfinder>
 			}
 		}
 
-		// If we've exhausted all possibilities without finding a valid target,
-		// no path exists
+		// If no valid target, no path exists
 		return false;
 	}
 
@@ -438,9 +430,11 @@ public partial class Pathfinder : Manager<Pathfinder>
 		int dy = Mathf.Abs(a.GridCoordinates.Y - b.GridCoordinates.Y);
 		int dz = Mathf.Abs(a.GridCoordinates.Z - b.GridCoordinates.Z);
 
-		float D = 1f; // axis
-		float D2 = 1.4142136f; // sqrt(2), 2D diagonal
-		float D3 = 1.7320508f; // sqrt(3), 3D diagonal
+		float D = 1f; 
+		// sqrt(2), 2D diagonal
+		float D2 = 1.4142136f; 
+		// sqrt(3), 3D diagonal
+		float D3 = 1.7320508f; 
 
 		int aMax = Mathf.Max(dx, Mathf.Max(dy, dz));
 		int cMin = Mathf.Min(dx, Mathf.Min(dy, dz));
@@ -461,11 +455,14 @@ public partial class Pathfinder : Manager<Pathfinder>
 		int dz = Mathf.Abs(a.GridCoordinates.Z - b.GridCoordinates.Z);
 
 		int sum = dx + dy + dz;
-		if (sum == 1) return 1f; // axis-aligned
-		if (sum == 2) return 1.4142136f; // 2D diagonal
-		if (sum == 3) return 1.7320508f; // 3D diagonal
+		// axis-aligned
+		if (sum == 1) return 1f;
+		// 2D diagonal
+		if (sum == 2) return 1.4142136f; 
+		// 3D diagonal
+		if (sum == 3) return 1.7320508f; 
 
-		// Shouldn't happen with our neighbor generator, fall back:
+		// Shouldn't happen with our neighbor generator, fall back
 		return 1f + 0.0001f * sum;
 	}
 
@@ -495,7 +492,6 @@ public partial class Pathfinder : Manager<Pathfinder>
 			{
 				for (int dz = -radius; dz <= radius; dz++)
 				{
-					// Skip the center cell
 					if (dx == 0 && dy == 0 && dz == 0)
 						continue;
 
@@ -650,8 +646,10 @@ public partial class Pathfinder : Manager<Pathfinder>
 	{
 		public GridCell Cell;
 		public NodeRecord Parent;
-		public float CostSoFar; // g value
-		public float EstimatedTotalCost; // f = g + h
+		// g value
+		public float CostSoFar; 
+		// f = g + h
+		public float EstimatedTotalCost;
 	}
 
 	/// <summary>

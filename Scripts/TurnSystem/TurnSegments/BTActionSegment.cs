@@ -41,7 +41,8 @@ public partial class BTActionSegment : TurnSegment
 
         foreach (var unit in activeUnits)
         {
-            CameraController.Instance.FocusOn(unit); 
+	        if( unit.GridPositionData.AnchorCell.fogState == Enums.FogState.Visible)
+				CameraController.Instance.FocusOn(unit); 
 
             await ProcessUnitUntilFinished(unit);
 

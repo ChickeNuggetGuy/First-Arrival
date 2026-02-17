@@ -19,8 +19,8 @@ public partial class CameraController : Manager<CameraController>
     [Export] private float moveSpeed;
     [Export] private float zoomSpeed;
     [Export] private float rotationSpeed;
-    [Export] private float minDistanceToTarget = 2.0f;  // Minimum distance to transposer
-    [Export] private float maxDistanceToTarget = 50.0f; // Maximum distance from transposer
+    [Export] private float minDistanceToTarget = 2.0f; 
+    [Export] private float maxDistanceToTarget = 50.0f; 
     
     [Export] public int CurrentYLevel {get; private set;}
 
@@ -34,14 +34,13 @@ public partial class CameraController : Manager<CameraController>
 
     #region Functions
 
-    public override void Deinitialize()
-    {
-        GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
-        
-        playerTeamHolder.SelectedGridObjectChanged -= GridObjectTeam_GridObjectSelected;
-        base._ExitTree();
-    }
 
+
+    /// <summary>
+    /// Focuses the camera on the given gridobject
+    /// Iternally, places the transposer at the acnchor cell of the gridobject
+    /// </summary>
+    /// <param name="target"></param>
     public void FocusOn(GridObject target)
     {
         if (target == null) return;
@@ -87,15 +86,14 @@ public partial class CameraController : Manager<CameraController>
     private void HandleCameraRotation(float delta)
     {
         float yawDelta = 0f;
-
-        // Inverted Q/E rotation (Q now rotates right, E now rotates left)
-        if (Input.IsActionPressed("cameraRotateRight")) // Assuming this is E
+        
+        if (Input.IsActionPressed("cameraRotateRight"))
         {
-            yawDelta -= rotationSpeed * delta; // Changed from += to -=
+            yawDelta -= rotationSpeed * delta; 
         }
-        if (Input.IsActionPressed("cameraRotateLeft")) // Assuming this is Q
+        if (Input.IsActionPressed("cameraRotateLeft")) 
         {
-            yawDelta += rotationSpeed * delta; // Changed from -= to +=
+            yawDelta += rotationSpeed * delta;
         }
 
         if (Mathf.Abs(yawDelta) > 0.001f)
@@ -110,7 +108,7 @@ public partial class CameraController : Manager<CameraController>
     {
         if (_pcam != null)
         {
-            // Get the current horizontal distance (XZ plane)
+            // Get the current horizontal distance 
             var currentOffset = _pcam.FollowOffset;
             float horizontalDistance = new Vector2(currentOffset.X, currentOffset.Z).Length();
             
@@ -118,13 +116,35 @@ public partial class CameraController : Manager<CameraController>
             float yaw = _manualYaw;
             Vector3 newOffset = new Vector3(
                 Mathf.Sin(yaw) * horizontalDistance,
-                currentOffset.Y, // Keep the same Y offset
+                currentOffset.Y,
                 Mathf.Cos(yaw) * horizontalDistance
             );
             
             _pcam.FollowOffset = newOffset;
         }
     }
+    
+    #region manager Data
+    public override void Load(Godot.Collections.Dictionary<string,Variant> data)
+    {
+	    base.Load(data);
+	    if(!HasLoadedData) return;
+    }
+
+    public override Godot.Collections.Dictionary<string,Variant> Save()
+    {
+	    return null;
+    }
+    
+    public override void Deinitialize()
+    {
+	    GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+        
+	    playerTeamHolder.SelectedGridObjectChanged -= GridObjectTeam_GridObjectSelected;
+	    base._ExitTree();
+    }
+    #endregion
+    
     
     #region Base Class Functions
     
@@ -263,17 +283,6 @@ public partial class CameraController : Manager<CameraController>
         return Task.CompletedTask;
     }
     
-    #region manager Data
-    public override void Load(Godot.Collections.Dictionary<string,Variant> data)
-    {
-	    base.Load(data);
-	    if(!HasLoadedData) return;
-    }
-
-    public override Godot.Collections.Dictionary<string,Variant> Save()
-    {
-	    return null;
-    }
-    #endregion
+  
     
 }

@@ -145,9 +145,10 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public void SetIsActive(bool isActive)
 	{
 		IsActive = isActive;
-		// If becoming inactive, remove from grid logic
+	
 		if (!isActive && GridPositionData != null)
 		{
+			// remove from grid logic
 			GridPositionData.SetGridCell(null);
 		}
 	}
@@ -167,15 +168,13 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	{
 		var data = new Godot.Collections.Dictionary<string, Variant>();
 
-		// 1. Identity
 		data["Filename"] = SceneFilePath;
 		data["Name"] = Name;
 		data["Team"] = (int)Team;
 		data["IsActive"] = IsActive;
 		data["Settings"] = (int)gridObjectSettings;
 
-		// 2. Position
-		// We save the Grid Coordinates of the root cell.
+		// Position
 		if (GridPositionData.AnchorCell != null)
 		{
 			data["HasPosition"] = true;
@@ -269,10 +268,9 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			}
 		}
 
-		// 4. NOW set the grid position AFTER nodes are loaded (important for inventory, stats, etc.)
 		if (hasPosition && cell != null)
 		{
-			// Force update the position to ensure it's correctly placed
+			// Force update the position 
 			GridPositionData.SetGridCell(cell);
 		}
 	}

@@ -132,7 +132,7 @@ public partial class GridObjectSight : GridObjectNode
 
         _visibleCells.Clear();
 
-        // Viewer ray origin (eye)
+        // Viewer ray origin 
         Vector3 eye = GetViewerEyePosition();
 
         foreach (var cell in _tempCellSet)
@@ -140,7 +140,6 @@ public partial class GridObjectSight : GridObjectNode
             if (cell == null || cell == GridCell.Null)
                 continue;
 
-            // Optional: require LOS for the cell itself (affects fog/cell visibility)
             if (_useLosForCells && cell != startCell)
             {
                 Vector3 cellPoint = cell.WorldCenter + Vector3.Up * _targetHeight;

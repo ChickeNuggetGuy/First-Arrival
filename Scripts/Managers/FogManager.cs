@@ -76,7 +76,6 @@ public partial class FogManager : Manager<FogManager>
 
     /// <summary>
     /// Event handler for when any team updates their visibility.
-    ///  filter this to ONLY update the shader if it's the Player team.
     /// </summary>
     private void OnVisibilityChanged(Enums.UnitTeam team, ImageTexture3D texture)
     {
@@ -103,7 +102,6 @@ public partial class FogManager : Manager<FogManager>
 
     public override void Deinitialize()
     {
-        // Cleanup event subscriptions
         if (GridObjectManager.Instance != null)
         {
             var playerHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);

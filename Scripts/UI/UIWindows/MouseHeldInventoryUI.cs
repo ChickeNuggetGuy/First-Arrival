@@ -18,6 +18,7 @@ public partial class MouseHeldInventoryUI : InventoryGridUI
 		InventoryGrid = InventoryManager.Instance.GetInventoryGrid(Enums.InventoryType.MouseHeld);
 		InventoryGrid.ItemAdded += InventoryGridOnItemAdded;
 		InventoryGrid.ItemRemoved += InventoryGridOnItemRemoved;
+		SetupInventoryUI(InventoryGrid);
 		base._Setup();
 		return Task.CompletedTask;
 	}

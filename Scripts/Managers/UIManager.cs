@@ -11,8 +11,24 @@ public partial class UIManager : Manager<UIManager>
 	[Export] public bool BlockingInput { get; private set; } = false;
 	public UIWindow CurrentWindow { get; private set; }
 	[Export] private Control uiHolder;
+	[Export] private LoadingSCcreenUI loadingSCcreenUI;
+	#region Functions
+
+	public void ShowLoadingScreen()
+	{
+		if (loadingSCcreenUI != null)
+		{
+			_ = loadingSCcreenUI.ShowCall();
+		}
+	}
+
 	public override string GetManagerName() => "UIManager";
 
+	
+	/// <summary>
+	/// Finds and loops through all children Ui Windows and adds them to Windows 
+	/// </summary>
+	/// <param name="loadingData"></param>
 	protected override async Task _Setup(bool loadingData)
 	{
 		foreach (var child in uiHolder.GetChildren())
@@ -25,6 +41,11 @@ public partial class UIManager : Manager<UIManager>
 		await Task.CompletedTask;
 	}
 
+	
+	/// <summary>
+	///  Loops through and setup all children Ui Windows 
+	/// </summary>
+	/// <param name="loadingData"></param>
 	protected override async Task _Execute(bool loadingData)
 	{
 		if (_windows.Count == 0) return;
@@ -38,6 +59,13 @@ public partial class UIManager : Manager<UIManager>
 		await Task.CompletedTask;
 	}
 
+	
+	
+	/// <summary>
+	/// Block all Game inputs apart from UI Inputs
+	/// </summary>
+	/// <param name="blockingWindow"></param>
+	/// <returns></returns>
 	public bool BlockInputs( UIWindow blockingWindow)
 	{
 		if (BlockingInput) return false;
@@ -46,6 +74,8 @@ public partial class UIManager : Manager<UIManager>
 		BlockingInput = true;
 		return true;
 	}
+	
+	
 	
 	public bool UnblockInputs( UIWindow blockingWindow)
 	{
@@ -73,4 +103,7 @@ public partial class UIManager : Manager<UIManager>
 	{
 		return;
 	}
+
+	#endregion
+
 }
