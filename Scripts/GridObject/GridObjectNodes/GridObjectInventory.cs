@@ -20,7 +20,6 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	public Godot.Collections.Array<StartingInventoryConfig> startingItemsConfig = new();
 	protected override void Setup()
 	{
-		GD.Print("Inventory Setup");
 		InventoryManager inventoryManager = InventoryManager.Instance;
 		if (inventoryManager == null)
 		{

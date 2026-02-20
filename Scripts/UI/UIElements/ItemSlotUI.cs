@@ -20,6 +20,7 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 	protected InventoryGridUI parentGridUI;
 	public Vector2I inventoryCoords;
 
+	[Export] TextureRect itemIcon;
 	[Export] Label itemCountLabel;
 	public Item Item { get; private set; }
 
@@ -36,28 +37,6 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 
 	private void ButtonOnPressed()
 	{
-		// Debug slot state
-		if (Item != null)
-			GD.Print($"  - Slot UI thinks it has: {Item.ItemData?.ItemName}");
-		else
-			GD.Print($"  - Slot UI thinks it is Empty");
-
-		// Debug grid state verification
-		if (parentGridUI != null && parentGridUI.InventoryGrid != null)
-		{
-			if (parentGridUI.InventoryGrid.TryGetItemAt(inventoryCoords.X, inventoryCoords.Y, out var itemInfo))
-			{
-				if (itemInfo.item != null)
-					GD.Print($"  - Grid verification: Found {itemInfo.item.ItemData?.ItemName} x{itemInfo.count}");
-				else
-					GD.Print($"  - Grid verification: Empty/Null item returned");
-			}
-			else
-			{
-				GD.Print($"  - Grid verification: Slot empty");
-			}
-		}
-
 		parentGridUI.ItemSlot_Pressed(this);
 	}
 
@@ -67,7 +46,7 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 		Item = item;
 		if (item == null || item.ItemData == null)
 		{
-			Icon = null;
+			itemIcon.Texture = null;
 			itemCountLabel.Text = "";
 			return;
 		}
@@ -82,12 +61,12 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 			atlasTex.Atlas = item.ItemData.ItemIcon;
 			atlasTex.Region = item.ItemData.GetTextureRegionForCell(localCoords.X, localCoords.Y);
 
-			Icon = atlasTex;
+			itemIcon.Texture = atlasTex;
 		}
 		else
 		{
 			//Use full texture
-			Icon = item.ItemData.ItemIcon;
+			itemIcon.Texture = item.ItemData.ItemIcon;
 		}
 	}
 

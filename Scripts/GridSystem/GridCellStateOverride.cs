@@ -48,9 +48,7 @@ public partial class GridCellStateOverride : GridObject
 		}
 
 		// DEBUG: Check shape status
-		GridShape shape = this.GridPositionData.Shape;
-		GD.Print($"[{Name}] GridPositionData found: {GridPositionData != null}");
-		GD.Print($"[{Name}] Shape: {(shape != null ? $"Size({shape.SizeX}x{shape.SizeY}x{shape.SizeZ})" : "NULL")}");
+		GridShape shape = this.GridPositionData.Shape; ;
     
 		if (shape != null)
 		{
@@ -60,7 +58,6 @@ public partial class GridCellStateOverride : GridObject
 					for (int z = 0; z < shape.SizeZ; z++)
 						if (shape.IsOccupied(x, y, z))
 							occupiedCount++;
-			GD.Print($"[{Name}] Occupied cells in shape: {occupiedCount}");
 		}
 		
 		GridCell rootCell = this.GridPositionData.AnchorCell;
@@ -199,7 +196,6 @@ public partial class GridCellStateOverride : GridObject
 				}
 			}
 		}
-		GD.Print($"GridCellStateOverride {Name} applied to {changedCells.Count} cells.");
 	}
 	
 	

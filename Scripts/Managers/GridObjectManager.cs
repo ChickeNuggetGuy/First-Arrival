@@ -115,7 +115,6 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		bool success;
 		GridCell cell;
 
-		GD.Print("TrySpawnGridObject called");
 		if (team.HasFlag(Enums.UnitTeam.Player))
 		{
 			success = GridSystem.Instance.TryGetRandomGridCell(true, out cell, teamFilter: Enums.UnitTeam.Player);

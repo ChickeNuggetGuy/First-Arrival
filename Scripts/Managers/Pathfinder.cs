@@ -47,21 +47,24 @@ public partial class Pathfinder : Manager<Pathfinder>
 		var gridSystem = GetGridSystemThreadSafe();
 		if (gridSystem == null)
 		{
-			GD.Print("GridSystem is null.");
+			if(DebugMode)
+				GD.Print("GridSystem is null.");
 			return new List<GridCell>();
 		}
 
 		// If adjacentIsValid is false, the goal must be walkable
 		if (!adjacentIsValid && !goal.IsWalkable)
 		{
-			GD.Print("Goal is not walkable (no connections).");
+			if(DebugMode)
+				GD.Print("Goal is not walkable (no connections).");
 			return new List<GridCell>();
 		}
 
 		// If start and goal are the same cell, return just that
 		if (start.GridCoordinates == goal.GridCoordinates)
 		{
-			GD.Print("Start and goal are equal.");
+			if(DebugMode)
+				GD.Print("Start and goal are equal.");
 			return new List<GridCell> { start };
 		}
 		
@@ -82,14 +85,16 @@ public partial class Pathfinder : Manager<Pathfinder>
 			
 			if (validTargets.Count == 0)
 			{
-				GD.Print("No valid walkable targets adjacent to goal.");
+				if(DebugMode)
+					GD.Print("No valid walkable targets adjacent to goal.");
 				return new List<GridCell>();
 			}
 
 			// If the start cell is one of the valid targets, return just that
 			if (validTargets.Contains(start))
 			{
-				GD.Print("Start is adjacent to goal.");
+				if(DebugMode)
+					GD.Print("Start is adjacent to goal.");
 				return new List<GridCell> { start };
 			}
 		}
@@ -529,10 +534,9 @@ public partial class Pathfinder : Manager<Pathfinder>
 		}
 
 		// Check if start or end is obstructed
-		if ((startCell.state & Enums.GridCellState.Obstructed) != 0 ||
-			(endCell.state & Enums.GridCellState.Obstructed) != 0)
+		if ((endCell.state & Enums.GridCellState.Obstructed) != 0)
 		{
-			GD.Print("Start or end point is obstructed.");
+			GD.Print("end point is obstructed.");
 			return result;
 		}
 
@@ -572,9 +576,9 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 			for (int i = 0; i <= numPoints; i++)
 			{
-				float t = (float)i / numPoints; // Interpolation factor (0 to 1)
+				float t = (float)i / numPoints;
 
-				// Calculate the current position along the straight line
+				// Calculate the current position along  straight line
 				Vector3 currentPos = startPos.Lerp(endPos, t);
 
 				// Calculate the vertical offset for the arc (parabolic shape)
@@ -583,12 +587,11 @@ public partial class Pathfinder : Manager<Pathfinder>
 				// Apply the vertical offset to create the arc
 				Vector3 arcPos = currentPos + Vector3.Up * verticalOffset;
 
-				// Store the smooth path position
 				smoothPath.Add(arcPos);
 
 				// Convert world position to grid coordinates
 				var getGridCellResult = gridSystem.TryGetGridCellFromWorldPosition(arcPos, out GridCell cell, true);
-				
+
 				if (!getGridCellResult)
 				{
 					GD.Print($"Failed to get grid cell at position: {arcPos}");
@@ -598,12 +601,16 @@ public partial class Pathfinder : Manager<Pathfinder>
 
 				GridCell gridCell = cell;
 
-				// For arc paths, allow AIR spaces but block solid obstacles
-				if ((gridCell.state & Enums.GridCellState.Obstructed) != 0)
+				if (gridCell != startCell)
 				{
-					GD.Print($"Obstacle detected at: {gridCell.GridCoordinates}");
-					pathValid = false;
-					break;
+
+					// For arc paths, allow AIR spaces but block solid obstacles
+					if ((gridCell.state & Enums.GridCellState.Obstructed) != 0)
+					{
+						GD.Print($"Obstacle detected at: {gridCell.GridCoordinates}");
+						pathValid = false;
+						break;
+					}
 				}
 
 				// Only add the grid cell if it's different from the last one

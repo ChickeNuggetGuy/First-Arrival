@@ -62,7 +62,6 @@ public partial class GridObjectAnimation : GridObjectNode
 
 	public void SetLocomotionType(Enums.LocomotionType locomotionType) {
 
-		GD.Print("Test: SetLocomotionType");
 		switch (locomotionType)
 		{
 			case Enums.LocomotionType.None:

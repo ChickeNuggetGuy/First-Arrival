@@ -38,11 +38,7 @@ public partial class Chunk : Node3D
 
         // Keep the wrapper node reference unchanged; only link the component
         chunkData.chunk = this;
-
-        GD.Print(
-            $"Initializing chunk at {gridCoords}, Type: {chunkData.chunkType}"
-        );
-
+        
         if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
         {
             GD.Print("Skipping mesh generation for ManMade chunk.");
@@ -74,10 +70,7 @@ public partial class Chunk : Node3D
 		        localVertices[i++] = new Vector3(localX, localY, localZ);
 	        }
         }
-
-        GD.Print(
-            $"Chunk {gridCoords} initialized with {localVertices.Length} vertices."
-        );
+        
     }
 
     public void Generate(Material material)

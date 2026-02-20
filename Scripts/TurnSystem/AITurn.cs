@@ -26,7 +26,7 @@ public partial class AITurn : Turn
     [Export] public int MaxTicksPerUnit { get; set; } = 20;
 
     /// <summary>
-    /// Delay between each unit's turn for visual pacing (ms).
+    /// Delay between each unit's turn (ms).
     /// </summary>
     [Export] public int DelayBetweenUnitsMs { get; set; } = 200;
 	
@@ -36,7 +36,6 @@ public partial class AITurn : Turn
         var teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Team);
         if (teamHolder == null)
         {
-            GD.PushWarning($"AITurn: No team holder for {Team}");
             TurnManager.Instance.RequestEndOfTurn();
             return;
         }
@@ -102,18 +101,13 @@ public partial class AITurn : Turn
                 + "Possible infinite Running loop."
             );
         }
-
-        GD.Print(
-            $"AITurn: {unit.Name} finished with {status} after {ticks} tick(s)."
-        );
+        
     }
 
     private void SetupBlackboard(Blackboard blackboard, GridObject unit)
     {
-        // The grid object itself — all BT nodes read this
         blackboard.Set("grid_object", Variant.From(unit));
 
-        // Convenience: cache the start cell
         blackboard.Set(
             "start_cell_coords",
             Variant.From(unit.GridPositionData.AnchorCell.GridCoordinates)

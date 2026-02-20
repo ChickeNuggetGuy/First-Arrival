@@ -1,3 +1,4 @@
+using System.Linq;
 using Godot;
 using Godot.Collections;
 using System.Threading.Tasks;
@@ -142,15 +143,17 @@ public partial class StartingEuipmentUI : UIWindow
 				itemsNotAdded.Add(item);
 			}
 		}
-		
-		GD.Print("Cound not add " + itemsNotAdded.Count + " items!");
 
-		foreach (Item item in itemsNotAdded)
+		if (itemsNotAdded.Count > 0)
 		{
-			item.QueueFree();
+			GD.Print("Cound not add " + itemsNotAdded.Count + " items!");
+
+			foreach (Item item in itemsNotAdded)
+			{
+				item.QueueFree();
+			}
 		}
-		
-		
+
 	}
 
 	protected override void _Show()

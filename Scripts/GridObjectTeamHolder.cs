@@ -105,6 +105,8 @@ public partial class GridObjectTeamHolder : Node
 	    TeamVisibleCells.Clear();
 	    TeamVisibleCells.UnionWith(newTeamVisible);
 	    ExploredCells.UnionWith(TeamVisibleCells);
+        
+        // GD.Print($"UpdateVisibility: Team {Team}, ActiveUnits: {gridObjects.Count}, VisibleCells: {TeamVisibleCells.Count}");
 
 	    UpdateVisibilityTextures();
 
@@ -118,17 +120,26 @@ public partial class GridObjectTeamHolder : Node
     private void UpdateVisibilityTextures()
     {
         var allCells = GridSystem.Instance.AllGridCells;
-        if (allCells == null || !allCells.Any()) return;
+        if (allCells == null || !allCells.Any())
+        {
+            GD.PrintErr("UpdateVisibilityTextures: No cells found!");
+            return;
+        }
 
         int minX = allCells.Min(c => c.GridCoordinates.X);
         int maxX = allCells.Max(c => c.GridCoordinates.X);
         int minZ = allCells.Min(c => c.GridCoordinates.Z);
         int maxZ = allCells.Max(c => c.GridCoordinates.Z);
+        
+        // Calculate Y bounds dynamically to ensure we cover all grid layers
+        int minY = allCells.Min(c => c.GridCoordinates.Y);
+        int maxY = allCells.Max(c => c.GridCoordinates.Y);
 
         VisibilityMinX = minX;
         VisibilityMinZ = minZ;
         VisibilityWidth = maxX - minX + 1;
         VisibilityHeight = maxZ - minZ + 1; 
+        VisibilityDepth = maxY - minY + 1;
         
         //  data for 3D Texture
         Godot.Collections.Array<Image> allSlices = new Godot.Collections.Array<Image>();
@@ -137,17 +148,18 @@ public partial class GridObjectTeamHolder : Node
         VisibilityTexturesForDebug.Clear();
 
         // Iterate through all Y levels defined by the map
-        for (int y = 0; y < VisibilityDepth; y++)
+        for (int i = 0; i < VisibilityDepth; i++)
         {
+            int y = minY + i;
             Image image;
             
-            // Check cache
-            if (!_visibilityImages.TryGetValue(y, out image) ||
+            // Check cache (using relative index i for cache key to keep 0-based index for texture array)
+            if (!_visibilityImages.TryGetValue(i, out image) ||
                 image.GetWidth() != VisibilityWidth || image.GetHeight() != VisibilityHeight)
             {
                 image = Image.Create(VisibilityWidth, VisibilityHeight, false, Image.Format.Rgba8);
-                _visibilityImages[y] = image;
-                VisibilityTextures[y] = ImageTexture.CreateFromImage(image);
+                _visibilityImages[i] = image;
+                VisibilityTextures[i] = ImageTexture.CreateFromImage(image);
             }
 
             // Fill black 
@@ -181,7 +193,9 @@ public partial class GridObjectTeamHolder : Node
                                                       Enums.FogState.Unseen;
                             
                             if(cell.fogState != newState)
+                            {
                                 cell.SetFogState(newState);
+                            }
                         }
                     }
 
@@ -191,7 +205,7 @@ public partial class GridObjectTeamHolder : Node
             }
 
             // Update debug texture
-            var tex = VisibilityTextures[y];
+            var tex = VisibilityTextures[i];
             tex.Update(image);
             VisibilityTexturesForDebug.Add(tex);
             

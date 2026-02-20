@@ -9,11 +9,7 @@ using Godot;
 
 public class ThrowAction : Action, ICompositeAction, IItemAction
 {
-  public Action ParentAction
-  {
-    get => Parent;
-    set => SetParent(value);
-  }
+  public Action ParentAction { get; set; }
 
   public List<Action> SubActions { get; set; } = new();
   

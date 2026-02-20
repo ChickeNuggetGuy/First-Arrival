@@ -13,7 +13,7 @@ public static class NodeExtensions
 	public static T FindChildByType<T>(this Node parent) where T : Node
 	{
 		return parent.GetChildren()
-					 .OfType<Node>() // Ensure we're working with Node objects
+					 .OfType<Node>()
 					 .FirstOrDefault(child => child.GetType() == typeof(T)) as T;
 	}
 
@@ -77,9 +77,9 @@ public static class NodeExtensions
 	{
 		if (node.GetParent() != null)
 		{
-			node.GetParent().RemoveChild(node); // Remove from old parent
+			node.GetParent().RemoveChild(node);
 		}
-		newParent.AddChild(node); // Add to new parent
+		newParent.AddChild(node);
 	}
 
 	public static bool Contains<T>(this T[,] array, T value)
@@ -99,11 +99,8 @@ public static class NodeExtensions
 	}
 
 
-	public static bool TryGetAllComponentsInChildrenRecursive<T>(
-		this Node node,
-		out List<T> retList,
-		string attachedScriptPropertyName = null
-	) where T : class
+	public static bool TryGetAllComponentsInChildrenRecursive<T>(this Node node, out List<T> retList,
+		string attachedScriptPropertyName = null) where T : class
 	{
 		retList = new List<T>();
 
@@ -138,11 +135,8 @@ public static class NodeExtensions
 		return retList.Count > 0;
 	}
 	
-	public static bool TryGetAllComponentsInChildren<T>(
-		this Node node,
-		out List<T> retList,
-		string attachedScriptPropertyName = null
-	) where T : class
+	public static bool TryGetAllComponentsInChildren<T>(this Node node, out List<T> retList,
+		string attachedScriptPropertyName = null) where T : class
 	{
 		retList = new List<T>();
 
@@ -185,6 +179,7 @@ public static class NodeExtensions
 		return null;
 	}
 
+	
 	/// <summary>
 	/// Gets or creates a child node of the specified type.
 	/// </summary>

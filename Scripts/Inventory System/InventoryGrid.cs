@@ -254,7 +254,6 @@ public partial class InventoryGrid : Resource
                     {
                         Items[pos.X, pos.Y] = (existingItem, newCount);
                     }
-                    GD.Print($"AddItemAt: Merged into item '{existingItem.ItemData.ItemName}'. New Count: {newCount}");
                     
                     if (item != existingItem)
                     {
@@ -291,13 +290,11 @@ public partial class InventoryGrid : Resource
                 if(Items[x, y].item != null && Items[x, y].item.ItemData.ItemID == item.ItemData.ItemID && _inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                 {
                      Items[x, y].count += count;
-                     GD.Print($"AddItemAt: Merged stack at {x},{y}. New count: {Items[x,y].count}");
                      if (item != Items[x,y].item) item.QueueFree();
                 }
                 else
                 {
                      Items[x, y] = (item, count);
-                     GD.Print($"AddItemAt: Placed new item at {x},{y}. Count: {count}");
                      item.currentGrid = this;
                      EmitSignal(SignalName.ItemAdded,this, item);
                 }
@@ -355,13 +352,11 @@ public partial class InventoryGrid : Resource
              if (itemRemovedCompletely)
              {
                  Items[pos.X, pos.Y] = (null, 0);
-                 GD.Print($"RemoveItem: Cleared slot at {pos}.");
              }
              else
              {
                  // Update the stack size for this cell to match the new total
                  Items[pos.X, pos.Y] = (item, newStackSize);
-                 GD.Print($"RemoveItem: Updated slot at {pos} to count {newStackSize}.");
              }
         }
 

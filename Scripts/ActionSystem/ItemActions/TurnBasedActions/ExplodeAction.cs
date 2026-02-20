@@ -10,7 +10,7 @@ namespace FirstArrival.Scripts.ActionSystem.ItemActions;
 
 public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, IItemAction
 {
-    public Action ParentAction { get => Parent; set => SetParent(value); }
+    public Action ParentAction { get; set; }
     public List<Action> SubActions { get; set; } = new();
     public Item Item { get; set; }
     
@@ -42,8 +42,6 @@ public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, I
 
     protected override Task Setup()
     {
-	    ParentAction = this;
-
 	    ThrowActionDefinition throwActionDef = null;
 	    
 	    if (Item?.ItemData != null)

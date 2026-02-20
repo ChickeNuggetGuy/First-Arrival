@@ -9,8 +9,6 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class ThrowActionDefinition : ItemActionDefinition
 {
-  public Item Item { get; set; }
-
   private List<GridCell> _path = new List<GridCell>();
   private Vector3[] _vectorPath;
 

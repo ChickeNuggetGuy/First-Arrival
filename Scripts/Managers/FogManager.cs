@@ -61,11 +61,14 @@ public partial class FogManager : Manager<FogManager>
             GD.Print("FogManager: Player visibility texture is not yet initialized.");
             return;
         }
-
-        GD.Print("--- FOG MANAGER INIT ---");
-        GD.Print($"Texture Resolution: {mapSize}");
-        GD.Print($"Cell Size (World): {cellSize}");
-        GD.Print("------------------------");
+		
+        if(DebugMode)
+        {
+	        GD.Print("--- FOG MANAGER INIT ---");
+	        GD.Print($"Texture Resolution: {mapSize}");
+	        GD.Print($"Cell Size (World): {cellSize}");
+	        GD.Print("------------------------");
+        }
         
         SetGlobalVisibilityTexture(playerTexture);
         

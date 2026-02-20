@@ -66,7 +66,7 @@ public partial class BehaviorTree : BTNode
 
 		if (RestartOnTick && _lastStatus != BTStatus.Running)
 		{
-			// Full restart each turn
+			//TODO: Full restart each turn
 		}
 
 		_lastStatus = _root.Tick(delta);

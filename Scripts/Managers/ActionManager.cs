@@ -32,7 +32,22 @@ public partial class ActionManager : Manager<ActionManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
+		GridObjectTeamHolder playerTeam = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+
+		if (playerTeam != null)
+		{
+			playerTeam.SelectedGridObjectChanged += PlayerTeamOnSelectedGridObjectChanged;
+		}
 		await Task.CompletedTask;
+	}
+
+	private void PlayerTeamOnSelectedGridObjectChanged(GridObject gridObject)
+	{
+		gridObject.TryGetGridObjectNode<GridObjectActions>(out GridObjectActions gridObjectActions);
+		if (gridObjectActions != null)
+		{
+			SetSelectedAction(gridObjectActions.ActionDefinitions[0]);
+		}
 	}
 
 	public override void _Input(InputEvent @event)
@@ -142,11 +157,13 @@ public partial class ActionManager : Manager<ActionManager>
 		{
 			if (extraData != null && extraData.ContainsKey("item"))
 			{
+				GD.Print("Set item");
 				itemActionDefinition.Item = extraData["item"].As<Item>();
 			}
 		}
 
-		GD.Print($"set selected action {SelectedAction.GetActionName()}");
+		if(DebugMode)
+			GD.Print($"set selected action to {SelectedAction.GetActionName()}");
 	}
 
 	public async Task<bool> TryTakeAction(

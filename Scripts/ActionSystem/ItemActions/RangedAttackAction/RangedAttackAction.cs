@@ -26,9 +26,9 @@ public partial class RangedAttackAction : Action, IItemAction
 
     protected override async Task Execute()
     {
-        if (parentGridObject == null || parentGridObject.objectCenter == null)
+        if (parentGridObject == null)
         {
-            GD.PrintErr("Execute: parentGridObject or objectCenter is null");
+            GD.PrintErr("Execute: parentGridObject is null");
             return;
         }
         
@@ -64,15 +64,8 @@ public partial class RangedAttackAction : Action, IItemAction
         {
             tweenPos = results["position"].As<Vector3>();
             GD.Print($"Hit {tweenPos}");
-
-            if (results["collider"].As<Node>() is GridObject gridObject )
-            {
-                targetGridObject = gridObject;
-            }
-            else if (results["collider"].As<Node>().GetParent() is GridObject parent)
-            {
-	            targetGridObject = parent;
-            }
+			
+            targetGridObject =  results["collider"].As<Node>().FindParentByTypeRecursive<GridObject>();
         }
         else
         {
@@ -96,7 +89,7 @@ public partial class RangedAttackAction : Action, IItemAction
 	    damage = rangedAttackActionDefinition.damage;
         
         
-        if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder targetStatHolder)) return;
+        if(!targetGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder targetStatHolder)) return;
 
         if (!targetStatHolder.TryGetStat(Enums.Stat.Health, out var health))
         {
@@ -105,7 +98,7 @@ public partial class RangedAttackAction : Action, IItemAction
         else if (Item != null && Item.ItemData != null && Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanRanged))
         {
             health.RemoveValue(damage);
-            GD.Print($"Target unit: {targetGridObject} Damaged for {damage} damage, remaining health is {health.CurrentValue}");
+            GD.Print($"Target unit: {targetGridObject.Name} Damaged for {damage} damage, remaining health is {health.CurrentValue}");
         }
     }
 
