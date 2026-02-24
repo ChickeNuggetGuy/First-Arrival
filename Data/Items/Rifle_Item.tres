@@ -8,15 +8,30 @@
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="4_axqm3"]
 [ext_resource type="Texture2D" uid="uid://c53tofvq62o2d" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Preset_A_Rifle_01_Military_Side.png" id="4_xokv0"]
 
+[sub_resource type="Resource" id="Resource_xokv0"]
+script = ExtResource("2_w5xnn")
+range = 10
+damage = 25
+confirmClick = true
+
+[sub_resource type="Resource" id="Resource_tj85d"]
+script = ExtResource("2_w5xnn")
+Type = 1
+range = 20
+damage = 25
+
+[sub_resource type="Resource" id="Resource_xaass"]
+script = ExtResource("2_w5xnn")
+Type = 2
+attackCount = 3
+range = 18
+damage = 25
+confirmClick = true
+
 [sub_resource type="Resource" id="Resource_xgeb5"]
 script = ExtResource("1_axqm3")
 damage = 15
 metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
-
-[sub_resource type="Resource" id="Resource_tj85d"]
-script = ExtResource("2_w5xnn")
-range = 16
-damage = 30
 
 [sub_resource type="Resource" id="Resource_ipk4j"]
 script = ExtResource("3_2n7ds")
@@ -43,6 +58,5 @@ LeftHandItemPosition = Vector3(0.24844818, -0.05375739, -0.06803122)
 LeftHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
 RightHandItemPosition = Vector3(0.01, 0.01, 0.01)
 RightHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
-ActionDefinitions = Array[Object]([SubResource("Resource_xgeb5"), SubResource("Resource_tj85d"), SubResource("Resource_ipk4j")])
+ActionDefinitions = Array[Object]([SubResource("Resource_xokv0"), SubResource("Resource_tj85d"), SubResource("Resource_xaass"), SubResource("Resource_xgeb5"), SubResource("Resource_ipk4j")])
 MaxStackSize = 4
-ItemSettings = 15

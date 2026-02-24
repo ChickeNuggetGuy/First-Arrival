@@ -13,7 +13,7 @@ public partial class MoveActionDefinition : ActionDefinition
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
   {
     return new MoveAction(parent, startGridCell, targetGridCell, this, costs);
@@ -23,7 +23,7 @@ public partial class MoveActionDefinition : ActionDefinition
   GridObject gridObject,
   GridCell startingGridCell,
   GridCell targetGridCell,
-  Dictionary<Enums.Stat, int> costs,
+  Godot.Collections.Dictionary<Enums.Stat, int> costs,
   out string reason
 )
 {
@@ -60,7 +60,7 @@ public partial class MoveActionDefinition : ActionDefinition
 
   // Cost simulation (same logic you already had)
   var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-	  gridObject.visualMesh.Rotation.Y
+	  gridObject.Rotation.Y
   );
 
   for (int i = 0; i < tempPath.Count - 1; i++)

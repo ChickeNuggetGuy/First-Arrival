@@ -90,7 +90,7 @@ public partial class GridObjectSight : GridObjectNode
 
         var newlySeenObjects = new List<GridObject>();
 
-        Vector3 forwardVector = (-parentGridObject.GlobalBasis.Z).Normalized();
+        Vector3 forwardVector = (parentGridObject.GlobalBasis.Z).Normalized();
 
         var mainConeCells = gridSystem.GetGridCellsInCone(
             startCell,

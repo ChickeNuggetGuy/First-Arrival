@@ -12,8 +12,9 @@ public partial class InteractAction : Action, ICompositeAction
 	public List<Action> SubActions { get; set; }
 	
 	IInteractableGridobject targetGridObject;
-	public InteractAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,ActionDefinition parentAction,
-		Dictionary<Enums.Stat, int> costs) : base(parentGridObject, startingGridCell, targetGridCell ,parentAction, costs)
+	public InteractAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
+		ActionDefinition parentAction, Godot.Collections.Dictionary<Enums.Stat, int> costs)
+		: base(parentGridObject, startingGridCell, targetGridCell ,parentAction, costs)
 	{
 		targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>  gridObject is IInteractableGridobject ) as IInteractableGridobject;
 	}
@@ -60,7 +61,8 @@ public partial class InteractAction : Action, ICompositeAction
 		}
 		
 		MoveAction moveAction = moveActionDefinition.InstantiateAction(parentGridObject,
-			startingGridCell, moveDestination, new Dictionary<Enums.Stat, int>()) as MoveAction;
+			startingGridCell, moveDestination, 
+			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveAction;
 		AddSubAction(moveAction);
 	}
 

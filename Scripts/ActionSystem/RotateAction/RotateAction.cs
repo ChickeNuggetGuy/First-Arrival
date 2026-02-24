@@ -15,7 +15,7 @@ public partial class RotateAction : Action
     GridCell startingGridCell,
     GridCell targetGridCell,
     ActionDefinition parentAction,
-    Dictionary<Enums.Stat, int> costs,
+    Godot.Collections.Dictionary<Enums.Stat, int> costs,
     Enums.Direction targetDirection
   ) : base(parentGridObject, startingGridCell, targetGridCell, parentAction, costs)
   {
@@ -82,16 +82,16 @@ public partial class RotateAction : Action
 	  float targetYawRad = RotationHelperFunctions.GetRotationRadians(_targetDirection);
 
 	  // IMPORTANT: read mesh yaw, not parent yaw
-	  float currentYaw = parentGridObject.visualMesh.Rotation.Y;
+	  float currentYaw = parentGridObject.Rotation.Y;
 	  float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
 	  float finalYaw = currentYaw + delta;
 
 	  float duration = Mathf.Abs(delta) / Mathf.DegToRad(TurnSpeedDegPerSec);
 	  if (duration < 0.0001f)
 	  {
-		  var r = parentGridObject.visualMesh.Rotation;
+		  var r = parentGridObject.Rotation;
 		  r.Y = finalYaw;
-		  parentGridObject.visualMesh.Rotation = r;
+		  parentGridObject.Rotation = r;
 		  return;
 	  }
 
@@ -99,14 +99,14 @@ public partial class RotateAction : Action
 	  tween.SetTrans(Tween.TransitionType.Sine);
 	  tween.SetEase(Tween.EaseType.InOut);
 
-	  tween.TweenProperty(parentGridObject.visualMesh, "rotation:y", finalYaw, duration);
+	  tween.TweenProperty(parentGridObject, "rotation:y", finalYaw, duration);
 	  await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
   }
 
   protected override Task ActionComplete()
   {
 	  var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-		  parentGridObject.visualMesh.Rotation.Y
+		  parentGridObject.Rotation.Y
 	  );
 	  parentGridObject.GridPositionData.SetDirection(facing);
 	  return Task.CompletedTask;

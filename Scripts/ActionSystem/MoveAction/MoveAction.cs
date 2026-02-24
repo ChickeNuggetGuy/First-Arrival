@@ -17,7 +17,7 @@ public partial class MoveAction : Action, ICompositeAction
 		GridCell startingGridCell,
 		GridCell targetGridCell,
 		ActionDefinition parent,
-		Dictionary<Enums.Stat, int> costs
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 		: base(
 			parentGridObject,
@@ -54,7 +54,7 @@ public partial class MoveAction : Action, ICompositeAction
 			return;
 		
 		var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-			parentGridObject.visualMesh.Rotation.Y
+			parentGridObject.Rotation.Y
 		);
 
 		// Build step actions using the correct cell for each step

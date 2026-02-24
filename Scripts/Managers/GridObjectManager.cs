@@ -139,7 +139,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 
 		gridObjectTeams[team].AddGridObject(gridObjectInstance);
 		gridObjectTeams[team].AddChild(gridObjectInstance);
-		gridObjectInstance.GlobalPosition = cell.WorldPosition;
+		gridObjectInstance.GlobalPosition = cell.WorldCenter;
 
 		gridObjectInstance.Name = $"{Enum.GetName(team)}_{GetGridObjectTeamHolder(team).GridObjects[Enums.GridObjectState.Active].Count}_{Guid.NewGuid().ToString().Substring(0,4)}";
 		await gridObjectInstance.Initialize(team, cell);

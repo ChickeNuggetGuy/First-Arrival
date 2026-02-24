@@ -27,7 +27,7 @@ public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, I
         GridCell targetGridCell,
         ActionDefinition parent,
         Item item,
-        Dictionary<Enums.Stat, int> costs,
+        Godot.Collections.Dictionary<Enums.Stat, int> costs,
         int turnsUntilExplode = 2,
         int radius = 2,
         float damage = 50
@@ -82,7 +82,7 @@ public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, I
 		    Item,
 		    path,
 		    vectorPath,
-		    new Dictionary<Enums.Stat, int>()
+		    new  Godot.Collections.Dictionary<Enums.Stat, int>()
 	    );
 
 	    AddSubAction(throwAction);
@@ -138,10 +138,8 @@ public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, I
 	                if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out var gridObjectStatHolder)) continue;
 	                
 	                //TODO: make the grenade decide which stats it affects (i.e emp grnades, falshbangs affecting accuracy etc)
-	                if(!gridObjectStatHolder.TryGetStat(Enums.Stat.Health, out var health)) continue;
-	                
-	                health.RemoveValue(grenadeDamage);
-	                GD.Print($"Damaging object at {cell.GridCoordinates}. New health: {health.CurrentValue}");
+
+	                gridObjectStatHolder.TryRemoveStatCosts(costs);
                 }
             }
         }

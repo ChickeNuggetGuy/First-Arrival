@@ -10,6 +10,7 @@ public abstract partial class ActionDefinition : Resource
 {
   public GridObject parentGridObject { get; set; }
   [Export] public bool confirmClick = false;
+  
 
   public List<GridCell> ValidGridCells { get; protected set; } =
     new List<GridCell>();
@@ -19,7 +20,7 @@ public abstract partial class ActionDefinition : Resource
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs,
+    Godot.Collections.Dictionary<Enums.Stat, int> costs,
     bool executeAfterCreation = true
   )
   {
@@ -34,16 +35,11 @@ public abstract partial class ActionDefinition : Resource
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   );
   
-  public bool CanTakeAction(
-    GridObject gridObject,
-    GridCell startingGridCell,
-    GridCell targetGridCell,
-    out Dictionary<Enums.Stat, int> costs,
-    out string reason
-  )
+  public bool CanTakeAction(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell,
+    out  Godot.Collections.Dictionary<Enums.Stat, int> costs, out string reason)
   {
     costs = CreateCostContainer();
 	
@@ -100,7 +96,7 @@ public abstract partial class ActionDefinition : Resource
     GridObject gridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
-    out Dictionary<Enums.Stat, int> costs,
+    out  Godot.Collections.Dictionary<Enums.Stat, int> costs,
     out string reason
   )
   {
@@ -131,7 +127,7 @@ public abstract partial class ActionDefinition : Resource
     GridObject gridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs,
+    Godot.Collections.Dictionary<Enums.Stat, int> costs,
     out string reason
   );
 
@@ -146,7 +142,7 @@ public abstract partial class ActionDefinition : Resource
     GridCell startingGridCell
   );
 
-  public (GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs) DetermineBestAIAction()
+  public (GridCell gridCell, int score,  Godot.Collections.Dictionary<Enums.Stat, int> costs) DetermineBestAIAction()
   {
 	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.AnchorCell);
 	  GD.Print($"{GetActionName()}: Possible grid cells: {possibleGridCells.Count}");
@@ -155,7 +151,7 @@ public abstract partial class ActionDefinition : Resource
 		  return (null, int.MinValue, null);
 	  }
 
-	  var gridCellScores = new List<(GridCell gridCell, int score, Dictionary<Enums.Stat, int> costs)>();
+	  var gridCellScores = new List<(GridCell gridCell, int score,  Godot.Collections.Dictionary<Enums.Stat, int> costs)>();
 
 	  foreach (var possibleGridCell in possibleGridCells)
 	  {
@@ -188,18 +184,18 @@ public abstract partial class ActionDefinition : Resource
 
   
 
-  protected Dictionary<Enums.Stat, int> CreateCostContainer()
+  protected  Godot.Collections.Dictionary<Enums.Stat, int> CreateCostContainer()
   {
-    return new Dictionary<Enums.Stat, int>
+    return new  Godot.Collections.Dictionary<Enums.Stat, int>
     {
       { Enums.Stat.TimeUnits, 0 },
       { Enums.Stat.Stamina, 0 }
     };
   }
 
-  protected Dictionary<Enums.Stat, int> CreateFailCosts()
+  protected  Godot.Collections.Dictionary<Enums.Stat, int> CreateFailCosts()
   {
-    return new Dictionary<Enums.Stat, int>
+    return new  Godot.Collections.Dictionary<Enums.Stat, int>
     {
       { Enums.Stat.TimeUnits, -1 },
       { Enums.Stat.Stamina, -1 }
@@ -207,7 +203,7 @@ public abstract partial class ActionDefinition : Resource
   }
 
   protected static void AddCost(
-    Dictionary<Enums.Stat, int> target,
+	  Godot.Collections.Dictionary<Enums.Stat, int> target,
     Enums.Stat stat,
     int value
   )
@@ -216,9 +212,8 @@ public abstract partial class ActionDefinition : Resource
     target[stat] += value;
   }
 
-  protected static void AddCosts(
-    Dictionary<Enums.Stat, int> target,
-    Dictionary<Enums.Stat, int> add
+  protected static void AddCosts(Godot.Collections.Dictionary<Enums.Stat, int> target,
+    Godot.Collections.Dictionary<Enums.Stat, int> add
   )
   {
     if (add == null) return;
@@ -234,7 +229,7 @@ public abstract partial class ActionDefinition : Resource
     GridObject gridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs,
+    Godot.Collections.Dictionary<Enums.Stat, int> costs,
     out string reason
   )
   {

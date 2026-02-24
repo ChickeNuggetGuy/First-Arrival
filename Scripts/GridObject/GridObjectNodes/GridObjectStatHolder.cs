@@ -7,7 +7,7 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class GridObjectStatHolder : GridObjectNode
 {
-	private Dictionary<Enums.Stat, GridObjectStat> _stats = new Dictionary<Enums.Stat, GridObjectStat>();
+	private Godot.Collections.Dictionary<Enums.Stat, GridObjectStat> _stats = new Godot.Collections.Dictionary<Enums.Stat, GridObjectStat>();
 	public List<GridObjectStat> Stats
 	{
 		get
@@ -45,7 +45,7 @@ public partial class GridObjectStatHolder : GridObjectNode
 		else return true;
 	}
 	
-	public bool CanAffordStatCost(System.Collections.Generic.Dictionary<Enums.Stat, int> costs)
+	public bool CanAffordStatCost(Godot.Collections.Dictionary<Enums.Stat, int> costs)
 	{
 		foreach (var stat in costs)
 		{
@@ -54,6 +54,18 @@ public partial class GridObjectStatHolder : GridObjectNode
 			if (statObj == null) return false;
 			
 			if (stat.Value  > statObj.CurrentValue ) return false;
+		}
+		return true;
+	}
+
+	public bool TryRemoveStatCosts(Godot.Collections.Dictionary<Enums.Stat, int> costs)
+	{
+		foreach (var stat in costs)
+		{
+			GridObjectStat statObj = Stats.FirstOrDefault(s => s.Stat == stat.Key);
+			if (statObj == null) continue;
+			
+			statObj.RemoveValue(stat.Value);
 		}
 		return true;
 	}

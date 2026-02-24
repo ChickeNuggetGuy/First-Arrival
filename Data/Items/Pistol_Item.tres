@@ -39,5 +39,4 @@ ItemShape = SubResource("Resource_uou2a")
 weight = 5
 ActionDefinitions = [SubResource("Resource_2jyhj"), SubResource("Resource_wvx2b"), SubResource("Resource_fv7ql")]
 MaxStackSize = 2
-ItemSettings = 3
 metadata/_custom_type_script = "uid://da4j8smky5g6x"

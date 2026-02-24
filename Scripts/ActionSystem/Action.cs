@@ -1,5 +1,5 @@
-using Godot;
 using System.Collections.Generic;
+using Godot;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
@@ -12,7 +12,7 @@ public abstract partial class Action
   protected ActionDefinition parentActionDefinition;
   public Action NextAction {get; protected set;}
 
-  protected Dictionary<Enums.Stat, int> costs = new();
+  protected Godot.Collections.Dictionary<Enums.Stat, int> costs = new();
   public Action Parent { get; private set; } = null;
   private bool costsDeducted = false;
 
@@ -36,7 +36,7 @@ public abstract partial class Action
     GridCell startingGridCell,
     GridCell targetGridCell,
     ActionDefinition parent,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
   {
     this.parentActionDefinition = parent;
@@ -44,8 +44,8 @@ public abstract partial class Action
     this.startingGridCell = startingGridCell;
     this.targetGridCell = targetGridCell;
     this.costs = costs != null
-      ? new Dictionary<Enums.Stat, int>(costs)
-      : new Dictionary<Enums.Stat, int>();
+      ? new Godot.Collections.Dictionary<Enums.Stat, int>(costs)
+      : new Godot.Collections.Dictionary<Enums.Stat, int>();
   }
 
   public virtual async Task SetupCall()

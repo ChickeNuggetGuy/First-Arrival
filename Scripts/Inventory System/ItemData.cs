@@ -40,7 +40,7 @@ public partial class ItemData : Resource
 	public Array<ActionDefinition> ActionDefinitions;
 	
 	[Export] public int MaxStackSize { get; protected set; } = 1;
-	[Export] public Enums.ItemSettings ItemSettings { get; protected set; }
+	
 	public static Item CreateItem(ItemData itemData)
 	{
 		Item retVal = new Item();

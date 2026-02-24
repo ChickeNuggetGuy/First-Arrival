@@ -16,7 +16,7 @@ public partial class ThrowActionDefinition : ItemActionDefinition
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
   {
     GD.Print($"Vector path {(_vectorPath?.Length ?? 0)} path: {(_path?.Count ?? 0)}");
@@ -27,7 +27,7 @@ public partial class ThrowActionDefinition : ItemActionDefinition
     GridObject gridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs,
+    Godot.Collections.Dictionary<Enums.Stat, int> costs,
     out string reason
   )
   {

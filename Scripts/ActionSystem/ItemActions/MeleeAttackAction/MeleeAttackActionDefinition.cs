@@ -15,7 +15,7 @@ public partial class MeleeAttackActionDefinition
 		GridObject parent,
 		GridCell startGridCell,
 		GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 	{
 		return new MeleeAttackAction(parent, startGridCell, targetGridCell, this, costs)
@@ -28,17 +28,11 @@ public partial class MeleeAttackActionDefinition
 		GridObject gridObject,
 		GridCell startingGridCell,
 		GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs,
 		out string reason
 	)
 	{
 		if (Item == null)
-		{
-			reason = "No melee item equipped";
-			return false;
-		}
-		
-		if(!Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanMelee))
 		{
 			reason = "No melee item equipped";
 			return false;

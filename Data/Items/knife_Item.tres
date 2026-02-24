@@ -32,4 +32,3 @@ ItemShape = SubResource("Resource_did8u")
 weight = 2
 ActionDefinitions = Array[Object]([SubResource("Resource_u2q4j"), SubResource("Resource_lvcgx")])
 MaxStackSize = 5
-ItemSettings = 13

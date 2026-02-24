@@ -14,6 +14,9 @@ metadata/_custom_type_script = "uid://60yksynr5w30"
 [sub_resource type="Resource" id="Resource_3n0l4"]
 script = ExtResource("2_oyuuw")
 turnsUntilExplode = 1
+affectedStats = Dictionary[int, int]({
+1: 100
+})
 metadata/_custom_type_script = "uid://ckx5jaq00ebpn"
 
 [sub_resource type="Resource" id="Resource_5mon7"]
@@ -33,4 +36,3 @@ ItemShape = SubResource("Resource_5mon7")
 weight = 5
 ActionDefinitions = [SubResource("Resource_yew0j"), SubResource("Resource_3n0l4")]
 MaxStackSize = 2
-ItemSettings = 12

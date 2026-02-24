@@ -10,8 +10,8 @@ public class MoveStepAction : Action, ICompositeAction
   public Action ParentAction { get; set; }
   public List<Action> SubActions { get; set; }
   public Enums.Direction targetDirection { get; set; }
-  
-  public Vector3 TargetWorldPos => targetGridCell.WorldPosition; // or WorldCenter
+
+  public Vector3 TargetWorldPos => targetGridCell.WorldCenter;
   public GridCell TargetCell => targetGridCell;
 
 
@@ -22,7 +22,7 @@ public class MoveStepAction : Action, ICompositeAction
     GridCell startingGridCell,
     GridCell targetGridCell,
     ActionDefinition parent,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
     : base(parentGridObject, startingGridCell, targetGridCell, parent, costs)
   {
@@ -35,7 +35,7 @@ public class MoveStepAction : Action, ICompositeAction
     // Use actual transform-facing, not cached direction state
     Enums.Direction currentDirection =
 	    RotationHelperFunctions.GetDirectionFromRotation3D(
-		    parentGridObject.visualMesh.Rotation.Y
+		    parentGridObject.Rotation.Y
 	    );
 	targetDirection =
       RotationHelperFunctions.GetDirectionBetweenCells(
@@ -59,7 +59,7 @@ public class MoveStepAction : Action, ICompositeAction
         return;
       }
       
-      Dictionary<Enums.Stat, int> rotateCosts = new();
+      Godot.Collections.Dictionary<Enums.Stat, int> rotateCosts = new();
       if (!rotateActionDefinition.TryBuildCostsOnly(
             parentGridObject,
             startingGridCell,
@@ -73,7 +73,7 @@ public class MoveStepAction : Action, ICompositeAction
             currentDirection,
             targetDirection
           );
-        rotateCosts = new Dictionary<Enums.Stat, int>
+        rotateCosts = new Godot.Collections.Dictionary<Enums.Stat, int>
         {
           { Enums.Stat.TimeUnits, Mathf.Abs(steps) * 1 },
           { Enums.Stat.Stamina, Mathf.Abs(steps) * 1 },
@@ -129,7 +129,7 @@ public class MoveStepAction : Action, ICompositeAction
 	  var moveTw = tween.TweenProperty(
 		  parentGridObject,
 		  "position",
-		  targetGridCell.WorldPosition,
+		  targetGridCell.WorldCenter,
 		  0.5f // StepMoveDurationSec
 	  );
 	  moveTw.SetTrans(Tween.TransitionType.Linear);

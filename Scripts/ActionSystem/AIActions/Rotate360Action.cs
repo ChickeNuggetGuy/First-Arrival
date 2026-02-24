@@ -11,7 +11,9 @@ public class Rotate360Action : Action, ICompositeAction
 	public Action ParentAction { get; set; }
 	public List<Action> SubActions { get; set; }
 	
-	public Rotate360Action(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, ActionDefinition parent, Dictionary<Enums.Stat, int> costs) : base(parentGridObject, startingGridCell, targetGridCell, parent, costs)
+	public Rotate360Action(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
+		ActionDefinition parent,  Godot.Collections.Dictionary<Enums.Stat, int> costs) 
+		: base(parentGridObject, startingGridCell, targetGridCell, parent, costs)
 	{
 	}
 
@@ -47,7 +49,7 @@ public class Rotate360Action : Action, ICompositeAction
 				parentGridObject,
 				startingGridCell,
 				nextCell,
-				new Dictionary<Enums.Stat, int>() // Costs are handled by the parent composite action
+				new  Godot.Collections.Dictionary<Enums.Stat, int>()
 			);
 			
 			AddSubAction(rotateAction);

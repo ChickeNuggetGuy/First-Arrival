@@ -1,4 +1,6 @@
 using System;
+using Godot;
+using Godot.Collections;
 
 namespace FirstArrival.Scripts.Utility;
 
@@ -73,6 +75,15 @@ public class Enums
 		RangedAccuracy
 	}
 
+	public static Dictionary<Stat, Color> statColors = new()
+	{
+		{ Stat.Health, Colors.Red },
+		{ Stat.Stamina, Colors.Green },
+		{ Stat.Bravery, Colors.Purple },
+		{ Stat.TimeUnits, Colors.Orange },
+		{ Stat.RangedAccuracy, Colors.LightBlue }
+	};
+
 	public enum StatTurnBehavior
 	{
 		None = 0,
@@ -112,14 +123,12 @@ public class Enums
 		
 	}
 
-	[Flags]
-	public enum ItemSettings
+	public enum RangedAttackType
 	{
-		None = 0,
-		CanMelee = 1 << 0,
-		CanRanged = 1 << 1,
-		CanThrow = 1 << 2,
-		CanEquip = 1 << 3,
+		SNAP,
+		AIM,
+		AUTO,
+		
 	}
 	#endregion
 

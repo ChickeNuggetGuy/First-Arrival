@@ -63,11 +63,23 @@ public partial class Item : Node3D, IContextUser<Item>
 		Dictionary<string,Callable> actions = new Dictionary<string,Callable>();
 		foreach (var action in ItemData.ActionDefinitions)
 		{
-			actions.Add(action.GetActionName(),Callable.From(() => ActionManager.Instance.SetSelectedAction(action,
-				new Dictionary<string, Variant>()
-				{
-					{ "item", this }
-				})));
+			if (action is RangedAttackActionDefinition rangedAttackActionDefinition)
+			{
+				actions.Add(rangedAttackActionDefinition.Type.ToString().ToPascalCase() + " Shot" ,
+					Callable.From(() => ActionManager.Instance.SetSelectedAction(action,
+					new Dictionary<string, Variant>()
+					{
+						{ "item", this }
+					})));
+			}
+			else
+			{
+				actions.Add(action.GetActionName(), Callable.From(() => ActionManager.Instance.SetSelectedAction(action,
+					new Dictionary<string, Variant>()
+					{
+						{ "item", this }
+					})));
+			}
 		}
 		return actions;
 	}

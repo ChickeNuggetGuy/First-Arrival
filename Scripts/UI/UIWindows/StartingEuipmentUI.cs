@@ -13,11 +13,15 @@ public partial class StartingEuipmentUI : UIWindow
 	[Export] Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new();
 	
 	Dictionary<Enums.InventoryType,InventoryGridUI> inventoryGridUIs = new Dictionary<Enums.InventoryType, InventoryGridUI>();
+	
 
 	[Export] public Label unitNameLabel;
 	[Export] public Button acceptButton;
 	[Export] public Button previousButton;
 	[Export] public Button nextButton;
+
+	[ExportGroup("Grid Object Stat Settings")] 
+	[Export] protected Array<TextStatBar> _statBars = new();
 
 	private Array<GridObject> playerUnits = new Array<GridObject>();
 	private int currentUnitIndex = 0;
@@ -120,8 +124,16 @@ public partial class StartingEuipmentUI : UIWindow
 			else
 			{
 				// Unit might not have this inventory type (e.g. some units might not have a backpack)
-				// You might want to clear the UI or handle this case
 				GD.Print($"Unit {currentUnit.Name} missing inventory type {pair.Key}");
+			}
+		}
+
+		if (_statBars != null && _statBars.Count > 0)
+		{
+			currentUnit.TryGetGridObjectNode<GridObjectStatHolder>(out var statHolder);
+			foreach (var statBar in _statBars)
+			{
+				statBar.UpdateStat(statHolder);
 			}
 		}
 	}

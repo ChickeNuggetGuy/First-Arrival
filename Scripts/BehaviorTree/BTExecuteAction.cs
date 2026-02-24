@@ -59,7 +59,7 @@ public partial class BTExecuteAction : BTAsyncBridge
         }
 
         GridCell targetCell = null;
-        Dictionary<Enums.Stat, int> costs = null;
+        Godot.Collections.Dictionary<Enums.Stat, int> costs = null;
 
         // 4. Resolve Target (Override vs Best Score)
         if (Blackboard.Has("override_target_coords"))
@@ -127,7 +127,7 @@ public partial class BTExecuteAction : BTAsyncBridge
         return accepted;
     }
 
-    private (GridCell cell, Dictionary<Enums.Stat, int> costs)? FindBestTarget(ActionDefinition actionDef)
+    private (GridCell cell,  Godot.Collections.Dictionary<Enums.Stat, int> costs)? FindBestTarget(ActionDefinition actionDef)
     {
         if (UseScoring)
         {

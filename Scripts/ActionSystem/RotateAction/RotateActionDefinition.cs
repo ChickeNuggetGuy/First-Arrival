@@ -11,7 +11,7 @@ public partial class RotateActionDefinition : ActionDefinition
 		GridObject parent,
 		GridCell startGridCell,
 		GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 	{
 		return new RotateAction(
@@ -28,7 +28,7 @@ public partial class RotateActionDefinition : ActionDefinition
 		GridObject gridObject,
 		GridCell startingGridCell,
 		GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs,
 		out string reason
 	)
 	{
@@ -39,7 +39,7 @@ public partial class RotateActionDefinition : ActionDefinition
 
 		// Determine current facing from the actual transform (Rotation.Y)
 		var currentFacing = RotationHelperFunctions.GetDirectionFromRotation3D(
-			gridObject.visualMesh.Rotation.Y
+			gridObject.Rotation.Y
 		);
 
 		if (currentFacing == targetDirection)

@@ -10,14 +10,17 @@ using FirstArrival.Scripts.Utility;
 public partial class RangedAttackActionDefinition
 	: ItemActionDefinition
 {
-	
+	[Export] public Enums.RangedAttackType Type;
+	[Export] public int attackCount = 1;
 	[Export] public int range;
 	[Export] public int damage;
+	[Export] public Godot.Collections.Dictionary<Enums.Stat, int> damagingStats = new();
+	
 	public override Action InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,
 		GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 	{
 		return new RangedAttackAction(parent, startGridCell, targetGridCell, this, costs)
@@ -30,7 +33,7 @@ public partial class RangedAttackActionDefinition
 		GridObject gridObject,
 		GridCell startingGridCell,
 		GridCell targetGridCell,
-		Dictionary<Enums.Stat, int> costs,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs,
 		out string reason
 	)
 	{
@@ -46,13 +49,7 @@ public partial class RangedAttackActionDefinition
 			reason = $"starting grid cell {startingGridCell} is equal to {targetGridCell}";
 			return false;
 		}
-
-		if (!Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanRanged))
-		{
-			reason = "No ranged item equipped";
-			return false;
-		}
-
+		
 		if (!targetGridCell.HasGridObject())
 		{
 			reason = "No grid object found";
@@ -80,7 +77,11 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
-		AddCost(costs, Enums.Stat.TimeUnits, 8 * Item.ItemData.weight);
+		for (int i = 0; i < attackCount; i++)
+		{
+			AddCost(costs, Enums.Stat.TimeUnits, 2 * Item.ItemData.weight);
+		}
+
 
 		reason = "success";
 		return true;
@@ -91,10 +92,6 @@ public partial class RangedAttackActionDefinition
 		GridCell startingGridCell
 	)
 	{
-		if (Item == null || !Item.ItemData.ItemSettings.HasFlag(Enums.ItemSettings.CanRanged))
-		{
-			return new List<GridCell>();
-		}
 
 		List<GridCell> tempCells = parentGridObject.TeamHolder.GetVisibleGridCells().Where(cell =>
 		{

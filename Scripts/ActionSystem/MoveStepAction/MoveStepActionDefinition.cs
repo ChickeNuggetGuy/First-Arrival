@@ -11,7 +11,7 @@ public partial class MoveStepActionDefinition : ActionDefinition
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
   {
     return new MoveStepAction(parent, startGridCell, targetGridCell, this, costs);
@@ -21,7 +21,7 @@ public partial class MoveStepActionDefinition : ActionDefinition
     GridObject gridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
-    Dictionary<Enums.Stat, int> costs,
+    Godot.Collections.Dictionary<Enums.Stat, int> costs,
     out string reason
   )
   {
@@ -45,7 +45,7 @@ public partial class MoveStepActionDefinition : ActionDefinition
 
     // Determine rotation cost based on actual transform-facing
     var currentFacing = RotationHelperFunctions.GetDirectionFromRotation3D(
-	    gridObject.visualMesh.Rotation.Y
+	    gridObject.Rotation.Y
     );
     
     var targetFacing = RotationHelperFunctions.GetDirectionBetweenCells(

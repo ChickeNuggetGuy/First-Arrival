@@ -28,7 +28,7 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
     Item item,
     List<GridCell> p,
     Vector3[] vPath,
-    Dictionary<Enums.Stat, int> costs
+    Godot.Collections.Dictionary<Enums.Stat, int> costs
   ) : base(parentGridObject, startingGridCell, targetGridCell, parentAction, costs)
   {
     Item = item;
@@ -63,7 +63,7 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
 
       if (rotateActionDefinition != null)
       {
-        var zeroCosts = new Dictionary<Enums.Stat, int>();
+        var zeroCosts = new  Godot.Collections.Dictionary<Enums.Stat, int>();
         var rotateAction =
           (RotateAction)rotateActionDefinition.InstantiateAction(
             parentGridObject,
