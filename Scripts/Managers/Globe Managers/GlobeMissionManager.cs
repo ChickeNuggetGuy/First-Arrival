@@ -200,19 +200,26 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     public void LoadMissionScene(MissionCellDefinition missionDefinition)
     {
-        GameManager.Instance.unitCounts = new Vector2I(
-            2,
-            missionDefinition.mission.EnemySpawnCount
-        );
-        
-        GameManager.Instance.mapSize = new Vector2I(
-	        GD.RandRange(2,4),
-	        GD.RandRange(2,4)
-        );
-        GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene, null, true);
-        RemoveMissionDefinition(missionDefinition.cellIndex);
-    }
+	    // Save the complete Globe state NOW, before leaving
+	    GameManager.SaveGlobeTransitionState();
 
+	    // Set up battle parameters (these are public fields on GameManager, so the Battle scene can read them)
+	    GameManager.Instance.unitCounts = new Vector2I(2, missionDefinition.mission.EnemySpawnCount);
+	    GameManager.Instance.mapSize = new Vector2I(GD.RandRange(2,4), GD.RandRange(2,4));
+	    GameManager.Instance.currentMission = missionDefinition;
+	    missionDefinition.missionStatus |= Enums.MissionStatus.Visited;
+
+	    // Switch to battle scene WITHOUT saving anything else
+	    GameManager._loadFromAutosave = false;
+	    GameManager._pendingSaveData = null;
+	    GameManager._pendingSaveName = "";
+
+	    GameManager.Instance.TryChangeScene(
+		    GameManager.GameScene.BattleScene,
+		    null,
+		    saveManagerData: false  
+	    );
+    }
 
 
     private Node3D SpawnMissionVisual(HexCellData cell, string name)
@@ -238,7 +245,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     }
 
 
-    private void RemoveMissionDefinition(int cellIndex)
+    public void RemoveMissionDefinition(int cellIndex)
     {
 	    if (!_activeMissions.ContainsKey(cellIndex)) return;
 	    
@@ -318,6 +325,13 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
             MissionBase mission = null;
             Enums.MissionType type = (Enums.MissionType)mData["type"].AsInt32();
+            Enums.MissionStatus status = (Enums.MissionStatus)mDefData["missionStatus"].AsInt32();
+            Craft onRouteCraft = null;
+            if (mDefData.ContainsKey("onRouteCraft"))
+            {
+	            onRouteCraft = new Craft();
+	            onRouteCraft.Load(mDefData["onRouteCraft"].AsGodotDictionary<String, Variant>());
+            }
             int count = mData["enemyCount"].AsInt32();
 
             if (className == nameof(EliminateMission))
@@ -327,9 +341,8 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
             if (mission != null)
             {
-                _activeMissions.Add(
-                    cellIdx,
-                    new MissionCellDefinition(cellIdx, "New Mission", mission)
+                _activeMissions.Add(cellIdx,
+                    new MissionCellDefinition(cellIdx, "New Mission", mission, null, status, onRouteCraft)
                 );
             }
         }

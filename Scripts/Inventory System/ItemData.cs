@@ -41,6 +41,9 @@ public partial class ItemData : Resource
 	
 	[Export] public int MaxStackSize { get; protected set; } = 1;
 	
+	[Export] public int buyPrice;
+	[Export] public int sellPrice;
+	
 	public static Item CreateItem(ItemData itemData)
 	{
 		Item retVal = new Item();

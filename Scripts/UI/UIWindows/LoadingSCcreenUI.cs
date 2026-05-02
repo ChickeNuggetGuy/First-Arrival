@@ -36,22 +36,26 @@ public partial class LoadingSCcreenUI : UIWindow
 			_ = HideCall();
 		}
 
-		if (isLoading)
-		{
-			float percent = GameManager.Instance.loadingPercent;
-			if (loadingBar != null)
-			{
-				loadingBar.Value = percent * 100f;
-			}
-			if (loadingPercentLabel != null)
-			{
-				loadingPercentLabel.Text = $"{GameManager.Instance.loadingState}: {(percent * 100f):F0}%";
-			}
+		if (!isLoading) return;
 
-			if (percent >= 1f)
-			{
-				HideCall();
-			}
+		float percent = GameManager.Instance.loadingPercent;
+
+		if (loadingBar != null)
+		{
+			loadingBar.Value = percent * 100f;
+		}
+
+		if (loadingPercentLabel != null)
+		{
+			string state = GameManager.Instance.loadingState.ToString();
+			string mgr = GameManager.Instance.loadingManagerName ?? "";
+			string mgrPart = string.IsNullOrWhiteSpace(mgr) ? "" : $" - {mgr}";
+			loadingPercentLabel.Text = $"{state}{mgrPart}: {(percent * 100f):F0}%";
+		}
+
+		if (percent >= 1f)
+		{
+			HideCall();
 		}
 	}
 }

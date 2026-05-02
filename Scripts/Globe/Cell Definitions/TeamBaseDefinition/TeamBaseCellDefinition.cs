@@ -156,7 +156,6 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 	private void AddCraft(Enums.CraftStatus status, Craft craftToAdd)
 	{
-		 
 		craftToAdd.Setup(CraftCount, cellIndex, this);
 		craft[status].Add(craftToAdd);
 	}
@@ -166,9 +165,12 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if(craftToAdd == null) return false;
 		if(!craft.ContainsKey(status)) return false;
 		if(craft[status].Contains(craftToAdd)) return false;
-		
+
+		GlobeTeamHolder team = GlobeTeamManager.Instance.GetTeamData(teamAffiliation);
+		if (team == null) return false;
 		if(CraftCount >= maxCraft) return false;
 		
+		if(!team.TryRemoveFunds(craftToAdd.buyPrice)) return false;
 		AddCraft(status, craftToAdd);
 		return true;
 	}
@@ -227,101 +229,150 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	}
 	
 	
-	public async Task SendCraft(int startCellIndex, int targetCellIndex, Craft craft, GlobeTeamManager teamManager)
-	{
-		GlobePathfinder pathfinder = GlobePathfinder.Instance;
-		GlobeHexGridManager manager = GlobeHexGridManager.Instance;
-		GlobeMissionManager missionManager = GlobeMissionManager.Instance;
-		
-		if (pathfinder == null || manager == null  || missionManager == null)
-		{
-			GD.PrintErr("manager is null");
-			return;
-		}
+	public async Task SendCraft(
+    int startCellIndex,
+    int targetCellIndex,
+    Craft craft,
+    GlobeTeamManager teamManager)
+{
+    // ── Early out: craft is already at its home base ──
+    if (startCellIndex == targetCellIndex && targetCellIndex == craft.HomeBaseIndex)
+    {
+        // Move craft directly into Home status
+        TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
+        craft.TargetCellIndex = -1;
 
-		List<int> path = pathfinder.GetPath(
-			startCellIndex,
-			targetCellIndex
-		);
+        // Clean up the visual
+        if (craft.visual != null)
+        {
+            craft.visual.QueueFree();
+            craft.SetVisual(null);
+        }
 
-		if (path == null || path.Count == 0)
-		{
-			GD.PrintErr("No path found for mission!");
-			return;
-		}
+        return;
+    }
 
-		if (!TryChangeCraftStatus(Enums.CraftStatus.EnRoute, craft))
-		{
-			GD.PrintErr("Failed to change craft status!");
-			return;
-		}
-			
-		MeshInstance3D shipNode = craft.visual ?? teamManager.shipScene.Instantiate<MeshInstance3D>();
+    // ── Normal pathfinding & tween path ──
+    GlobePathfinder pathfinder = GlobePathfinder.Instance;
+    GlobeHexGridManager manager = GlobeHexGridManager.Instance;
+    GlobeMissionManager missionManager = GlobeMissionManager.Instance;
 
-		if (craft.visual == null)
-		{
-			craft.SetVisual(shipNode);
-		}
-		
-		if (teamManager.shipContainer != null && shipNode.GetParent() != teamManager.shipContainer)
-			teamManager.shipContainer.AddChild(shipNode);
-		else
-		{
-			if (shipNode.GetParent() != null)
-			{
-				shipNode.Reparent(teamManager.shipContainer);
-			}
-			else
-				teamManager.AddChild(shipNode);
-		}
+    if (pathfinder == null || manager == null || missionManager == null)
+    {
+        GD.PrintErr("manager is null");
+        return;
+    }
 
-		var startCell = manager.GetCellFromIndex(path[0]);
-		if (startCell.HasValue)
-			shipNode.GlobalPosition = startCell.Value.Center;
+    List<int> path = pathfinder.GetPath(startCellIndex, targetCellIndex);
 
-		craft.TargetCellIndex = targetCellIndex;
-		Tween shipTween = teamManager.GetTree().CreateTween();
-		
-		MissionCellDefinition missionCellDefinition = null;
-		if(missionManager.GetActiveMissions().ContainsKey(targetCellIndex)) 
-			missionCellDefinition = missionManager.GetActiveMissions()[targetCellIndex];
-		
-		TeamBaseCellDefinition teamBaseCellDefinition = null;
-		teamManager.GetTeamData(Enums.UnitTeam.Player).TryGetBaseAtIndex(targetCellIndex, out teamBaseCellDefinition); 
-			
-		
-		for (int i = 1; i < path.Count; i++)
-		{
-			HexCellData? cell = manager.GetCellFromIndex(path[i]);
-			if (!cell.HasValue)
-				continue;
-			
-			Vector3 targetPos = cell.Value.Center;
+    if (path == null || path.Count == 0)
+    {
+        GD.PrintErr("No path found for mission!");
+        return;
+    }
 
-			shipTween.TweenCallback(
-				Callable.From(() =>
-				{
-					Vector3 upDir = shipNode.GlobalPosition.Normalized();
-					shipNode.LookAt(targetPos, upDir);
-				})
-			);
+    if (!TryChangeCraftStatus(Enums.CraftStatus.EnRoute, craft))
+    {
+        GD.PrintErr("Failed to change craft status!");
+        return;
+    }
 
-			shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
-		}
+    MissionCellDefinition missionCellDefinition = null;
+    if (missionManager.GetActiveMissions().ContainsKey(targetCellIndex))
+        missionCellDefinition = missionManager.GetActiveMissions()[targetCellIndex];
 
-		await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
-		
-		craft.CurrentCellIndex = targetCellIndex;
-		TryChangeCraftStatus(Enums.CraftStatus.Idle, craft); 
-		
-		if(missionCellDefinition != null)
-			missionManager.LoadMissionScene(missionCellDefinition);
+    TeamBaseCellDefinition teamBaseCellDefinition = null;
+    teamManager.GetTeamData(Enums.UnitTeam.Player).TryGetBaseAtIndex(
+        targetCellIndex,
+        out teamBaseCellDefinition
+    );
 
-		if (teamBaseCellDefinition != null)
-		{
-			TryTransferCraft(craft.GetBaseCellDefinition(), teamBaseCellDefinition, new List<Craft>(){craft}, teamManager);
-		}
-	}
+    MeshInstance3D shipNode = craft.visual
+        ?? teamManager.shipScene.Instantiate<MeshInstance3D>();
+
+    if (craft.visual == null)
+        craft.SetVisual(shipNode);
+
+    if (teamManager.shipContainer != null
+        && shipNode.GetParent() != teamManager.shipContainer)
+        teamManager.shipContainer.AddChild(shipNode);
+    else
+    {
+        if (shipNode.GetParent() != null)
+            shipNode.Reparent(teamManager.shipContainer);
+        else
+            teamManager.AddChild(shipNode);
+    }
+
+    var startCell = manager.GetCellFromIndex(path[0]);
+    if (startCell.HasValue)
+        shipNode.GlobalPosition = startCell.Value.Center;
+
+    craft.TargetCellIndex = targetCellIndex;
+    Tween shipTween = teamManager.GetTree().CreateTween();
+
+    if (missionCellDefinition != null)
+        missionCellDefinition.SetOnRouteCraft(craft);
+
+    for (int i = 1; i < path.Count; i++)
+    {
+        HexCellData? cell = manager.GetCellFromIndex(path[i]);
+        if (!cell.HasValue)
+            continue;
+
+        Vector3 targetPos = cell.Value.Center;
+
+        shipTween.TweenCallback(
+            Callable.From(() =>
+            {
+                Vector3 upDir = shipNode.GlobalPosition.Normalized();
+                shipNode.LookAt(targetPos, upDir);
+            })
+        );
+
+        shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
+    }
+
+    await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
+
+    craft.CurrentCellIndex = targetCellIndex;
+
+    if (missionCellDefinition != null)
+    {
+        // Arrived at a mission – go idle and launch the battle
+        TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+        missionManager.LoadMissionScene(missionCellDefinition);
+    }
+    else if (teamBaseCellDefinition != null)
+    {
+        if (teamBaseCellDefinition.cellIndex == craft.HomeBaseIndex)
+        {
+            // Arrived home
+            TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
+            craft.TargetCellIndex = -1;
+
+            // Hide the visual now that the craft is docked
+            shipNode.QueueFree();
+            craft.SetVisual(null);
+        }
+        else
+        {
+            // Arrived at a different base – transfer ownership
+            TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+            TryTransferCraft(
+                craft.GetBaseCellDefinition(),
+                teamBaseCellDefinition,
+                new List<Craft>() { craft },
+                teamManager
+            );
+        }
+    }
+    else
+    {
+        // Arrived at a plain cell
+        TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+    }
+}
 
 
 	public static bool TryTransferCraft(TeamBaseCellDefinition fromBase, TeamBaseCellDefinition toBase,

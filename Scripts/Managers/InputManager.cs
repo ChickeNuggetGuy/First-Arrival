@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
+using Godot.Collections;
 
 namespace FirstArrival.Scripts.Managers;
 
@@ -13,6 +14,8 @@ public partial class InputManager : Manager<InputManager>
 	public HexCellData? CurrentCell { get; private set; }
 	[Export] public Camera3D camera3D;
 	[Export] private Node3D mouseMarker;
+	
+	[Export] private Dictionary<string, Node3D> mousemarkers;
 
 	[Export] public CollisionObject3D globeMesh;
 
@@ -42,9 +45,10 @@ public partial class InputManager : Manager<InputManager>
 	public override void _Process(double delta)
 	{
 		if (UIManager.Instance.BlockingInput) return;
-		base._Process(delta);
+
 		if (!ExecuteComplete) return;
 		WorldMouseMarker();
+		base._Process(delta);
 		if (DebugMode && currentGridCell != null)
 		{
 			GD.Print(

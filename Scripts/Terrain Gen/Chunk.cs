@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using FirstArrival.Scripts.Utility;
 using Godot;
 
 [GlobalClass]
 public partial class Chunk : Node3D
 {
+	[Export] public Enums.ChunkType chunkType;
+	
     public int chunkSize;
     public float cellSize;
     public ChunkData chunkData;
@@ -14,12 +17,10 @@ public partial class Chunk : Node3D
     private ArrayMesh mesh;
     public MeshInstance3D meshInstance;
 
-    // We store local vertices separately so they start at (0,0,0) in local space
     private Vector3[] localVertices;
     private List<int> triangles;
     private List<Vector2> uv;
 
-    // This keeps track of the bounding volume of the final chunk mesh
     public Aabb bounds;
 
     public void Initialize(
@@ -36,7 +37,6 @@ public partial class Chunk : Node3D
         this.cellSize = cellSize;
         this.chunkData = chunkData;
 
-        // Keep the wrapper node reference unchanged; only link the component
         chunkData.chunk = this;
         
         if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
@@ -83,7 +83,6 @@ public partial class Chunk : Node3D
         triangles = new List<int>();
         uv = new List<Vector2>();
 
-        // 1. Pre-calculate UVs for the shared vertex grid
         for (int y = 0; y <= chunkSize; y++)
         {
             for (int x = 0; x <= chunkSize; x++)
@@ -92,7 +91,6 @@ public partial class Chunk : Node3D
             }
         }
 
-        // 2. Create triangles using the winding order that was previously visible
         for (int y = 0; y < chunkSize; y++)
         {
             for (int x = 0; x < chunkSize; x++)
@@ -129,7 +127,7 @@ public partial class Chunk : Node3D
         meshInstance.MaterialOverride = material;
 
         meshInstance.CreateTrimeshCollision();
-        // Set collision layer/mask safely if StaticBody was created
+
         if (meshInstance.GetChildCount() > 0)
         {
             var sb = meshInstance.GetChildOrNull<StaticBody3D>(0);
@@ -167,7 +165,6 @@ public partial class Chunk : Node3D
             Vector3 edge1 = vertices[i1] - vertices[i0];
             Vector3 edge2 = vertices[i2] - vertices[i0];
 
-            // Use edge2 x edge1 so the normal points UP for winding (BL -> BR -> TL)
             Vector3 faceNormal = edge2.Cross(edge1);
             if (faceNormal.LengthSquared() < Mathf.Epsilon)
                 continue;

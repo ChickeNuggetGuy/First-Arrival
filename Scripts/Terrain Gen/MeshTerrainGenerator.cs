@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 using Godot;
+using Godot.Collections;
+using Array = Godot.Collections.Array;
 
 namespace FirstArrival.Scripts.Managers;
 
@@ -20,13 +21,27 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	[Export] private int minHeightY = 0;
 	[Export] private int maxHeightY = 6;
+
+	[Export] private Enums.ChunkType mapType;
 	[Export] private Material chunkMaterial { get; set; }
 
 	public Vector3[,] terrainHeights { get; set; }
 
 	[ExportGroup("Chunk Overrides")]
 	[Export]
-	private ChunkData[] chunkOverrides { get; set; } = Array.Empty<ChunkData>();
+	private ChunkData[] chunkOverrides { get; set; }
+
+	[ExportGroup("Chunk Prefab Loading")]
+	[Export]
+	private string chunksRootFolder { get; set; } = "res://Scenes/Chunks";
+
+	[Export] private bool autoLoadChunkPrefabsFromFolders { get; set; } = true;
+
+	[ExportGroup("Urban Spawning Performance")]
+	[Export]
+	private int manmadeSpawnBudgetPerFrame { get; set; } = 2;
+
+	[Export] private bool logManmadeLoads { get; set; } = false;
 
 	[ExportGroup("Raycast Sampling")]
 	[Export]
@@ -42,8 +57,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	[Export] private float blendExponent { get; set; } = 1.0f;
 
-	private ChunkData[] chunkTypes;
+	[Export] private Godot.Collections.Dictionary<Enums.ChunkType, Array> chunkPrefabs =
+		new();
+
+	private Array<ChunkData> chunkTypes;
 	private bool[,] lockedVertices;
+	private readonly RandomNumberGenerator rng = new();
+
+	private readonly System.Collections.Generic.Dictionary<string, PackedScene> packedSceneCache = new();
 
 	#endregion
 
@@ -53,9 +74,29 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	protected override async Task _Setup(bool loadingData)
 	{
+		switch (mapType)
+		{
+			case Enums.ChunkType.Grassland:
+			case Enums.ChunkType.Forest:
+			case Enums.ChunkType.Mountain:
+				generateTerrainMesh = true;
+				break;
+			case Enums.ChunkType.Urban:
+				generateTerrainMesh = false;
+				break;
+			default:
+				throw new ArgumentOutOfRangeException();
+		}
+
+		rng.Randomize();
+
+		if (autoLoadChunkPrefabsFromFolders)
+			PopulateChunkPrefabPathsFromFolders();
+
+		BuildChunkTypesForCurrentMap();
+
 		if (generateTerrainMesh)
 		{
-			BuildChunkTypesFromOverrides();
 			GenerateHeightMap();
 			GD.Print("MeshTerrainGenerator: base height data ready.");
 		}
@@ -65,19 +106,28 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		if (generateTerrainMesh)
+		GameManager gameManager = GameManager.Instance;
+
+		int manmadeCreatedThisFrame = 0;
+		int budget = Mathf.Max(1, manmadeSpawnBudgetPerFrame);
+
+		// Always ensure chunk nodes exist and position them (procedural or man-made)
+		for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
 		{
-			GameManager gameManager = GameManager.Instance;
-
-			for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
+			for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
 			{
-				for (int chunkZ = 0; chunkZ < gameManager.mapSize.Y; chunkZ++)
+				ChunkData cData = GetChunkData(chunkX, chunkZ);
+
+				bool willInstantiate =
+					cData != null
+					&& cData.GetChunkNode() == null
+					&& cData.chunkType == ChunkData.ChunkType.ManMade;
+
+				EnsureChunkNodeExists(chunkX, chunkZ);
+
+				var node = cData?.GetChunkNode();
+				if (node != null)
 				{
-					EnsureChunkNodeExists(chunkX, chunkZ);
-
-					var cData = GetChunkData(chunkX, chunkZ);
-					var node = cData.GetChunkNode();
-
 					float chunkWorldSize = chunkSize * cellSize.X;
 
 					node.Position = new Vector3(
@@ -86,8 +136,23 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 						chunkZ * chunkWorldSize
 					);
 				}
-			}
 
+				// Throttle heavy scene instantiation so the game doesn't look frozen.
+				if (willInstantiate)
+				{
+					manmadeCreatedThisFrame++;
+					if (manmadeCreatedThisFrame >= budget)
+					{
+						manmadeCreatedThisFrame = 0;
+						await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+					}
+				}
+			}
+		}
+
+		// Only generate mesh terrain when procedural terrain is enabled
+		if (generateTerrainMesh)
+		{
 			if (!HasLoadedData)
 			{
 				await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -127,6 +192,217 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	#endregion
 
+	#region Chunk Prefabs (folder loading)
+
+	private void PopulateChunkPrefabPathsFromFolders()
+	{
+		chunkPrefabs.Clear();
+
+		foreach (Enums.ChunkType type in Enum.GetValues(typeof(Enums.ChunkType)))
+		{
+			string folder = $"{chunksRootFolder}/{type}";
+			DirAccess dir = DirAccess.Open(folder);
+			if (dir == null)
+				continue;
+
+			var paths = new Array();
+
+			// Some Godot C# bindings don’t expose named params, so call and filter.
+			dir.ListDirBegin();
+			while (true)
+			{
+				string file = dir.GetNext();
+				if (file == "")
+					break;
+
+				if (file == "." || file == "..")
+					continue;
+
+				if (file.StartsWith(".", StringComparison.Ordinal))
+					continue;
+
+				if (dir.CurrentIsDir())
+					continue;
+
+				bool isScene =
+					file.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase)
+					|| file.EndsWith(".scn", StringComparison.OrdinalIgnoreCase);
+
+				if (!isScene)
+					continue;
+
+				paths.Add($"{folder}/{file}");
+			}
+
+			dir.ListDirEnd();
+
+			if (paths.Count > 0)
+				chunkPrefabs[type] = paths;
+		}
+
+		GD.Print(
+			$"MeshTerrainGenerator: Loaded prefab paths for {chunkPrefabs.Count} "
+			+ "map type(s)."
+		);
+	}
+
+	private bool TryGetPrefabListForMapType(Enums.ChunkType type, out Array list)
+	{
+		list = null;
+
+		if (chunkPrefabs == null)
+			return false;
+
+		if (!chunkPrefabs.ContainsKey(type))
+			return false;
+
+		list = chunkPrefabs[type];
+		return list != null && list.Count > 0;
+	}
+
+	private string ResolvePrefabVariantToPath(Variant v)
+	{
+		string s = v.AsString();
+		if (!string.IsNullOrWhiteSpace(s))
+			return s;
+
+		PackedScene ps = v.As<PackedScene>();
+		if (ps != null && !string.IsNullOrWhiteSpace(ps.ResourcePath))
+			return ps.ResourcePath;
+
+		return "";
+	}
+
+	#endregion
+
+	#region Chunk Types (procedural vs urban)
+
+	private void BuildChunkTypesForCurrentMap()
+	{
+		if (mapType == Enums.ChunkType.Urban)
+		{
+			BuildChunkTypesUrbanRandom();
+			ApplyChunkOverridesOnTop();
+			return;
+		}
+
+		BuildChunkTypesFromOverrides();
+	}
+
+	private void BuildChunkTypesUrbanRandom()
+	{
+		GameManager gameManager = GameManager.Instance;
+		int chunksX = gameManager.mapSize.X;
+		int chunksZ = gameManager.mapSize.Y;
+
+		if (chunksX <= 0 || chunksZ <= 0)
+		{
+			chunkTypes = new Array<ChunkData>();
+			GD.PrintErr("MeshTerrainGenerator: mapSize is invalid; chunkTypes cleared.");
+			return;
+		}
+
+		int count = chunksX * chunksZ;
+
+		if (chunkTypes == null)
+			chunkTypes = new Array<ChunkData>();
+
+		if (chunkTypes.Count != count)
+			chunkTypes.Resize(count);
+
+		if (!TryGetPrefabListForMapType(mapType, out Array prefabs))
+		{
+			GD.PrintErr(
+				$"MeshTerrainGenerator: No prefabs registered for {mapType}. "
+				+ $"Expected folder: {chunksRootFolder}/{mapType} "
+				+ "or assign chunkPrefabs manually."
+			);
+
+			for (int z = 0; z < chunksZ; z++)
+			{
+				for (int x = 0; x < chunksX; x++)
+				{
+					int idx = x + z * chunksX;
+					chunkTypes[idx] = new ChunkData
+					{
+						chunkCoordinates = new Vector2I(x, z),
+						chunkType = ChunkData.ChunkType.ManMade,
+						chunkGOIndex = ""
+					};
+				}
+			}
+
+			return;
+		}
+
+		for (int z = 0; z < chunksZ; z++)
+		{
+			for (int x = 0; x < chunksX; x++)
+			{
+				int idx = x + z * chunksX;
+
+				int pick = rng.RandiRange(0, prefabs.Count - 1);
+				string path = ResolvePrefabVariantToPath(prefabs[pick]);
+
+				chunkTypes[idx] = new ChunkData
+				{
+					chunkCoordinates = new Vector2I(x, z),
+					chunkType = ChunkData.ChunkType.ManMade,
+					chunkGOIndex = path
+				};
+			}
+		}
+	}
+
+	private void ApplyChunkOverridesOnTop()
+	{
+		if (chunkOverrides == null || chunkOverrides.Length == 0)
+			return;
+
+		GameManager gameManager = GameManager.Instance;
+		int chunksX = gameManager.mapSize.X;
+		int chunksZ = gameManager.mapSize.Y;
+
+		for (int i = 0; i < chunkOverrides.Length; i++)
+		{
+			var ov = chunkOverrides[i];
+			if (ov == null)
+				continue;
+
+			Vector2I coords = ov.chunkCoordinates;
+			if (
+				coords.X < 0
+				|| coords.Y < 0
+				|| coords.X >= chunksX
+				|| coords.Y >= chunksZ
+			)
+			{
+				GD.PrintErr($"Chunk override [{i}] out-of-range coords {coords}.");
+				continue;
+			}
+
+			int idx = coords.X + coords.Y * chunksX;
+
+			ChunkData ovCopy = ov.Duplicate(true) as ChunkData;
+			if (ovCopy == null)
+			{
+				ovCopy = new ChunkData
+				{
+					chunkCoordinates = ov.chunkCoordinates,
+					chunkType = ov.chunkType,
+					chunkGOIndex = ov.chunkGOIndex
+				};
+			}
+
+			ovCopy.SetChunkNode(null);
+			ovCopy.chunk = null;
+
+			chunkTypes[idx] = ovCopy;
+		}
+	}
+
+	#endregion
+
 	#region Heightmap Generation
 
 	public void GenerateHeightMap()
@@ -143,7 +419,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		{
 			NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
 			Seed = (int)GD.Randi(),
-			Frequency = 1.0f / (20f * cellSize.X),
+			Frequency = 1.0f / (20f * cellSize.X)
 		};
 		noise.FractalType = FastNoiseLite.FractalTypeEnum.Fbm;
 		noise.FractalOctaves = 3;
@@ -183,13 +459,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				}
 				else
 				{
-					// Sample with WORLD coordinates
 					float rawNoise = noise.GetNoise2D(worldX, worldZ);
-
-					// Remap [-1,1] -> [0,1]
 					float normalized = (rawNoise + 1f) * 0.5f;
-
-					// Power curve: flat valleys, gentle hills
 					float shaped = Mathf.Pow(normalized, 2.5f);
 
 					y = shaped * maxHeightY;
@@ -216,9 +487,9 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			for (int x = 0; x < vertsX; x++)
 			{
 				if (
-					!includeManMade &&
-					lockedVertices != null &&
-					lockedVertices[x, z]
+					!includeManMade
+					&& lockedVertices != null
+					&& lockedVertices[x, z]
 				)
 					continue;
 
@@ -235,39 +506,37 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	private void BuildChunkTypesFromOverrides()
 	{
 		GameManager gameManager = GameManager.Instance;
-		int chunksX = gameManager.mapSize.X; // East-West
-		int chunksZ = gameManager.mapSize.Y; // North-South 
+		int chunksX = gameManager.mapSize.X;
+		int chunksZ = gameManager.mapSize.Y;
 
 		if (chunksX <= 0 || chunksZ <= 0)
 		{
-			chunkTypes = Array.Empty<ChunkData>();
-			GD.PrintErr(
-				"MeshTerrainGenerator: mapSize is invalid; chunkTypes cleared."
-			);
+			chunkTypes = new Array<ChunkData>();
+			GD.PrintErr("MeshTerrainGenerator: mapSize is invalid; chunkTypes cleared.");
 			return;
 		}
 
 		int count = chunksX * chunksZ;
 
-		if (chunkTypes == null || chunkTypes.Length != count)
-			chunkTypes = new ChunkData[count];
+		if (chunkTypes == null)
+			chunkTypes = new Array<ChunkData>();
 
-		// CONSISTENT: Loop uses chunkX and chunkZ naming
+		if (chunkTypes.Count != count)
+			chunkTypes.Resize(count);
+
 		for (int chunkZ = 0; chunkZ < chunksZ; chunkZ++)
 		{
 			for (int chunkX = 0; chunkX < chunksX; chunkX++)
 			{
 				int idx = chunkX + chunkZ * chunksX;
-				var defaultData = new ChunkData
+				chunkTypes[idx] = new ChunkData
 				{
 					chunkCoordinates = new Vector2I(chunkX, chunkZ),
 					chunkType = ChunkData.ChunkType.Procedural
 				};
-				chunkTypes[idx] = defaultData;
 			}
 		}
 
-		// Apply overrides
 		if (chunkOverrides == null || chunkOverrides.Length == 0)
 			return;
 
@@ -278,13 +547,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			if (ov == null)
 				continue;
 
-			Vector2I coords = ov.chunkCoordinates; // X and Y (representing X and Z)
-			if (
-				coords.X < 0
-				|| coords.Y < 0
-				|| coords.X >= chunksX
-				|| coords.Y >= chunksZ
-			)
+			Vector2I coords = ov.chunkCoordinates;
+			if (coords.X < 0 || coords.Y < 0 || coords.X >= chunksX || coords.Y >= chunksZ)
 			{
 				GD.PrintErr(
 					$"Chunk override [{i}] has out-of-range coords {coords}. "
@@ -302,7 +566,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				ovCopy = new ChunkData
 				{
 					chunkCoordinates = ov.chunkCoordinates,
-					chunkType = ov.chunkType
+					chunkType = ov.chunkType,
+					chunkGOIndex = ov.chunkGOIndex
 				};
 			}
 
@@ -316,11 +581,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		}
 	}
 
-	public void ValidateHeights(
-		Vector3[,] verts,
-		int passes,
-		float maxStepHeight
-	)
+	public void ValidateHeights(Vector3[,] verts, int passes, float maxStepHeight)
 	{
 		int vertsX = verts.GetLength(0);
 		int vertsZ = verts.GetLength(1);
@@ -328,7 +589,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 		for (int pass = 0; pass < passes; pass++)
 		{
-			// --- Pass A: Clamp max height difference between neighbors ---
 			for (int z = 0; z < vertsZ; z++)
 			{
 				for (int x = 0; x < vertsX; x++)
@@ -338,60 +598,63 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 					float h = verts[x, z].Y;
 
-					// Check right neighbor
 					if (x + 1 < vertsX)
 						h = ClampTowardNeighbor(
-							h, verts[x + 1, z].Y, maxStepHeight, step
+							h,
+							verts[x + 1, z].Y,
+							maxStepHeight,
+							step
 						);
 
-					// Check forward neighbor
 					if (z + 1 < vertsZ)
 						h = ClampTowardNeighbor(
-							h, verts[x, z + 1].Y, maxStepHeight, step
+							h,
+							verts[x, z + 1].Y,
+							maxStepHeight,
+							step
 						);
 
-					// Check left neighbor
 					if (x - 1 >= 0)
 						h = ClampTowardNeighbor(
-							h, verts[x - 1, z].Y, maxStepHeight, step
+							h,
+							verts[x - 1, z].Y,
+							maxStepHeight,
+							step
 						);
 
-					// Check back neighbor
 					if (z - 1 >= 0)
 						h = ClampTowardNeighbor(
-							h, verts[x, z - 1].Y, maxStepHeight, step
+							h,
+							verts[x, z - 1].Y,
+							maxStepHeight,
+							step
 						);
 
 					verts[x, z] = new Vector3(verts[x, z].X, h, verts[x, z].Z);
 				}
 			}
 
-			// --- Pass B: Fix invalid cell patterns ---
 			for (int z = 0; z < vertsZ - 1; z++)
 			{
 				for (int x = 0; x < vertsX - 1; x++)
 				{
-					float bl = verts[x, z].Y; // bottom-left
-					float br = verts[x + 1, z].Y; // bottom-right
-					float tl = verts[x, z + 1].Y; // top-left
-					float tr = verts[x + 1, z + 1].Y; // top-right
+					float bl = verts[x, z].Y;
+					float br = verts[x + 1, z].Y;
+					float tl = verts[x, z + 1].Y;
+					float tr = verts[x + 1, z + 1].Y;
 
 					float[] heights = { bl, br, tl, tr };
 					int uniqueCount = heights.Distinct().Count();
 
 					if (uniqueCount <= 1)
-						continue; // flat cell, fine
+						continue;
 
 					if (uniqueCount >= 3)
 					{
-						// 3 or 4 unique heights — snap outliers to majority
 						FixCellToMajority(verts, x, z, heights);
 						continue;
 					}
 
-					// Exactly 2 unique heights — check for invalid patterns
-					// Invalid: 3 share one height, 1 is different (ramp with
-					// a notch)
 					var groups = heights
 						.GroupBy(h => h)
 						.OrderByDescending(g => g.Count())
@@ -399,12 +662,10 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 					if (groups[0].Count() == 3)
 					{
-						// 3+1 pattern — snap the outlier
 						FixCellToMajority(verts, x, z, heights);
 						continue;
 					}
 
-					// 2+2 pattern — check if diagonal (saddle)
 					bool isSaddle =
 						Mathf.IsEqualApprox(bl, tr)
 						&& Mathf.IsEqualApprox(br, tl)
@@ -412,14 +673,9 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 					if (isSaddle)
 					{
-						// Resolve saddle: pick the lower height for the
-						// minority pair (prefer flatter terrain)
 						float keep = Mathf.Min(bl, br);
 						SetCellHeight(verts, x, z, keep);
 					}
-
-					// 2+2 along an edge (adjacent split) is valid — a clean
-					// ramp, so we leave it alone.
 				}
 			}
 		}
@@ -437,12 +693,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		if (Mathf.Abs(diff) <= maxDiff)
 			return current;
 
-		// Pull current toward neighbor so the gap is exactly maxDiff
-		float clamped = diff > 0
-			? neighbor + maxDiff
-			: neighbor - maxDiff;
+		float clamped = diff > 0 ? neighbor + maxDiff : neighbor - maxDiff;
 
-		// Re-quantize if using grid snapping
 		if (quantizeStep > 0f)
 			clamped = Mathf.Round(clamped / quantizeStep) * quantizeStep;
 
@@ -456,14 +708,12 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		float[] heights
 	)
 	{
-		// Find the most common height in the cell
 		float majority = heights
 			.GroupBy(h => h)
 			.OrderByDescending(g => g.Count())
 			.First()
 			.Key;
 
-		// Only fix unlocked vertices
 		if (!lockedVertices[x, z] && !Mathf.IsEqualApprox(heights[0], majority))
 			verts[x, z] = new Vector3(verts[x, z].X, majority, verts[x, z].Z);
 
@@ -504,21 +754,42 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			verts[x, z] = new Vector3(verts[x, z].X, height, verts[x, z].Z);
 		if (!lockedVertices[x + 1, z])
 			verts[x + 1, z] = new Vector3(
-				verts[x + 1, z].X, height, verts[x + 1, z].Z
+				verts[x + 1, z].X,
+				height,
+				verts[x + 1, z].Z
 			);
 		if (!lockedVertices[x, z + 1])
 			verts[x, z + 1] = new Vector3(
-				verts[x, z + 1].X, height, verts[x, z + 1].Z
+				verts[x, z + 1].X,
+				height,
+				verts[x, z + 1].Z
 			);
 		if (!lockedVertices[x + 1, z + 1])
 			verts[x + 1, z + 1] = new Vector3(
-				verts[x + 1, z + 1].X, height, verts[x + 1, z + 1].Z
+				verts[x + 1, z + 1].X,
+				height,
+				verts[x + 1, z + 1].Z
 			);
 	}
 
 	#endregion
 
 	#region Chunk Node Management
+
+	private PackedScene LoadPackedSceneCached(string prefabPath)
+	{
+		if (string.IsNullOrWhiteSpace(prefabPath))
+			return null;
+
+		if (packedSceneCache.TryGetValue(prefabPath, out PackedScene cached))
+			return cached;
+
+		PackedScene loaded = ResourceLoader.Load<PackedScene>(prefabPath);
+		if (loaded != null)
+			packedSceneCache[prefabPath] = loaded;
+
+		return loaded;
+	}
 
 	private void EnsureChunkNodeExists(int chunkX, int chunkZ)
 	{
@@ -535,33 +806,36 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			if (cData.chunkType == ChunkData.ChunkType.ManMade)
 			{
 				string prefabPath = GetChunkPrefabPath(cData.GetchunkGOIndex());
-				GD.Print($"Loading ManMade chunk from: {prefabPath}");
+				if (logManmadeLoads)
+					GD.Print($"Loading ManMade chunk from: {prefabPath}");
 
-				if (!ResourceLoader.Exists(prefabPath))
+				if (string.IsNullOrWhiteSpace(prefabPath))
 				{
-					GD.PrintErr($"Chunk prefab not found: {prefabPath}");
-					cData.chunkType = ChunkData.ChunkType.Procedural;
+					GD.PrintErr(
+						$"Empty prefab path for ManMade chunk at {chunkX},{chunkZ}. "
+						+ "Spawning empty node."
+					);
 
 					chunkNode = new Node3D { Name = $"Chunk_{chunkX}_{chunkZ}" };
 					AddChild(chunkNode, forceReadableName: true);
 				}
 				else
 				{
-					PackedScene chunkScene =
-						ResourceLoader.Load<PackedScene>(prefabPath);
+					PackedScene chunkScene = LoadPackedSceneCached(prefabPath);
 					if (chunkScene == null)
 					{
-						GD.PrintErr(
-							$"Failed to load PackedScene at {prefabPath}, "
-							+ "falling back to Procedural."
-						);
-						cData.chunkType = ChunkData.ChunkType.Procedural;
+						GD.PrintErr($"Failed to load PackedScene at {prefabPath}.");
+
+						if (generateTerrainMesh)
+							cData.chunkType = ChunkData.ChunkType.Procedural;
 
 						chunkNode = new Node3D { Name = $"Chunk_{chunkX}_{chunkZ}" };
 						AddChild(chunkNode, forceReadableName: true);
 					}
 					else
 					{
+						// If Instantiate() is where you hang, it’s almost always
+						// because the scene’s _Ready() (or tools) is doing heavy work.
 						chunkNode = chunkScene.Instantiate<Node3D>();
 						chunkNode.Name = $"Chunk_{chunkX}_{chunkZ}";
 						AddChild(chunkNode, forceReadableName: true);
@@ -575,17 +849,17 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			}
 
 			cData.SetChunkNode(chunkNode);
-			EnsureChunkComponent(cData);
+			EnsureChunkComponentFast(cData);
 		}
 		else
 		{
-			EnsureChunkComponent(cData);
+			EnsureChunkComponentFast(cData);
 		}
 	}
 
-	private void EnsureChunkComponent(ChunkData cData)
+	private void EnsureChunkComponentFast(ChunkData cData)
 	{
-		var node = cData.GetChunkNode();
+		Node3D node = cData.GetChunkNode();
 		if (node == null)
 			return;
 
@@ -595,13 +869,19 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			return;
 		}
 
-		var comp = node.GetOrCreateChildOfType<Chunk>();
-		if (comp == null)
+		// Avoid any deep recursive "GetOrCreateChildOfType" scan on big city scenes.
+		// Only look at direct children.
+		for (int i = 0; i < node.GetChildCount(); i++)
 		{
-			comp = new Chunk();
-			node.AddChild(comp);
+			if (node.GetChild(i) is Chunk existing)
+			{
+				cData.chunk = existing;
+				return;
+			}
 		}
 
+		var comp = new Chunk { Name = "Chunk" };
+		node.AddChild(comp);
 		cData.chunk = comp;
 	}
 
@@ -615,20 +895,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		return t * t * (3f - 2f * t);
 	}
 
-	// Smoothly blends procedural terrain to 0 around any man-made chunk within
-	// 'blendRadiusCells' (in vertex/cell units). This ensures crossable seams
-	// and removes harsh borders.
 	private void BlendHeightsToZeroAroundManmade()
 	{
-		if (terrainHeights == null || chunkTypes == null || chunkTypes.Length == 0)
+		if (terrainHeights == null || chunkTypes == null || chunkTypes.Count == 0)
 			return;
-
-		GameManager gameManager = GameManager.Instance;
 
 		int vertsX = terrainHeights.GetLength(0);
 		int vertsZ = terrainHeights.GetLength(1);
 
-		// Pre-initialize weights to 1.0 (no change)
 		float[,] weights = new float[vertsX, vertsZ];
 		for (int z = 0; z < vertsZ; z++)
 		{
@@ -638,7 +912,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 		int radius = Mathf.Max(1, blendRadiusCells);
 
-		// Collect all man-made chunk rectangles in vertex index space
 		var manmadeChunks = new List<(int vx0, int vz0, int vx1, int vz1)>();
 		foreach (var c in chunkTypes)
 		{
@@ -659,7 +932,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		if (manmadeChunks.Count == 0)
 			return;
 
-		// For each man-made chunk, compute a smooth falloff to 0 for nearby vertices
 		foreach (var rect in manmadeChunks)
 		{
 			int vx0 = rect.vx0;
@@ -667,7 +939,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			int vx1 = rect.vx1;
 			int vz1 = rect.vz1;
 
-			// Extended bounds to limit iteration
 			int ex0 = Mathf.Clamp(vx0 - radius, 0, vertsX - 1);
 			int ez0 = Mathf.Clamp(vz0 - radius, 0, vertsZ - 1);
 			int ex1 = Mathf.Clamp(vx1 + radius, 0, vertsX - 1);
@@ -677,41 +948,34 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			{
 				for (int x = ex0; x <= ex1; x++)
 				{
-					// Distance in vertex-space to the rectangle (0 = on or inside)
 					int dx =
 						(x < vx0) ? (vx0 - x) : (x > vx1) ? (x - vx1) : 0;
 					int dz =
 						(z < vz0) ? (vz0 - z) : (z > vz1) ? (z - vz1) : 0;
 
 					float dist = Mathf.Sqrt(dx * dx + dz * dz);
-
 					if (dist > radius)
 						continue;
 
-					// Map distance to [0..1], apply optional exponent, then smoothstep
 					float t = dist / radius;
 					if (!Mathf.IsEqualApprox(blendExponent, 1.0f))
 						t = Mathf.Pow(t, Mathf.Max(0.0001f, blendExponent));
 					float factor = Smooth01(t);
 
-					// Combine influences from multiple man-made chunks by taking the min
 					if (factor < weights[x, z])
 						weights[x, z] = factor;
 				}
 			}
 		}
 
-		// Apply weights to heights and lock exact border vertices (weight ~ 0)
 		for (int z = 0; z < vertsZ; z++)
 		{
 			for (int x = 0; x < vertsX; x++)
 			{
 				float w = weights[x, z];
 
-				// If already locked (inside man-made), keep it at 0
 				if (lockedVertices[x, z])
 				{
-					// Ensure interior is exactly zero
 					var v0 = terrainHeights[x, z];
 					if (!Mathf.IsZeroApprox(v0.Y))
 					{
@@ -727,12 +991,10 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 					var v = terrainHeights[x, z];
 					float newY = v.Y * w;
 
-					// Keep height quantized to the grid of cellSize.Y
 					newY = Mathf.Round(newY / cellSize.Y) * cellSize.Y;
 					v.Y = newY;
 					terrainHeights[x, z] = v;
 
-					// If weight is effectively 0, lock this vertex to keep the seam firm
 					if (w <= 0.0001f)
 						lockedVertices[x, z] = true;
 				}
@@ -740,25 +1002,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		}
 
 		GD.Print(
-			$"MeshTerrainGenerator: Applied zero-blend radius {radius} cells " +
-			$"around {manmadeChunks.Count} man-made chunk(s)."
+			$"MeshTerrainGenerator: Applied zero-blend radius {radius} cells "
+			+ $"around {manmadeChunks.Count} man-made chunk(s)."
 		);
 	}
 
 	#endregion
 
 	#region Man-made Border Baking (Legacy - not used)
-
-	private bool TryRaycastManmadeHeightAtVertex(
-		int vertexX,
-		int vertexZ,
-		out float height
-	)
-	{
-		float worldX = vertexX * cellSize.X;
-		float worldZ = vertexZ * cellSize.X;
-		return TryRaycastManmadeHeightAtWorld(worldX, worldZ, out height);
-	}
 
 	private bool TryRaycastManmadeHeightAtWorld(
 		float worldX,
@@ -792,33 +1043,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	#region Sampling helpers
 
-	public ChunkData GetChunkFromVertexIndex(
-		int vertexX,
-		int vertexZ,
-		GameManager gameManager
-	)
-	{
-		// Map vertex indices to chunk coordinates
-		if (vertexX < 0)
-			vertexX = 0;
-		else if (vertexX >= gameManager.mapSize.X * chunkSize)
-			vertexX = gameManager.mapSize.X * chunkSize - 1;
-
-		if (vertexZ < 0)
-			vertexZ = 0;
-		else if (vertexZ >= gameManager.mapSize.Y * chunkSize)
-			vertexZ = gameManager.mapSize.Y * chunkSize - 1;
-
-		int chunkX = vertexX / chunkSize;
-		int chunkZ = vertexZ / chunkSize;
-
-		if (chunkX < 0 || chunkX >= gameManager.mapSize.X)
-			return null;
-		if (chunkZ < 0 || chunkZ >= gameManager.mapSize.Y)
-			return null;
-		return GetChunkData(chunkX, chunkZ);
-	}
-
 	public bool IsManMadeChunkAtWorld(
 		float worldX,
 		float worldZ,
@@ -840,37 +1064,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		)
 			return false;
 
-		return GetChunkData(chunkX, chunkZ).chunkType
-		       == ChunkData.ChunkType.ManMade;
-	}
-
-	public float SampleHeightAtCellCenter(
-		int cellX,
-		int cellZ,
-		GameManager gameManager
-	)
-	{
-		return SampleHeightAtCellCenterWithManmade(cellX, cellZ, gameManager);
-	}
-
-	public float SampleHeightAtCellCenterWithManmade(
-		int cellX,
-		int cellZ,
-		GameManager gameManager
-	)
-	{
-		float worldX = cellX * cellSize.X;
-		float worldZ = cellZ * cellSize.X;
-		return SampleHeightAtWorld(worldX, worldZ, gameManager);
-	}
-
-	public float SampleHeightAtWorld(
-		float worldX,
-		float worldZ,
-		GameManager gameManager
-	)
-	{
-		return SampleHeightAtWorldWithManmade(worldX, worldZ, gameManager);
+		return GetChunkData(chunkX, chunkZ).chunkType == ChunkData.ChunkType.ManMade;
 	}
 
 	public float SampleHeightAtWorldWithManmade(
@@ -884,19 +1078,20 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			if (TryRaycastManmadeHeightAtWorld(worldX, worldZ, out float h))
 				return h;
 
+			if (terrainHeights == null)
+				return 0f;
+
 			return SampleHeightFromHeightmap(worldX, worldZ);
 		}
+
+		if (terrainHeights == null)
+			return 0f;
 
 		return SampleHeightFromHeightmap(worldX, worldZ);
 	}
 
 	private float SampleHeightFromHeightmap(float worldX, float worldZ)
 	{
-		if (terrainHeights == null)
-			throw new InvalidOperationException(
-				"SampleHeightFromHeightmap called before terrain heights are initialized."
-			);
-
 		int ix = Mathf.Clamp(
 			Mathf.RoundToInt(worldX / cellSize.X),
 			0,
@@ -917,31 +1112,46 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	public ChunkData GetChunkData(int chunkX, int chunkZ) =>
 		chunkTypes[chunkX + chunkZ * GameManager.Instance.mapSize.X];
 
-	private string GetChunkPrefabPath(string chunkId)
+	private string GetChunkPrefabPath(string chunkIdOrPath)
 	{
-		return $"res://Scenes/Chunks/{chunkId}.tscn";
+		if (string.IsNullOrWhiteSpace(chunkIdOrPath))
+			return "";
+
+		if (chunkIdOrPath.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
+			return chunkIdOrPath;
+
+		if (chunkIdOrPath.Contains("/"))
+		{
+			bool hasExt =
+				chunkIdOrPath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase)
+				|| chunkIdOrPath.EndsWith(".scn", StringComparison.OrdinalIgnoreCase);
+
+			return hasExt
+				? $"{chunksRootFolder}/{chunkIdOrPath}"
+				: $"{chunksRootFolder}/{chunkIdOrPath}.tscn";
+		}
+
+		bool alreadyScene =
+			chunkIdOrPath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase)
+			|| chunkIdOrPath.EndsWith(".scn", StringComparison.OrdinalIgnoreCase);
+
+		if (alreadyScene)
+			return $"{chunksRootFolder}/{mapType}/{chunkIdOrPath}";
+
+		return $"{chunksRootFolder}/{mapType}/{chunkIdOrPath}.tscn";
 	}
 
 	public Vector2I GetMapSize() => GameManager.Instance.mapSize;
-	public int GetChunkSize() => chunkSize;
-	public Vector2 GetCellSize() => cellSize;
 
-	public Vector3I GetMapCellSize() =>
-		new Vector3I(
-			GameManager.Instance.mapSize.X * chunkSize,
-			chunkSize,
-			GameManager.Instance.mapSize.Y * chunkSize
-		);
-
-	public bool HasHeightData => terrainHeights != null;
-
-	public ChunkData[] GetChunks() => chunkTypes;
-
+	#endregion
 
 	#region manager Data
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
+		if (!generateTerrainMesh)
+			return new Godot.Collections.Dictionary<string, Variant>();
+
 		if (terrainHeights == null || lockedVertices == null)
 		{
 			GD.PrintErr("MeshTerrainGenerator: Cannot save, data is null.");
@@ -951,10 +1161,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		int width = terrainHeights.GetLength(0);
 		int depth = terrainHeights.GetLength(1);
 
-		// Flatten the 2D heightmap into a 1D float array
 		float[] flatHeights = new float[width * depth];
-
-		// Flatten the 2D locked boolean map into a 1D BYTE array
 		byte[] flatLocked = new byte[width * depth];
 
 		for (int x = 0; x < width; x++)
@@ -963,27 +1170,27 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			{
 				int index = x + (z * width);
 				flatHeights[index] = terrainHeights[x, z].Y;
-
-				// Convert bool to byte (1 for true, 0 for false)
 				flatLocked[index] = lockedVertices[x, z] ? (byte)1 : (byte)0;
 			}
 		}
 
-		var data = new Godot.Collections.Dictionary<string, Variant>
+		return new Godot.Collections.Dictionary<string, Variant>
 		{
 			{ "GridWidth", width },
 			{ "GridDepth", depth },
 			{ "Heights", flatHeights },
 			{ "LockedVertices", flatLocked }
 		};
-
-		return data;
 	}
 
 	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		base.Load(data);
-		if (!HasLoadedData) return;
+		if (!HasLoadedData)
+			return;
+
+		if (!generateTerrainMesh)
+			return;
 
 		if (data == null || !data.ContainsKey("Heights"))
 		{
@@ -991,31 +1198,17 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			return;
 		}
 
-		if (!data.ContainsKey("GridWidth") || !data.ContainsKey("GridDepth") || !data.ContainsKey("Heights"))
-		{
-			GD.PrintErr("MeshTerrainGenerator: Save data is missing critical keys.");
-			return;
-		}
-
-		// 1. Retrieve Dimensions
 		int width = data["GridWidth"].As<int>();
 		int depth = data["GridDepth"].As<int>();
-
-		// 2. Retrieve Arrays
 		float[] flatHeights = data["Heights"].As<float[]>();
 
-		// Retrieve Bytes and prepare to convert back to bool
 		byte[] flatLocked = null;
 		if (data.ContainsKey("LockedVertices"))
-		{
 			flatLocked = data["LockedVertices"].As<byte[]>();
-		}
 
-		// 3. Re-initialize the 2D arrays
 		terrainHeights = new Vector3[width, depth];
 		lockedVertices = new bool[width, depth];
 
-		// 4. Reconstruct the Vector3 grid
 		for (int x = 0; x < width; x++)
 		{
 			for (int z = 0; z < depth; z++)
@@ -1029,10 +1222,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				terrainHeights[x, z] = new Vector3(worldX, loadedY, worldZ);
 
 				if (flatLocked != null)
-				{
-					// Convert byte back to bool
 					lockedVertices[x, z] = flatLocked[index] > 0;
-				}
 			}
 		}
 
@@ -1041,10 +1231,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	#endregion
 
-	#endregion
-
 	public override void Deinitialize()
 	{
 		return;
+	}
+
+	public Vector3I GetMapCellSize()
+	{
+		return new Vector3I(Mathf.RoundToInt(cellSize.X) * chunkSize, Mathf.RoundToInt(cellSize.Y) * chunkSize,
+			Mathf.RoundToInt(cellSize.X) * chunkSize);
 	}
 }

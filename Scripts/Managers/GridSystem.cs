@@ -112,7 +112,7 @@ public partial class GridSystem : Manager<GridSystem>
 		if (MeshTerrainGenerator.Instance != null)
 		{
 			var gen = MeshTerrainGenerator.Instance;
-			_cellSize = gen.GetCellSize();
+			_cellSize = gen.cellSize;
 			_gridSize = gen.GetMapCellSize();
 		}
 		else

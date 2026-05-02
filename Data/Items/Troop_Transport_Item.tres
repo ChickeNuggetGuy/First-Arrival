@@ -12,3 +12,5 @@ ItemIcon = ExtResource("1_46n6x")
 globeOnly = true
 weight = 9999
 ActionDefinitions = []
+buyPrice = 100000
+sellPrice = 95000

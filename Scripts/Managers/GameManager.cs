@@ -35,6 +35,7 @@ public partial class GameManager : Manager<GameManager>
 	
 	public Vector2I mapSize = new Vector2I(1, 1);
 	public Vector2I unitCounts = new Vector2I(2, 2);
+	public MissionCellDefinition currentMission;
 	
 	public enum GameScene
 	{
@@ -59,17 +60,26 @@ public partial class GameManager : Manager<GameManager>
 	private const string AutosaveName = "autosave";
 
 	/// Temporary storage for game state data during a scene transition when not saving to disk. </summary>
-	private static Godot.Collections.Dictionary<string, Variant> _pendingSaveData = null;
+	public static Godot.Collections.Dictionary<string, Variant> _pendingSaveData = null;
 	
-	private static bool _loadFromAutosave = false;
+	public static bool _loadFromAutosave = false;
 	
-	private static string _pendingSaveName = "";
+	public static string _pendingSaveName = "";
 
 	/// <summary>
 	/// value from 0 to 1 representing current load progress
 	/// </summary>
 	public float loadingPercent = 0;
-	public LoadingState loadingState = LoadingState.NONE;	
+
+	public LoadingState loadingState = LoadingState.NONE;
+
+	/// <summary>
+	/// Name of the manager currently being set up / executed (shown on loading UI).
+	/// Empty when not applicable.
+	/// </summary>
+	public string loadingManagerName = "";
+	
+	private const string GlobeTransitionSaveName = "globe_transition";
 
 	#endregion
 
@@ -158,6 +168,7 @@ public partial class GameManager : Manager<GameManager>
 	{
 		loadingState = LoadingState.SETTINGUPMANAGERS;
 		loadingPercent = 0;
+		loadingManagerName = "";
 
 		managers ??= new Array<ManagerBase>();
 		foreach (Node child in GetChildren())
@@ -176,20 +187,26 @@ public partial class GameManager : Manager<GameManager>
 		// Initialize each sub-manager.
 		foreach (ManagerBase manager in managers)
 		{
+			loadingManagerName = manager.GetManagerName();
+
 			if (DebugMode)
 			{
-				GD.Print($"Setting up manager: {manager.GetManagerName()}");
+				GD.Print($"Setting up manager: {loadingManagerName}");
 			}
+
 			await manager.SetupCall(loadingData);
+
 			if (manager.includeInLoadingCalculation)
 			{
 				completedSteps++;
 				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
 			}
+
 			// Yield to main thread to allow UI to update
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		}
 
+		loadingManagerName = "";
 		await ExecuteCall(loadingData);
 	}
 
@@ -207,20 +224,26 @@ public partial class GameManager : Manager<GameManager>
 
 		foreach (ManagerBase manager in managers)
 		{
+			loadingManagerName = manager.GetManagerName();
+
 			if (DebugMode)
 			{
-				GD.Print($"Executing manager: {manager.GetManagerName()}");
+				GD.Print($"Executing manager: {loadingManagerName}");
 			}
+
 			await manager.ExecuteCall(loadingData);
+
 			if (manager.includeInLoadingCalculation)
 			{
 				completedSteps++;
 				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
 			}
+
 			// Yield to main thread to allow UI to update
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		}
 		
+		loadingManagerName = "";
 		loadingState = LoadingState.NONE;
 		loadingPercent = 1.0f;
 		EmitSignal(SignalName.CoreManagersLoaded);
@@ -242,6 +265,8 @@ public partial class GameManager : Manager<GameManager>
 
 		loadingState = LoadingState.CHANGINGSCENES;
 		loadingPercent = 0;
+		loadingManagerName = "Scene Transition";
+
 		UIManager.Instance?.ShowLoadingScreen();
 		currentScene = sceneName;
 
@@ -304,7 +329,6 @@ public partial class GameManager : Manager<GameManager>
 		GD.Print("[Cleanup] GameManager Deinitialized.");
 	}
 
-
 	private Godot.Collections.Dictionary<string, Variant> PackageCurrentStateAsDictionary()
 	{
 		List<ManagerBase> saveList = new();
@@ -328,7 +352,6 @@ public partial class GameManager : Manager<GameManager>
 		};
 	}
 
-
 	public void CheckGameState(Turn currentTurn)
 	{
 		var teamHolders = GridObjectManager.Instance.GetGridObjectTeamHolders();
@@ -346,25 +369,76 @@ public partial class GameManager : Manager<GameManager>
 				// Check if any active units remain for the player or enemy team.
 				if (kvp.Value.GridObjects[Enums.GridObjectState.Active].Count < 1)
 				{
-					EndGame();
+					if (currentMission != null)
+					{
+						currentMission.missionStatus = kvp.Key == Enums.UnitTeam.Player
+							? Enums.MissionStatus.Failed
+							: Enums.MissionStatus.Successful;
+					}
+					EndBattleAndReturnToGlobe();
 				}
 			}
 		}
 	}
+	
 
-	/// <summary>
-	/// Handles scene transition when a game session ends
-	/// </summary>
-	private void EndGame()
+	
+	public static void EndBattleAndReturnToGlobe()
 	{
-		if (currentSavename.Contains("quickplay_internal"))
+		Instance.EnsureSaveDir();
+		string fullPath = Instance.saveDir.PathJoin(GlobeTransitionSaveName + SaveExt);
+
+		if (!FileAccess.FileExists(fullPath))
 		{
-			TryChangeScene(GameScene.MainMenu, null);
+			GD.PrintErr("Globe transition save not found.");
+			return;
 		}
-		else
+
+		Godot.Collections.Dictionary<string, Variant> globeData;
+		using (var file = FileAccess.Open(fullPath, FileAccess.ModeFlags.Read))
 		{
-			TryChangeScene(GameScene.GlobeScene, null);
+			globeData = file.GetVar()
+				.AsGodotDictionary<string, Variant>();
 		}
+
+		// 1. Remove the completed mission from GlobeMissionManager's activeMissions
+		int missionCellIndex = Instance.currentMission?.cellIndex ?? -1;
+		if (missionCellIndex >= 0)
+			RemoveMissionFromSavedData(globeData, missionCellIndex);
+
+		// 2. Clean up the temporary file
+		DirAccess.RemoveAbsolute(fullPath);
+
+		// 3. Inject the updated data (craft still at mission cell, in Idle status)
+		_pendingSaveData = globeData;
+		_loadFromAutosave = false;
+		_pendingSaveName = Instance.currentSavename;
+
+		Instance.currentMission = null;
+
+		Error err = Instance.GetTree()
+			.ChangeSceneToFile(scenePaths[GameScene.GlobeScene]);
+		if (err != Error.Ok)
+			GD.PrintErr("Failed to switch back to Globe scene.");
+	}
+
+	private static void RemoveMissionFromSavedData(
+		Godot.Collections.Dictionary<string, Variant> root,
+		int cellIndex)
+	{
+		if (!root.TryGetValue("managers", out var m))
+			return;
+
+		var managers = m.AsGodotDictionary<string, Variant>();
+		if (!managers.TryGetValue("GlobeMissionManager", out var mm))
+			return;
+
+		var missionData = mm.AsGodotDictionary<string, Variant>();
+		if (!missionData.TryGetValue("activeMissions", out var am))
+			return;
+
+		var missions = am.AsGodotDictionary<string, Variant>();
+		missions.Remove(cellIndex.ToString());
 	}
 
 	#endregion
@@ -401,6 +475,10 @@ public partial class GameManager : Manager<GameManager>
 				currentScene = scene;
 				currentSavename = _pendingSaveName;
 
+				loadingState = LoadingState.CHANGINGSCENES;
+				loadingPercent = 0;
+				loadingManagerName = "Scene Transition";
+
 				CleanupManagers();
 
 				GD.Print($"Loading Save: {saveName} | Targeted Scene: {scene}");
@@ -424,7 +502,7 @@ public partial class GameManager : Manager<GameManager>
 	private async Task PerformInternalLoadSequence(Godot.Collections.Dictionary<string, Variant> root)
 	{
 		GD.Print($"[Load] New GameManager instance detected static data. Injecting...");
-		bool globalLoadingProcess = true; 
+		bool globalLoadingProcess = true;
 
 		if (!root.ContainsKey("managers")) return;
 		var managersDict = root["managers"].AsGodotDictionary<string, Variant>();
@@ -442,7 +520,6 @@ public partial class GameManager : Manager<GameManager>
 		{
 			if (child is ManagerBase mb) managersNow.Add(mb);
 		}
-
 
 		managersNow.Sort((a, b) => {
 			if (a is GlobeHexGridManager) return -1;
@@ -464,8 +541,11 @@ public partial class GameManager : Manager<GameManager>
 			}
 		}
     
-		// 5. Run standard lifecycle (Setup -> Execute) for all managers in the new scene.
+		// Run standard lifecycle (Setup -> Execute) for all managers in the new scene.
 		loadingState = LoadingState.SETTINGUPMANAGERS;
+		loadingPercent = 0;
+		loadingManagerName = "";
+
 		int coreManagersCount = 0;
 		foreach (var m in managersNow) if (m.includeInLoadingCalculation) coreManagersCount++;
 		int totalSteps = coreManagersCount * 2;
@@ -473,7 +553,10 @@ public partial class GameManager : Manager<GameManager>
 
 		foreach (var m in managersNow)
 		{
+			loadingManagerName = m.GetManagerName();
+
 			await m.SetupCall(globalLoadingProcess);
+
 			if (m.includeInLoadingCalculation)
 			{
 				completedSteps++;
@@ -485,7 +568,10 @@ public partial class GameManager : Manager<GameManager>
 		loadingState = LoadingState.EXECUTINGMANAGERS;
 		foreach (var m in managersNow)
 		{
+			loadingManagerName = m.GetManagerName();
+
 			await m.ExecuteCall(globalLoadingProcess);
+
 			if (m.includeInLoadingCalculation)
 			{
 				completedSteps++;
@@ -494,6 +580,7 @@ public partial class GameManager : Manager<GameManager>
 			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		}
 		
+		loadingManagerName = "";
 		loadingState = LoadingState.NONE;
 		loadingPercent = 1.0f;
 		EmitSignal(SignalName.CoreManagersLoaded);
@@ -595,6 +682,32 @@ public partial class GameManager : Manager<GameManager>
 		}
 		
 	}
+	
+	/// <summary>
+	/// Save the current (Globe) state into a dedicated file that battle will never overwrite.
+	/// </summary>
+	public static void SaveGlobeTransitionState()
+	{
+		if (Instance == null || Instance.currentScene != GameScene.GlobeScene)
+		{
+			GD.PrintErr("SaveGlobeTransitionState can only be called from the Globe scene.");
+			return;
+		}
+
+		Instance.EnsureSaveDir();
+		string fullPath = Instance.saveDir.PathJoin(GlobeTransitionSaveName + SaveExt);
+
+		var data = Instance.PackageCurrentStateAsDictionary();
+		data["scene"] = GameScene.GlobeScene.ToString(); // ensure it points back to globe
+
+		using var file = FileAccess.Open(fullPath, FileAccess.ModeFlags.Write);
+		if (file == null)
+		{
+			GD.PrintErr("Failed to open globe transition save file.");
+			return;
+		}
+		file.StoreVar(data);
+	}
 
 	#endregion
 
@@ -647,7 +760,6 @@ public partial class GameManager : Manager<GameManager>
 
 	#endregion
 
-
 	#region Get/Set Functions
 
 	public string GetCurrentSaveName() => currentSavename;
@@ -656,7 +768,5 @@ public partial class GameManager : Manager<GameManager>
 
 	#endregion
 	
-		
-
 	#endregion
 }

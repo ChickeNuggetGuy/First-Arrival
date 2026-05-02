@@ -22,11 +22,13 @@ public partial class GlobeTeamHolder : Node
 
 	public bool CanAffordCost(int cost) => funds >= cost;
 
-	public void TryRemoveFunds(int amount)
+	public bool TryRemoveFunds(int amount)
 	{
+		if (funds < amount) return false;
 		funds -= amount;
 		GD.Print("Try remove funds: " + funds);
 		EmitSignal(SignalName.FundsChanged, this, funds);
+		return true;
 	}
 
 	public Godot.Collections.Dictionary<string, Variant> Save()
@@ -75,7 +77,7 @@ public partial class GlobeTeamHolder : Node
 
 				// This now correctly loads crafts from the "crafts" array
 				newBase.Load(baseData);
-
+				GD.Print("Loaded Base: " + baseName);
 				Bases.Add(newBase);
 			}
 		}

@@ -34,6 +34,14 @@ public partial class Craft : ItemData
 	    baseCellDefinition = baseDefinition;
     }
 
+    
+    public void GoToBase()
+    {
+	    GD.Print("Sending craft home");
+	    TeamBaseCellDefinition baseDef = this.GetBaseCellDefinition();
+	    baseDef.SendCraft(CurrentCellIndex, baseDef.cellIndex, this, GlobeTeamManager.Instance);
+
+    }
     #region Save / Load
 
     public Godot.Collections.Dictionary<string, Variant> Save()

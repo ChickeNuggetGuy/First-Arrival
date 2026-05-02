@@ -57,16 +57,40 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	{
 		if (loadingData)
 		{
-
 			foreach (var teamHolder in GetAllTeamData().Values)
 			{
 				RestoreCraftVisuals(teamHolder);
 				
-
-				foreach(var baseDef in teamHolder.Bases)
+				foreach (var baseDef in teamHolder.Bases)
 				{
-					var cell = GlobeHexGridManager.Instance.GetCellFromIndex(baseDef.cellIndex);
-					if(cell.HasValue)
+					if (!baseDef.GetAllCraftData().TryGetValue(
+						    Enums.CraftStatus.Idle, out var idleCrafts))
+						continue;
+
+					// Iterate backwards since SendCraft mutates the list
+					for (int i = idleCrafts.Count - 1; i >= 0; i--)
+					{
+						var craft = idleCrafts[i];
+						if (craft.CurrentCellIndex != craft.HomeBaseIndex
+						    && craft.CurrentCellIndex != -1)
+						{
+							// Fire-and-forget: craft will tween its way home
+							_ = baseDef.SendCraft(
+								craft.CurrentCellIndex,
+								craft.HomeBaseIndex,
+								craft,
+								this
+							);
+						}
+					}
+				}
+
+				// Spawn bases as normal
+				foreach (var baseDef in teamHolder.Bases)
+				{
+					var cell = GlobeHexGridManager.Instance
+						.GetCellFromIndex(baseDef.cellIndex);
+					if (cell.HasValue)
 						SpawnBase(cell.Value, baseDef.definitionName);
 				}
 			}

@@ -221,4 +221,22 @@ public class Enums
 	}
 
 	#endregion
+
+	public enum ChunkType
+	{
+		Grassland,
+		Forest,
+		Mountain,
+		Urban
+	}
+	
+	[System.Flags]
+	public enum MissionStatus
+	{
+		None = 0,
+		Visited = 1,
+		Successful = 2,
+		Failed = 4,
+		OnRoute = 8,
+	}
 }
