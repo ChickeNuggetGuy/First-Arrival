@@ -116,6 +116,13 @@ public partial class UIWindow : UIElement
 		}
 
 		_Hide();
+		foreach (var uiElement in uiElements)
+		{
+			if (uiElement is UIWindow uiWindow)
+			{
+				await uiWindow.HideCall();
+			}
+		}
 		Visual.Hide();
 		IsShown = false;
 		

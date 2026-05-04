@@ -15,9 +15,25 @@ public partial class HexCellDefinition
 	public virtual Godot.Collections.Dictionary<string, Variant> Save()
 	{
 		Godot.Collections.Dictionary<string, Variant> returnData = new();
-		
+
 		returnData.Add("cellIndex", cellIndex);
 		returnData.Add("definitionName", definitionName);
 		return returnData;
 	}
+
+	public virtual void Load(
+		Godot.Collections.Dictionary<string, Variant> data
+	)
+	{
+		if (data.ContainsKey("cellIndex"))
+		{
+			cellIndex = data["cellIndex"].AsInt32();
+		}
+
+		if (data.ContainsKey("definitionName"))
+		{
+			definitionName = data["definitionName"].AsString();
+		}
+	}
+	
 }

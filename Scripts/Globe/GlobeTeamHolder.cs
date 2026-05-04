@@ -10,7 +10,9 @@ public partial class GlobeTeamHolder : Node
 	
 	public Craft SelectedCraft { get; protected set; }
 	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, int currentFunds);
-
+	[Signal] public delegate void BaseAddedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
+	[Signal] public delegate void BaseRemovedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
+	
 	public GlobeTeamHolder(Enums.UnitTeam affiliation, List<TeamBaseCellDefinition> bases, int startingFunds = 1000000)
 	{
 		Team = affiliation;
@@ -28,6 +30,18 @@ public partial class GlobeTeamHolder : Node
 		funds -= amount;
 		GD.Print("Try remove funds: " + funds);
 		EmitSignal(SignalName.FundsChanged, this, funds);
+		return true;
+	}
+	
+	public bool TryBuildBase( HexCellData cell, int baseIndex,  int cost)
+	{
+		if (!CanAffordCost(cost)) return false;
+
+		TryRemoveFunds(cost);
+		TeamBaseCellDefinition baseCellDefinition =
+			new TeamBaseCellDefinition(cell.Index, "Base " + baseIndex.ToString(), Team, null);
+		Bases.Add(baseCellDefinition);
+		EmitSignal(SignalName.BaseAdded, cell.Index, this);
 		return true;
 	}
 

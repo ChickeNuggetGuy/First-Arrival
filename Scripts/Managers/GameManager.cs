@@ -18,8 +18,6 @@ public partial class GameManager : Manager<GameManager>
 {
 
 	#region variables / Properties
-
-
 	/// <summary> List of sub-managers that this GameManager is responsible for initializing and executing. </summary>
 	[Export] public Array<ManagerBase> managers = new();
 
@@ -28,7 +26,8 @@ public partial class GameManager : Manager<GameManager>
 	{
 		{ GameScene.BattleScene, "res://Scenes/GameScenes/BattleScene.tscn" },
 		{ GameScene.GlobeScene,  "res://Scenes/GameScenes/GlobeScene.tscn" },
-		{ GameScene.MainMenu,  "res://Scenes/GameScenes/MainMenuScene.tscn" }
+		{ GameScene.MainMenu,  "res://Scenes/GameScenes/MainMenuScene.tscn" },
+		{ GameScene.BaseScene,  "res://Scenes/GameScenes/BaseScene.tscn" }
 	};
 	
 	[Export] protected string saveDir = "user://saves/";
@@ -37,12 +36,17 @@ public partial class GameManager : Manager<GameManager>
 	public Vector2I unitCounts = new Vector2I(2, 2);
 	public MissionCellDefinition currentMission;
 	
+	
+	public TeamBaseCellDefinition currentBase;
+	public PackedScene unitScene;
+
 	public enum GameScene
 	{
 		NONE,
 		MainMenu,
 		BattleScene,
-		GlobeScene
+		GlobeScene,
+		BaseScene
 	}
 	
 	public enum LoadingState
@@ -104,6 +108,7 @@ public partial class GameManager : Manager<GameManager>
 	/// </summary>
 	public override async void _Ready()
 	{
+		PackedScene unitScene = ResourceLoader.Load<PackedScene>("res://Scenes/GridObjects/Unit.tscn");
 		base._Ready();
 
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -375,12 +380,27 @@ public partial class GameManager : Manager<GameManager>
 							? Enums.MissionStatus.Failed
 							: Enums.MissionStatus.Successful;
 					}
-					EndBattleAndReturnToGlobe();
+					EndGame();
 				}
 			}
 		}
 	}
-	
+
+
+	private void EndGame()
+	{
+		if (currentSavename == "quickplay_internal")
+		{
+			Error err = Instance.GetTree()
+				.ChangeSceneToFile(scenePaths[GameScene.MainMenu]);
+			if (err != Error.Ok)
+				GD.PrintErr("Failed to switch back to Globe scene.");
+		}
+		else
+		{
+			EndBattleAndReturnToGlobe();
+		}
+	}
 
 	
 	public static void EndBattleAndReturnToGlobe()
@@ -401,20 +421,52 @@ public partial class GameManager : Manager<GameManager>
 				.AsGodotDictionary<string, Variant>();
 		}
 
-		// 1. Remove the completed mission from GlobeMissionManager's activeMissions
+		//Remove the completed mission from GlobeMissionManager's activeMissions
 		int missionCellIndex = Instance.currentMission?.cellIndex ?? -1;
 		if (missionCellIndex >= 0)
 			RemoveMissionFromSavedData(globeData, missionCellIndex);
 
-		// 2. Clean up the temporary file
+		// Clean up the temporary file
 		DirAccess.RemoveAbsolute(fullPath);
 
-		// 3. Inject the updated data (craft still at mission cell, in Idle status)
+		// Inject the updated data (craft still at mission cell, in Idle status)
 		_pendingSaveData = globeData;
 		_loadFromAutosave = false;
 		_pendingSaveName = Instance.currentSavename;
 
 		Instance.currentMission = null;
+
+		Error err = Instance.GetTree()
+			.ChangeSceneToFile(scenePaths[GameScene.GlobeScene]);
+		if (err != Error.Ok)
+			GD.PrintErr("Failed to switch back to Globe scene.");
+	}
+	
+	public static void ReturnToGlobe()
+	{
+		Instance.EnsureSaveDir();
+		string fullPath = Instance.saveDir.PathJoin(GlobeTransitionSaveName + SaveExt);
+
+		if (!FileAccess.FileExists(fullPath))
+		{
+			GD.PrintErr("Globe transition save not found.");
+			return;
+		}
+
+		Godot.Collections.Dictionary<string, Variant> globeData;
+		using (var file = FileAccess.Open(fullPath, FileAccess.ModeFlags.Read))
+		{
+			globeData = file.GetVar()
+				.AsGodotDictionary<string, Variant>();
+		}
+		
+		// Clean up the temporary file
+		DirAccess.RemoveAbsolute(fullPath);
+
+		// Inject the updated data (craft still at mission cell, in Idle status)
+		_pendingSaveData = globeData;
+		_loadFromAutosave = false;
+		_pendingSaveName = Instance.currentSavename;
 
 		Error err = Instance.GetTree()
 			.ChangeSceneToFile(scenePaths[GameScene.GlobeScene]);
@@ -665,7 +717,8 @@ public partial class GameManager : Manager<GameManager>
 		{
 			["mapSize"] = mapSize,
 			["unitCounts"] = unitCounts,
-			["currentScene"] = (int)currentScene
+			["currentScene"] = (int)currentScene,
+			["currentBase"] = currentBase.Save()
 		};
 	}
 
@@ -679,6 +732,12 @@ public partial class GameManager : Manager<GameManager>
 		if (data.ContainsKey("unitCounts"))
 		{
 			unitCounts = (Vector2I)data["unitCounts"];
+		}
+		
+		if (data.ContainsKey("currentBase"))
+		{
+			currentBase = new TeamBaseCellDefinition(-1, "", Enums.UnitTeam.None, null);
+			currentBase.Load((Godot.Collections.Dictionary<string, Variant>)data["currentBase"]);
 		}
 		
 	}

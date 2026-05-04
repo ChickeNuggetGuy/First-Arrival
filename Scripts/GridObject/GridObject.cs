@@ -31,20 +31,24 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export] public Array<GridObjectNode> gridObjectNodes = new Array<GridObjectNode>();
 
 	[Export] public Enums.GridObjectSettings gridObjectSettings = Enums.GridObjectSettings.None;
-	
+
 	[Export] public GridObjectAnimation animationNode;
 	[Export] public bool scenery = false;
 
 	public bool IsInitialized { get; protected set; } = false;
 	[Export] public bool IsActive { get; protected set; } = true;
-
+	
 	public override void _EnterTree()
 	{
 		AddToGroup("GridObjects");
 		base._EnterTree();
 	}
 
-	public virtual async Task Initialize(Enums.UnitTeam team, GridCell gridCell)
+	public virtual async Task Initialize(
+		Enums.UnitTeam team,
+		GridCell gridCell,
+		bool allowMissingGridCell = false
+	)
 	{
 		TeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(team);
 		Team = team;
@@ -57,6 +61,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		if (GridObjectNodeHolder == null)
 		{
 			GridObjectNodeHolder = new Node3D();
+			GridObjectNodeHolder.Name = "GridObjectNodeHolder";
 			AddChild(GridObjectNodeHolder);
 		}
 
@@ -67,7 +72,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			GridObjectNodeHolder.AddChild(GridPositionData);
 		}
 
-		if (gridCell == null)
+		if (gridCell == null && !allowMissingGridCell)
 		{
 			GridSystem.Instance.TryGetGridCellFromWorldPosition(
 				GridPositionData.GlobalPosition,
@@ -80,16 +85,26 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		GridPositionData.SetupCall(this);
 
 		if (GridPositionData.AutoCalculateShape)
+		{
 			GridPositionData.CalculateShapeFromColliders();
-		
+		}
+
 		if (gridCell != null)
+		{
 			GridPositionData.SetGridCell(gridCell);
-		else
-			GD.PrintErr($"GridObject {Name}: Initialize called but GridCell is null (could not find cell at {GridPositionData.GlobalPosition})");
+		}
+		else if (!allowMissingGridCell)
+		{
+			GD.PrintErr(
+				$"GridObject {Name}: Initialize called but GridCell is null " +
+				$"(could not find cell at {GridPositionData.GlobalPosition})"
+			);
+		}
 
 		await Task.Yield();
 		IsInitialized = true;
 	}
+
 
 	private void InitializeGridObjectNodes()
 	{
@@ -145,7 +160,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	public void SetIsActive(bool isActive)
 	{
 		IsActive = isActive;
-	
+
 		if (!isActive && GridPositionData != null)
 		{
 			// remove from grid logic
@@ -174,8 +189,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		data["IsActive"] = IsActive;
 		data["Settings"] = (int)gridObjectSettings;
 
-		// Position
-		if (GridPositionData.AnchorCell != null)
+		if (GridPositionData?.AnchorCell != null)
 		{
 			data["HasPosition"] = true;
 			data["GridX"] = GridPositionData.AnchorCell.GridCoordinates.X;
@@ -185,18 +199,20 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		}
 		else
 		{
-			GD.Print("Has position false");
 			data["HasPosition"] = false;
 		}
 
-		// Saves the state of children components
-		var nodeDataDict = new Godot.Collections.Dictionary<string, Variant>();
+		var nodeDataDict =
+			new Godot.Collections.Dictionary<string, Variant>();
 
-		// Ensure nodes are gathered
-		if (gridObjectNodes == null || gridObjectNodes.Count == 0) InitializeGridObjectNodes();
+		if (gridObjectNodes == null || gridObjectNodes.Count == 0)
+		{
+			InitializeGridObjectNodes();
+		}
 
 		foreach (var node in gridObjectNodes)
 		{
+			if (node == null) continue;
 			nodeDataDict[node.Name] = node.Save();
 		}
 
@@ -205,17 +221,35 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		return data;
 	}
 
-	public virtual async void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public virtual async void Load(
+		Godot.Collections.Dictionary<string, Variant> data
+	)
 	{
-		// Basic Data
+		await LoadAsync(data);
+	}
+
+	public virtual async Task LoadAsync(
+		Godot.Collections.Dictionary<string, Variant> data
+	)
+	{
 		if (data.ContainsKey("Name")) Name = data["Name"].AsString();
-		if (data.ContainsKey("Settings")) gridObjectSettings = (Enums.GridObjectSettings)(int)data["Settings"];
+		if (data.ContainsKey("Settings"))
+		{
+			gridObjectSettings =
+				(Enums.GridObjectSettings)(int)data["Settings"];
+		}
 
 		Enums.UnitTeam team = Enums.UnitTeam.None;
-		if (data.ContainsKey("Team")) team = (Enums.UnitTeam)(int)data["Team"];
+		if (data.ContainsKey("Team"))
+		{
+			team = (Enums.UnitTeam)(int)data["Team"];
+		}
 
 		bool isActive = true;
-		if (data.ContainsKey("IsActive")) isActive = data["IsActive"].AsBool();
+		if (data.ContainsKey("IsActive"))
+		{
+			isActive = data["IsActive"].AsBool();
+		}
 
 		GridCell cell = null;
 		Enums.Direction savedDirection = Enums.Direction.North;
@@ -224,28 +258,21 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 		if (data.ContainsKey("HasPosition") && data["HasPosition"].AsBool())
 		{
 			hasPosition = true;
-			int x = (int)data["GridX"];
-			int y = (int)data["GridY"];
-			int z = (int)data["GridZ"];
 
-			// We need to fetch the actual GridCell from the system
+			int x = data["GridX"].AsInt32();
+			int y = data["GridY"].AsInt32();
+			int z = data["GridZ"].AsInt32();
+
 			cell = GridSystem.Instance.GetGridCell(new Vector3I(x, y, z));
 
 			if (data.ContainsKey("Direction"))
 			{
-				savedDirection = (Enums.Direction)(int)data["Direction"];
+				savedDirection =
+					(Enums.Direction)data["Direction"].AsInt32();
 			}
 		}
 
-		if (hasPosition)
-		{
-			GD.Print($"Team {team} has position {cell}");
-			await Initialize(team, cell);
-		}
-		else
-		{
-			await Initialize(team, null);
-		}
+		await Initialize(team, hasPosition ? cell : null, !hasPosition);
 
 		if (hasPosition)
 		{
@@ -256,24 +283,29 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 
 		if (data.ContainsKey("Nodes"))
 		{
-			var nodeDataDict = (Godot.Collections.Dictionary<string, Variant>)data["Nodes"];
+			var nodeDataDict =
+				data["Nodes"].AsGodotDictionary();
 
 			foreach (var node in gridObjectNodes)
 			{
-				if (nodeDataDict.ContainsKey(node.Name))
-				{
-					var nodeData = (Godot.Collections.Dictionary<string, Variant>)nodeDataDict[node.Name];
-					node.Load(nodeData);
-				}
+				if (node == null) continue;
+				if (!nodeDataDict.ContainsKey(node.Name)) continue;
+
+				var nodeData =
+					(Godot.Collections.Dictionary<string, Variant>)
+					nodeDataDict[node.Name];
+
+				node.Load(nodeData);
 			}
 		}
 
 		if (hasPosition && cell != null)
 		{
-			// Force update the position 
 			GridPositionData.SetGridCell(cell);
 		}
 	}
+
+
 
 	#endregion
 }

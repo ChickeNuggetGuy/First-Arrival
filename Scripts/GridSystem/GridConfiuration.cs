@@ -26,7 +26,7 @@ public partial class GridConfiguration : Resource
                     GridSystem.Instance.CellSize.X
                 ),
                 GridWorldOrigin = GridSystem.Instance.GridWorldOrigin,
-                GridSize = GridSystem.Instance.GridSize
+                GridSize = GridSystem.Instance.GetGridSize(),
             };
         }
         

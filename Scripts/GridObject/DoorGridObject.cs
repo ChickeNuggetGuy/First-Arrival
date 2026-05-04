@@ -17,9 +17,12 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
     private bool _initialized = false;
     private readonly List<GridCell> _doorCells = new List<GridCell>();
 
-    public override async Task Initialize(Enums.UnitTeam team, GridCell g)
+    public override async Task Initialize(
+	    Enums.UnitTeam team,
+	    GridCell gridCell,
+	    bool allowMissingGridCell = false)
     {
-        await base.Initialize(team, g);
+        await base.Initialize(team, gridCell);
 
         if (_initialized) return;
 

@@ -417,14 +417,17 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 		FastNoiseLite noise = new FastNoiseLite
 		{
-			NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
 			Seed = (int)GD.Randi(),
-			Frequency = 1.0f / (20f * cellSize.X)
+			NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
+			Frequency = 1.0f / (80f * cellSize.X),
+			FractalType = FastNoiseLite.FractalTypeEnum.Fbm,
+			FractalOctaves = 2, 
+			FractalLacunarity = 2.0f,
+			FractalGain = 0.5f
 		};
-		noise.FractalType = FastNoiseLite.FractalTypeEnum.Fbm;
-		noise.FractalOctaves = 3;
-		noise.FractalLacunarity = 2.0f;
-		noise.FractalGain = 0.4f;
+		
+		
+
 
 		float chunkWorldSize = chunkSize * cellSize.X;
 
@@ -461,9 +464,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				{
 					float rawNoise = noise.GetNoise2D(worldX, worldZ);
 					float normalized = (rawNoise + 1f) * 0.5f;
-					float shaped = Mathf.Pow(normalized, 2.5f);
-
-					y = shaped * maxHeightY;
+					float shaped = Mathf.Pow(normalized, 1.8f);
+					 y = shaped * maxHeightY * 0.6f;   
 				}
 
 				terrainHeights[x, z] = new Vector3(worldX, y, worldZ);

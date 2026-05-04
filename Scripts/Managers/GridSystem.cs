@@ -22,9 +22,7 @@ public partial class GridSystem : Manager<GridSystem>
 	[Export(PropertyHint.Layers3DPhysics)] private uint _connectionObstacleMask = 0;
 
 	private const float EPS = 0.0001f;
-
-	[Export] private Vector3I _gridSize;
-	public Vector3I GridSize => _gridSize;
+	
 	[Export] private Vector2 _cellSize;
 	public Vector2 CellSize => _cellSize;
 
@@ -72,7 +70,6 @@ public partial class GridSystem : Manager<GridSystem>
 	[Export] private bool _allowDiagonalConnections = true;
 
 	[Export] private bool _blockDiagonalCornerCutting = true;
-
 	
 	[Export]
 	public bool ExportConfiguration
@@ -101,7 +98,15 @@ public partial class GridSystem : Manager<GridSystem>
 	#endregion
 
 	#region Functions
-
+	public Vector3I GetGridSize()
+	{
+		int chunkSize = MeshTerrainGenerator.Instance.chunkSize;
+		return new Vector3I(
+			GameManager.Instance.mapSize.X * chunkSize,
+			Mathf.RoundToInt(20 * _cellSize.Y),
+			GameManager.Instance.mapSize.Y * chunkSize
+		);
+	}
 	#region Manager Functions
 
 	public override string GetManagerName() => "GridSystem";
@@ -112,8 +117,7 @@ public partial class GridSystem : Manager<GridSystem>
 		if (MeshTerrainGenerator.Instance != null)
 		{
 			var gen = MeshTerrainGenerator.Instance;
-			_cellSize = gen.cellSize;
-			_gridSize = gen.GetMapCellSize();
+			_cellSize = gen.cellSize; 
 		}
 		else
 		{
@@ -246,7 +250,8 @@ public partial class GridSystem : Manager<GridSystem>
 
 	private async Task<List<GridObject>> SetupGrid()
 	{
-		GridCells = new GridCell[_gridSize.Y][,];
+
+		GridCells = new GridCell[GetGridSize().Y][,];
 		var space = GetTree().Root.GetWorld3D().DirectSpaceState;
 		
 		InventoryManager inventoryManager = InventoryManager.Instance;
@@ -276,13 +281,13 @@ public partial class GridSystem : Manager<GridSystem>
 			GD.Print("Ground Inventory Found!");
 		}
 
-		for (int y = 0; y < _gridSize.Y; y++)
+		for (int y = 0; y < GetGridSize().Y; y++)
 		{
-			GridCells[y] = new GridCell[_gridSize.X, _gridSize.Z];
+			GridCells[y] = new GridCell[GetGridSize().X, GetGridSize().Z];
 
-			for (int x = 0; x < _gridSize.X; x++)
+			for (int x = 0; x < GetGridSize().X; x++)
 			{
-				for (int z = 0; z < _gridSize.Z; z++)
+				for (int z = 0; z < GetGridSize().Z; z++)
 				{
 					Vector3I coords = new Vector3I(x, y, z);
 
@@ -468,11 +473,11 @@ public partial class GridSystem : Manager<GridSystem>
 		int totalBlocked = 0;
 		int cellsProcessed = 0;
 
-		for (int y = 0; y < _gridSize.Y; y++)
+		for (int y = 0; y < GetGridSize().Y; y++)
 		{
-			for (int x = 0; x < _gridSize.X; x++)
+			for (int x = 0; x < GetGridSize().X; x++)
 			{
-				for (int z = 0; z < _gridSize.Z; z++)
+				for (int z = 0; z < GetGridSize().Z; z++)
 				{
 					var cell = GridCells[y][x, z];
 					if (cell == null)
@@ -779,11 +784,11 @@ public partial class GridSystem : Manager<GridSystem>
 	{
 		int isolatedCells = 0;
 
-		for (int y = 0; y < _gridSize.Y; y++)
+		for (int y = 0; y < GetGridSize().Y; y++)
 		{
-			for (int x = 0; x < _gridSize.X; x++)
+			for (int x = 0; x < GetGridSize().X; x++)
 			{
-				for (int z = 0; z < _gridSize.Z; z++)
+				for (int z = 0; z < GetGridSize().Z; z++)
 				{
 					GridCell cell = GridCells[y][x, z];
 					if (cell == null)
@@ -966,7 +971,7 @@ public partial class GridSystem : Manager<GridSystem>
 	{
 		List<GridCell> cells = new List<GridCell>();
 
-		for (int y = 0; y < _gridSize.Y; y++)
+		for (int y = 0; y < GetGridSize().Y; y++)
 		{
 			var layer = GridCells[y];
 			int rows = layer.GetLength(0);
@@ -1206,11 +1211,11 @@ public partial class GridSystem : Manager<GridSystem>
 		Vector3I startCoords = startCell.GridCoordinates;
 
 		int minX = Mathf.Max(0, startCoords.X - cellRange);
-		int maxX = Mathf.Min(_gridSize.X - 1, startCoords.X + cellRange);
+		int maxX = Mathf.Min(GetGridSize().X - 1, startCoords.X + cellRange);
 		int minY = Mathf.Max(0, startCoords.Y - cellRange);
-		int maxY = Mathf.Min(_gridSize.Y - 1, startCoords.Y + cellRange);
+		int maxY = Mathf.Min(GetGridSize().Y - 1, startCoords.Y + cellRange);
 		int minZ = Mathf.Max(0, startCoords.Z - cellRange);
-		int maxZ = Mathf.Min(_gridSize.Z - 1, startCoords.Z + cellRange);
+		int maxZ = Mathf.Min(GetGridSize().Z - 1, startCoords.Z + cellRange);
 
 		for (int y = minY; y <= maxY; y++)
 		{
@@ -1335,9 +1340,9 @@ public partial class GridSystem : Manager<GridSystem>
 		int maxY = Mathf.FloorToInt((max.Y - EPS) / _cellSize.Y);
 
 		if (
-			!ClampIndexRange(ref minX, ref maxX, _gridSize.X)
-			|| !ClampIndexRange(ref minY, ref maxY, _gridSize.Y)
-			|| !ClampIndexRange(ref minZ, ref maxZ, _gridSize.Z)
+			!ClampIndexRange(ref minX, ref maxX, GetGridSize().X)
+			|| !ClampIndexRange(ref minY, ref maxY, GetGridSize().Y)
+			|| !ClampIndexRange(ref minZ, ref maxZ, GetGridSize().Z)
 		)
 		{
 			return false;
@@ -1603,7 +1608,7 @@ public partial class GridSystem : Manager<GridSystem>
 		{
 			CellSize = new Vector3(_cellSize.X, _cellSize.Y, _cellSize.X),
 			GridWorldOrigin = _gridWorldOrigin,
-			GridSize = _gridSize
+			GridSize = GetGridSize()
 		};
 
 		const string path = "res://Resources/GridConfiguration.tres";

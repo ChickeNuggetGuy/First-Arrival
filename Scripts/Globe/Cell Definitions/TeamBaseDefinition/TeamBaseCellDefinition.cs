@@ -10,11 +10,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 {
 	public Enums.UnitTeam teamAffiliation = Enums.UnitTeam.None;
 
-	private int maxCraft = 3;
-	private Dictionary<Enums.CraftStatus, List<Craft>> craft = new();
+	private Godot.Collections.Array<GridObject> stationedGridObjects = new Godot.Collections.Array<GridObject>();
 
-	public Dictionary<Enums.CraftStatus, List<Craft>> GetAllCraftData() => craft;
-	protected Dictionary<int, int> itemCounts = new();
+	private int maxCraft = 3;
+	private Godot.Collections.Dictionary<Enums.CraftStatus,  Godot.Collections.Array<Craft>> craft = new();
+
+	public Godot.Collections.Dictionary<Enums.CraftStatus,  Godot.Collections.Array<Craft>> GetAllCraftData() => craft;
+	protected Godot.Collections.Dictionary<int, int> itemCounts = new();
 	
 	public List<Craft> CraftList
 	{
@@ -52,9 +54,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		this.teamAffiliation = team;
 		if(craftList != null)
 		{
-			craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
-			craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
-			craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+			craft.Add(Enums.CraftStatus.Idle, new  Godot.Collections.Array<Craft>());
+			craft.Add(Enums.CraftStatus.EnRoute, new Godot.Collections.Array<Craft>());
+			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 			foreach (var c in craftList)
 			{
 				craft[c.Status].Add(c);
@@ -62,95 +64,161 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 		else
 		{
-			craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
-			craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
-			craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+			craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
+			craft.Add(Enums.CraftStatus.EnRoute, new Godot.Collections.Array<Craft>());
+			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 		}
 	}
 	
 
-    public override Godot.Collections.Dictionary<string, Variant> Save()
-    {
-        var data = base.Save(); // Saves cellIndex and name
+   public Godot.Collections.Array<GridObject> GetStationedGridObjects() =>
+	stationedGridObjects;
 
-        // 1. Serialize Craft
-        // We will flatten the dictionary into a single list of data objects
-        // The 'Status' field inside the Craft data will let us sort them back later.
-        Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>> serializedCrafts = new();
+public bool TryAddStationedGridObject(GridObject gridObject)
+{
+	if (gridObject == null) return false;
+	if (stationedGridObjects.Contains(gridObject)) return false;
 
-        foreach (var pair in craft)
-        {
-            foreach (var c in pair.Value)
-            {
-                if(c != null)
-                    serializedCrafts.Add(c.Save());
-            }
-        }
+	gridObject.SetIsActive(false);
+	gridObject.Visible = false;
+	stationedGridObjects.Add(gridObject);
+	return true;
+}
 
-        data.Add("teamAffiliation", (int)teamAffiliation);
-        data.Add("crafts", serializedCrafts); // Note: Changed key to "crafts"
-        
-        // Save Inventory Items if needed
-        // data.Add("itemCounts", itemCounts); 
+public bool TryRemoveStationedGridObject(GridObject gridObject)
+{
+	if (gridObject == null) return false;
+	if (!stationedGridObjects.Contains(gridObject)) return false;
 
-        return data;
-    }
+	stationedGridObjects.Remove(gridObject);
+	return true;
+}
 
-    public void Load(Godot.Collections.Dictionary<string, Variant> data)
-    {
-	    if (data.ContainsKey("teamAffiliation"))
-		    teamAffiliation = (Enums.UnitTeam)data["teamAffiliation"].AsInt32();
+public override Godot.Collections.Dictionary<string, Variant> Save()
+{
+	var data = base.Save();
 
-	    craft.Clear();
-	    craft.Add(Enums.CraftStatus.Idle, new List<Craft>());
-	    craft.Add(Enums.CraftStatus.EnRoute, new List<Craft>());
-	    craft.Add(Enums.CraftStatus.Home, new List<Craft>());
+	var serializedCrafts =
+		new Godot.Collections.Array<
+			Godot.Collections.Dictionary<string, Variant>>();
 
-	    if (data.ContainsKey("crafts"))
-	    {
-		    var craftsArray = data["crafts"].AsGodotArray<Godot.Collections.Dictionary<string, Variant>>();
+	foreach (var c in CraftList)
+	{
+		if (c == null) continue;
+		serializedCrafts.Add(c.Save());
+	}
 
-		    foreach (var craftData in craftsArray)
-		    {
-			    if (craftData == null) continue;
+	data["crafts"] = serializedCrafts;
+	data["units"] = GridObjectSerializationUtility.SaveGridObjects(
+		stationedGridObjects
+	);
+	data["teamAffiliation"] = (int)teamAffiliation;
+	data["itemCounts"] = itemCounts;
 
-			    int itemID = craftData.ContainsKey("itemID") 
-				    ? craftData["itemID"].AsInt32() 
-				    : -1;
+	return data;
+}
 
-			    if (itemID == -1)
-			    {
-				    GD.PrintErr("Craft data missing itemID, skipping.");
-				    continue;
-			    }
+public async Task LoadAsync(
+	Godot.Collections.Dictionary<string, Variant> data,
+	Node unitParent
+)
+{
+	base.Load(data);
 
-			    Enums.CraftStatus status = Enums.CraftStatus.Home;
-			    if (craftData.ContainsKey("status"))
-				    status = (Enums.CraftStatus)craftData["status"].AsInt32();
+	if (data.ContainsKey("teamAffiliation"))
+	{
+		teamAffiliation =
+			(Enums.UnitTeam)data["teamAffiliation"].AsInt32();
+	}
 
-			    ItemData originalData = InventoryManager.Instance.GetItemData(itemID);
+	craft.Clear();
+	craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
+	craft.Add(
+		Enums.CraftStatus.EnRoute,
+		new Godot.Collections.Array<Craft>()
+	);
+	craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 
-			    if (originalData is Craft craftResource)
-			    {
-				    Craft newInstance = (Craft)craftResource.Duplicate();
-				    
-				    newInstance.Load(craftData);
-				    
-				    // only fill in defaults for unset values
-				    newInstance.Setup(newInstance.Index, cellIndex, this);
+	itemCounts.Clear();
+	if (data.ContainsKey("itemCounts"))
+	{
+		var rawItemCounts = data["itemCounts"].AsGodotDictionary();
 
-				    // Status should already be set by Load(), but ensure consistency
-				    newInstance.Status = status;
+		foreach (Variant key in rawItemCounts.Keys)
+		{
+			int itemId = key.AsInt32();
+			int count = rawItemCounts[key].AsInt32();
+			itemCounts[itemId] = count;
+		}
+	}
 
-				    craft[status].Add(newInstance);
-			    }
-			    else
-			    {
-				    GD.PrintErr($"ItemID {itemID} did not resolve to a Craft resource.");
-			    }
-		    }
-	    }
-    }
+	stationedGridObjects.Clear();
+	if (data.ContainsKey("units"))
+	{
+		var unitsArray =
+			data["units"]
+				.AsGodotArray<
+					Godot.Collections.Dictionary<string, Variant>>();
+
+		stationedGridObjects =
+			await GridObjectSerializationUtility.LoadGridObjectsAsync(
+				unitsArray,
+				unitParent,
+				true
+			);
+	}
+
+	if (data.ContainsKey("crafts"))
+	{
+		var craftsArray =
+			data["crafts"]
+				.AsGodotArray<
+					Godot.Collections.Dictionary<string, Variant>>();
+
+		foreach (var craftData in craftsArray)
+		{
+			if (craftData == null) continue;
+
+			int itemID = craftData.ContainsKey("itemID")
+				? craftData["itemID"].AsInt32()
+				: -1;
+
+			if (itemID == -1)
+			{
+				GD.PrintErr("Craft data missing itemID, skipping.");
+				continue;
+			}
+
+			ItemData originalData = InventoryManager.Instance.GetItemData(
+				itemID
+			);
+
+			if (originalData is not Craft craftResource)
+			{
+				GD.PrintErr(
+					$"ItemID {itemID} did not resolve to a Craft " +
+					$"resource."
+				);
+				continue;
+			}
+
+			Craft newInstance = (Craft)craftResource.Duplicate(true);
+
+			await newInstance.LoadAsync(craftData, unitParent);
+			newInstance.Setup(newInstance.Index, cellIndex, this);
+
+			if (!craft.ContainsKey(newInstance.Status))
+			{
+				craft.Add(
+					newInstance.Status,
+					new Godot.Collections.Array<Craft>()
+				);
+			}
+
+			craft[newInstance.Status].Add(newInstance);
+		}
+	}
+}
 
 	#region Craft Functions
 
@@ -235,7 +303,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
     Craft craft,
     GlobeTeamManager teamManager)
 {
-    // ── Early out: craft is already at its home base ──
+    // Early out: craft is already at its home base 
     if (startCellIndex == targetCellIndex && targetCellIndex == craft.HomeBaseIndex)
     {
         // Move craft directly into Home status
@@ -251,8 +319,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
         return;
     }
-
-    // ── Normal pathfinding & tween path ──
+	
     GlobePathfinder pathfinder = GlobePathfinder.Instance;
     GlobeHexGridManager manager = GlobeHexGridManager.Instance;
     GlobeMissionManager missionManager = GlobeMissionManager.Instance;
@@ -409,7 +476,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			{
 				if (!toBase.TryAddCraft(craft.Status, craft))
 				{
-					toBase.AddCraft(craft.Status, craft);
+					fromBase.AddCraft(craft.Status, craft);
 					success = false;
 					continue;
 				}
@@ -424,8 +491,8 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 	#region Get/Set Funtions
 
-	public Dictionary<int, int> GetItemCounts => itemCounts;
-	public void SetItemCounts(Dictionary<int, int> itemCounts) => this.itemCounts = itemCounts;
+	public Godot.Collections.Dictionary<int, int> GetItemCounts => itemCounts;
+	public void SetItemCounts(Godot.Collections.Dictionary<int, int> itemCounts) => this.itemCounts = itemCounts;
 
 	private void AddItem(int itemID, int count)
 	{

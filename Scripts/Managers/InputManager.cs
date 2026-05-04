@@ -73,7 +73,7 @@ public partial class InputManager : Manager<InputManager>
 			if (node == null) return;
 
 			GridObject gridObject = null;
-			int maxParentChecks = 3;
+			int maxParentChecks = 4;
 			int parentLevel = 0;
 
 			// Check up to 3 parents to find a GridObject

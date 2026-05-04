@@ -18,8 +18,7 @@ public partial class OrbitalCamera : Node3D
     [Export] public float MaxPitch = 89.0f;  // Prevent looking straight down
     [Export] public float MinZoom = 2.0f;
     [Export] public float MaxZoom = 20.0f;
-	
-    // Current logical rotation (degrees)
+    
     private float _pitch = 0.0f;
     private float _yaw = 0.0f;
     
@@ -50,7 +49,7 @@ public partial class OrbitalCamera : Node3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        // 1. Mouse Rotation (Only when Right Click is held)
+        // Mouse Rotation (Only when Right Click is held)
         if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Right))
         {
             _yaw -= mouseMotion.Relative.X * MouseSensitivity;
@@ -62,7 +61,7 @@ public partial class OrbitalCamera : Node3D
             ClampPitch();
         }
 
-        // 2. Mouse Zoom (Scroll Wheel)
+        // Mouse Zoom (Scroll Wheel)
         if (@event is InputEventMouseButton mouseButton)
         {
             if (mouseButton.ButtonIndex == MouseButton.WheelUp)
@@ -110,9 +109,6 @@ public partial class OrbitalCamera : Node3D
 
     private void ClampPitch()
     {
-        // This is the specific logic to handle the "Globe Poles"
-        // We strictly limit the angle so it never hits 90 or -90 degrees.
-        // This prevents the camera from flipping upside down (Gimbal Lock).
         _pitch = Mathf.Clamp(_pitch, MinPitch, MaxPitch);
     }
 

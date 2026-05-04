@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
+using Godot.Collections;
 
 [GlobalClass]
 public partial class GlobeTeamManager : Manager<GlobeTeamManager>
@@ -24,14 +25,14 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	[Export(PropertyHint.ResourceType,"Craft")] private Craft testCraft;
 	
 
-	private Dictionary<Enums.UnitTeam, GlobeTeamHolder> teamData = 
-		new Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
+	private System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder> teamData = 
+		new System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
 	
 	public override string GetManagerName() => "GlobeTeamManager";
 	
 	protected override async Task _Setup(bool loadingData)
 	{
-		teamData ??= new Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
+		teamData ??= new System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
 		
 		// Only run default setup if we aren't loading existing data.
 		if (loadingData && teamData.Count != 0) return;
@@ -111,7 +112,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			foreach (var kvp in allCraft)
 			{
 				Enums.CraftStatus status = kvp.Key;
-				List<Craft> craftList = kvp.Value;
+				Array<Craft> craftList = kvp.Value;
 
 				foreach (Craft craft in craftList)
 				{
@@ -342,26 +343,8 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		}
 	}
 	
-	public bool TryBuildBase(Enums.UnitTeam team, HexCellData cell, int baseIndex,  int cost)
+	public bool TryBuildBase(Enums.UnitTeam team, HexCellData cell, int baseIndex , int cost)
 	{
-		if (team == Enums.UnitTeam.None) return false;
-		if (!teamData.ContainsKey(team)) teamData[team] = new GlobeTeamHolder(team, new());
-		if (!teamData[team].CanAffordCost(cost)) return false;
-
-		teamData[team].TryRemoveFunds(cost);
-		TeamBaseCellDefinition baseCellDefinition =
-			new TeamBaseCellDefinition(cell.Index, "Base " + baseIndex.ToString(), team, null);
-		teamData[team].Bases.Add(baseCellDefinition);
-		SpawnBase(cell, baseCellDefinition.definitionName);
-		buildBaseMode = false;
-		return true;
-	}
-	
-	public bool TryBuildBase(Enums.UnitTeam team, int cellIndex, int baseIndex , int cost)
-	{
-		if (cellIndex == -1) return false;
-		HexCellData? cell = GlobeHexGridManager.Instance.GetCellFromIndex(cellIndex);
-		if (cell == null) return false;
 		if (team ==  Enums.UnitTeam.None) return false;
 
 		if (!teamData.ContainsKey(team))
@@ -370,20 +353,13 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		}
 		
 		if(!teamData[team].CanAffordCost(cost)) return false;
-		
-		BuildBase(team, cell.Value, baseIndex, cost);
-		return true;
-	}
-	
-	private void BuildBase(Enums.UnitTeam team, HexCellData cell,int baseIndex , int cost)
-	{
-		TeamBaseCellDefinition newBase = new TeamBaseCellDefinition(cell.Index, "Base " + baseIndex.ToString(), team, null);
 
-		teamData[team].TryRemoveFunds(cost);
-		
-		teamData[team].Bases.Add(newBase);
-		SpawnBase(cell, "Base " + baseIndex.ToString());
-		buildBaseMode = false;
+		if (teamData[team].TryBuildBase(cell, baseIndex, cost))
+		{
+			SpawnBase(cell, "Base " + baseIndex.ToString());
+			buildBaseMode = false;
+		}
+		return true;
 	}
 	
 	private void SpawnBase(HexCellData cell, string name)
@@ -403,7 +379,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		if(label != null) label.Text = name;
 	}
 
-	public Dictionary<Enums.UnitTeam, GlobeTeamHolder> GetAllTeamData() => teamData;
+	public System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder> GetAllTeamData() => teamData;
 
 	public GlobeTeamHolder GetTeamData(Enums.UnitTeam team) => teamData.GetValueOrDefault(team, null);
 	

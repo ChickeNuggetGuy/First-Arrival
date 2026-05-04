@@ -4,11 +4,27 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 
 
-//TODO: Current Value Fill not actually working. The entire bar ois filled regardless
-[GlobalClass]
+//TODO: Current Value Fill not actually working. The entire bar is filled regardless
+[GlobalClass, Tool]
 public partial class TextStatBar : UIElement
 {
-	[Export] private Enums.Stat targetStat;
+	private Enums.Stat _targetStat;
+	[Export]
+	private Enums.Stat targetStat
+	{
+		get
+		{
+			return _targetStat;
+		}
+		set
+		{
+			_targetStat = value;
+			if (_statNameLabel != null)
+			{
+				_statNameLabel.Text = _targetStat.ToString();
+			}
+		}
+	}
 	
 	[ExportGroup("Label Settings "), Export] private Label _statNameLabel;
 	[Export(PropertyHint.Range, "25,250,")] private float _labelWidth;
@@ -35,7 +51,6 @@ public partial class TextStatBar : UIElement
 
 	public void UpdateStat(GridObjectStatHolder targetGridObjectStatHolder)
 	{
-		GD.Print("UpdateStat");
 		if (targetGridObjectStatHolder == null) return;
 		if (!targetGridObjectStatHolder.TryGetStat(targetStat, out var stat)) return;
 		if(statProgressBar == null) return;

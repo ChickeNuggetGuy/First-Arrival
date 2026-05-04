@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 using Godot.Collections;
 
@@ -15,8 +16,9 @@ public partial class GlobeUI : UIWindow
 	
 	[ExportGroup("Time"), Export] private Label currentDateUI;
 	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
-	
 
+	[ExportGroup("Bases"), Export] private Control baseButtonHolder;
+	private Dictionary<int, Button> baseButtons = new Dictionary<int, Button>();
 	protected override Task _Setup()
 	{
 		
@@ -49,14 +51,73 @@ public partial class GlobeUI : UIWindow
 			
 			currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
 			teamHolder.FundsChanged += TeamHolderOnFundsChanged;
-			
+			teamHolder.BaseAdded += TeamHolderOnBaseAdded;
+			teamHolder.BaseRemoved += TeamHolderOnBaseRemoved;
 		}
-		
+
+		RefreshUI();
 		return base._Setup();
 	}
 
 
+	private void RefreshUI()
+	{
+		RefreshBaseButtons(GlobeTeamManager.Instance.GetTeamData(Enums.UnitTeam.Player));
+	}
+
+	private void RefreshBaseButtons( GlobeTeamHolder teamHolder)
+	{
+		foreach (Node child in baseButtonHolder.GetChildren())
+		{
+			child.QueueFree();
+		}
+		baseButtons.Clear();
+
+		foreach (TeamBaseCellDefinition baseCellDefinition in teamHolder.Bases)
+		{
+			CreateBaseButton(baseCellDefinition.cellIndex, teamHolder);
+		}
+		
+	}
+
+	private void CreateBaseButton(int cellIndex, GlobeTeamHolder teamHolder)
+	{
+		if(cellIndex == -1) return;
+		for (int i = 0; i < teamHolder.Bases.Count; i++)
+		{
+			TeamBaseCellDefinition baseCellDefinition = teamHolder.Bases[i];
+			if (baseCellDefinition.cellIndex == cellIndex)
+			{
+				Button baseButton = new Button();
+				baseButton.Text = baseCellDefinition.definitionName;
+				baseButton.Pressed += () =>
+				{
+					OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
+					GameManager.Instance.currentBase = baseCellDefinition;
+					GameManager.SaveGlobeTransitionState();
+
+					GameManager.Instance.TryChangeScene(GameManager.GameScene.BaseScene, null, true);
+				};
+				baseButtonHolder.AddChild(baseButton);
+				baseButtons.Add(cellIndex, baseButton);
+			}
+		}
+		
+
+		
+	}
+
 	#region Signal Listeners
+	private void TeamHolderOnBaseRemoved(int hexCellIndex, GlobeTeamHolder teamHolder)
+	{
+		RefreshBaseButtons(teamHolder);
+	}
+
+	private void TeamHolderOnBaseAdded(int hexCellIndex, GlobeTeamHolder teamHolder)
+	{
+		RefreshBaseButtons(teamHolder);
+	}
+
 	private void sendMissionButtonOnPressed()
 	{
 		selectCraftUI.ShowCall();

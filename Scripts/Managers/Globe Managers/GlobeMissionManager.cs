@@ -203,9 +203,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    // Save the complete Globe state NOW, before leaving
 	    GameManager.SaveGlobeTransitionState();
 
-	    // Set up battle parameters (these are public fields on GameManager, so the Battle scene can read them)
-	    GameManager.Instance.unitCounts = new Vector2I(2, missionDefinition.mission.EnemySpawnCount);
-	    GameManager.Instance.mapSize = new Vector2I(GD.RandRange(2,4), GD.RandRange(2,4));
+	    // Set up battle parameters
+	    GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), missionDefinition.mission.EnemySpawnCount);
+	    GameManager.Instance.mapSize = new Vector2I(GD.RandRange(3,4), GD.RandRange(3,4));
 	    GameManager.Instance.currentMission = missionDefinition;
 	    missionDefinition.missionStatus |= Enums.MissionStatus.Visited;
 

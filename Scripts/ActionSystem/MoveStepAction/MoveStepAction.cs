@@ -113,7 +113,7 @@ public class MoveStepAction : Action, ICompositeAction
     }
     else if (targetDirection == Enums.Direction.NorthWest || targetDirection == Enums.Direction.SouthWest)
     {
-	    blendSpaceValue.X = -1;
+	    blendSpaceValue.X = 0;
     }
     blendSpaceValue.Y = 0;
 
@@ -123,7 +123,7 @@ public class MoveStepAction : Action, ICompositeAction
   protected override async Task Execute()
   {
 	  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
-	  parentGridObject.animationNode.TrySetParameter("moveBlendSpace", blendSpaceValue);
+	  parentGridObject.animationNode.TrySetParameter("WalkBlendSpace/blend_position", blendSpaceValue);
 
 	  var tween = parentGridObject.CreateTween();
 	  var moveTw = tween.TweenProperty(
@@ -145,7 +145,7 @@ public class MoveStepAction : Action, ICompositeAction
 	  {
 		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
 		  parentGridObject.animationNode.TrySetParameter(
-			  "moveBlendSpace",
+			  "WalkBlendSpace/blend_position",
 			  nextStep.blendSpaceValue
 		  );
 	  }
@@ -153,7 +153,7 @@ public class MoveStepAction : Action, ICompositeAction
 	  {
 		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
 		  parentGridObject.animationNode.TrySetParameter(
-			  "moveBlendSpace",
+			  "WalkBlendSpace/blend_position",
 			  Vector2.Zero
 		  );
 	  }

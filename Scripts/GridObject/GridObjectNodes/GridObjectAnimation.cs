@@ -46,13 +46,38 @@ public partial class GridObjectAnimation : GridObjectNode
 
 	public bool TrySetParameter(string parameterName, Variant value)
 	{
-		if (animationTree == null) return false;
-		
-		var parameter = animationTree.Get("parameters/" + parameterName);
+		if (animationTree == null)
+			return false;
 
-		if (parameter.VariantType != value.VariantType) return false;
-		
-		animationTree.Set("parameters/" + parameterName, value);
+		string path = "parameters/" + parameterName;
+
+		Variant current;
+		try
+		{
+			current = animationTree.Get(path);
+		}
+		catch (Exception e)
+		{
+			GD.PrintErr($"Invalid AnimationTree parameter path: {path}");
+			GD.PrintErr(e.Message);
+			return false;
+		}
+
+		if (current.VariantType == Variant.Type.Nil)
+		{
+			GD.PrintErr($"AnimationTree parameter does not exist: {path}");
+			return false;
+		}
+
+		if (current.VariantType != value.VariantType)
+		{
+			GD.PrintErr(
+				$"Type mismatch for {path}. Expected {current.VariantType}, got {value.VariantType}"
+			);
+			return false;
+		}
+
+		animationTree.Set(path, value);
 		return true;
 	}
 

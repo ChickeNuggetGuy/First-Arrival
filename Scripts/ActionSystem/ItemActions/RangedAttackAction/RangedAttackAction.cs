@@ -51,7 +51,7 @@ public partial class RangedAttackAction : Action, IItemAction
 
 		for (int i = 0; i < rangedAttackActionDefinition.attackCount; i++)
 		{
-			var visual = new CsgSphere3D { Radius = 0.5f };
+			var visual = new CsgSphere3D { Radius = 0.125f };
 			parentGridObject.GetTree().Root.AddChild(visual);
 			visual.GlobalPosition = parentGridObject.objectCenter.GlobalPosition;
 
@@ -78,10 +78,10 @@ public partial class RangedAttackAction : Action, IItemAction
 			}
 			else
 			{
-				tweenPos = parentGridObject.objectCenter.Position + newDirection * 50;
+				tweenPos = parentGridObject.objectCenter.Position + newDirection * 25;
 			}
 
-			tweenDuration = tweenPos.DistanceTo(parentGridObject.objectCenter.Position) / 50;
+			tweenDuration = tweenPos.DistanceTo(parentGridObject.objectCenter.Position) / 100 ;
 			tween.TweenProperty(visual, "position", tweenPos, tweenDuration);
 			await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
 			visual.QueueFree();
@@ -89,7 +89,7 @@ public partial class RangedAttackAction : Action, IItemAction
 			if (targetGridObject == null)
 			{
 				GD.Print("No target hit or target is not a GridObject");
-				return;
+				continue;
 			}
 
 

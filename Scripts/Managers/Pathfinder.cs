@@ -186,7 +186,6 @@ public partial class Pathfinder : Manager<Pathfinder>
 		// If we never reached a valid target, return an empty path.
 		if (targetRecord == null)
 		{
-			GD.Print("Target record is null - no path found.");
 			return new List<GridCell>();
 		}
 

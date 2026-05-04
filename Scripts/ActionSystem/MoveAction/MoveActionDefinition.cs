@@ -139,8 +139,7 @@ public partial class MoveActionDefinition : ActionDefinition
 	  if (sightArea == null) return (targetGridCell, 0);
 	  
 	  if(sightArea.SeenGridObjects.Count > 0)
-	  {
-		  GD.Print("Can see grid objects");
+	  { 
 		  return (targetGridCell, 100 / sightArea.SeenGridObjects.Count);
 	  }
 

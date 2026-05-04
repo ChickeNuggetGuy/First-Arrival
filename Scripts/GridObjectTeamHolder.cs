@@ -221,7 +221,6 @@ public partial class GridObjectTeamHolder : Node
 
     public void UpdateGridObjects(ActionDefinition actionCompleted, ActionDefinition currentAction)
     {
-	    GD.Print("UpdateGridObjects");
         if (CurrentGridObject != null && CurrentGridObject.IsInitialized)
         {
             if (CurrentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sight))

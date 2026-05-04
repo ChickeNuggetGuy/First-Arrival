@@ -6,10 +6,10 @@ using FirstArrival.Scripts.Utility;
 public partial class GridObjectStat : GridObjectNode
 {
 	[Export] public Enums.Stat Stat { get; private set; }
-	[Export] public float CurrentValue { get; protected set; }
+	[Export] public float CurrentValue { get; protected set; } = -1;
 
-	[Export] int minValue = 0;
-	[Export] int maxValue = 0;
+	[Export] int minValue = -1;
+	[Export] int maxValue = -1;
 
 	public (int min, int max) MinMaxValue
 	{
@@ -31,7 +31,13 @@ public partial class GridObjectStat : GridObjectNode
 	[Signal] public delegate void CurrentValueMinEventHandler(int value, GridObject gridObject);
 	[Signal] public delegate void CurrentValueMaxEventHandler(int value, GridObject gridObject);
 
-	
+	public GridObjectStat(Enums.Stat statType, float currentValue, int minValue, int maxValue)
+	{
+		Stat = statType;
+		CurrentValue = currentValue;
+		this.minValue = minValue;
+		this.maxValue = maxValue;
+	}
 	public override Godot.Collections.Array<Godot.Collections.Dictionary> _GetPropertyList()
 	{
 		Godot.Collections.Array<Godot.Collections.Dictionary> properties = [];
@@ -62,6 +68,16 @@ public partial class GridObjectStat : GridObjectNode
 
 	protected override void Setup()
 	{
+		if (minValue == -1)
+		{
+			minValue = 0;
+		}
+
+		if (maxValue == -1)
+		{
+			maxValue = GD.RandRange(50, 100);
+		}
+		
 		CurrentValue = MinMaxValue.max;
 		EmitSignal(SignalName.CurrentValueChanged, CurrentValue,parentGridObject);
 	}
