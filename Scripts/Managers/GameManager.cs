@@ -8,37 +8,22 @@ using Godot.Collections;
 
 namespace FirstArrival.Scripts.Managers;
 
-/// <summary>
-/// The central orchestrator for the game's lifecycle, managing scene transitions, 
-/// state persistence (saving/loading), and the initialization/execution of all sub-managers.
-/// It acts as the root of the manager hierarchy and ensures data consistency across scene swaps.
-/// </summary>
-[GlobalClass]
 public partial class GameManager : Manager<GameManager>
 {
+	#region Variables / Properties
 
-	#region variables / Properties
-	/// <summary> List of sub-managers that this GameManager is responsible for initializing and executing. </summary>
-	[Export] public Array<ManagerBase> managers = new();
+	// Track managers in the current active scene
+	public Array<ManagerBase> activeSceneManagers = new();
+	private List<ManagerBase> _persistentGlobals = new();
 
-	/// <summary> Mapping of GameScene enum values to their respective scene file paths on disk. </summary>
-	static Godot.Collections.Dictionary<GameScene, string> scenePaths = new()
+
+	public static readonly Godot.Collections.Dictionary<GameScene, string> scenePaths = new()
 	{
 		{ GameScene.BattleScene, "res://Scenes/GameScenes/BattleScene.tscn" },
-		{ GameScene.GlobeScene,  "res://Scenes/GameScenes/GlobeScene.tscn" },
-		{ GameScene.MainMenu,  "res://Scenes/GameScenes/MainMenuScene.tscn" },
-		{ GameScene.BaseScene,  "res://Scenes/GameScenes/BaseScene.tscn" }
+		{ GameScene.GlobeScene, "res://Scenes/GameScenes/GlobeScene.tscn" },
+		{ GameScene.MainMenu, "res://Scenes/GameScenes/MainMenuScene.tscn" },
+		{ GameScene.BaseScene, "res://Scenes/GameScenes/BaseScene.tscn" }
 	};
-	
-	[Export] protected string saveDir = "user://saves/";
-	
-	public Vector2I mapSize = new Vector2I(1, 1);
-	public Vector2I unitCounts = new Vector2I(2, 2);
-	public MissionCellDefinition currentMission;
-	
-	
-	public TeamBaseCellDefinition currentBase;
-	public PackedScene unitScene;
 
 	public enum GameScene
 	{
@@ -48,7 +33,7 @@ public partial class GameManager : Manager<GameManager>
 		GlobeScene,
 		BaseScene
 	}
-	
+
 	public enum LoadingState
 	{
 		NONE,
@@ -56,322 +41,292 @@ public partial class GameManager : Manager<GameManager>
 		SETTINGUPMANAGERS,
 		EXECUTINGMANAGERS
 	}
-	
+
 	[Export] public GameScene currentScene;
+	public Vector2I mapSize = new Vector2I(1, 1);
+	public Vector2I unitCounts = new Vector2I(2, 2);
+	public MissionCellDefinition currentMission;
+	public TeamBaseCellDefinition currentBase;
+	public PackedScene unitScene;
 
-	private string currentSavename = "new SaveGame";
-	private const string SaveExt = ".sav";
-	private const string AutosaveName = "autosave";
-
-	/// Temporary storage for game state data during a scene transition when not saving to disk. </summary>
-	public static Godot.Collections.Dictionary<string, Variant> _pendingSaveData = null;
-	
-	public static bool _loadFromAutosave = false;
-	
-	public static string _pendingSaveName = "";
-
-	/// <summary>
-	/// value from 0 to 1 representing current load progress
-	/// </summary>
 	public float loadingPercent = 0;
-
 	public LoadingState loadingState = LoadingState.NONE;
-
-	/// <summary>
-	/// Name of the manager currently being set up / executed (shown on loading UI).
-	/// Empty when not applicable.
-	/// </summary>
 	public string loadingManagerName = "";
-	
-	private const string GlobeTransitionSaveName = "globe_transition";
 
 	#endregion
 
-
-	#region Signals
-	
-	/// Emitted when the list of available save games changes (e.g., after a save or delete). </summary>
-	[Signal]
-	public delegate void GameSavesChangedEventHandler();
-
-	/// <summary> Emitted when all core managers have finished setup and execution. </summary>
 	[Signal]
 	public delegate void CoreManagersLoadedEventHandler();
-	#endregion
 
-	#region Functions
 	public override string GetManagerName() => "GameManager";
 
-	/// <summary>
-	/// Entry point for the GameManager. handles the initial state setup, 
-	/// determining whether to load from an autosave, pending data, or start a fresh session.
-	/// </summary>
-	public override async void _Ready()
+	public override void _Ready()
 	{
-		PackedScene unitScene = ResourceLoader.Load<PackedScene>("res://Scenes/GridObjects/Unit.tscn");
+		DebugMode = true;
 		base._Ready();
+		unitScene = ResourceLoader.Load<PackedScene>("res://Scenes/GridObjects/Unit.tscn");
 
-		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-
-		if (_loadFromAutosave)
-		{
-			// Load state from the physical autosave file if flagged.
-			_loadFromAutosave = false;
-			await LoadAutosaveInternal();
-		}
-		else if (_pendingSaveData != null)
-		{
-			// Load state from static pending data when transitioning between scenes 
-			// without saving to disk.
-			currentSavename = _pendingSaveName;
-			var data = _pendingSaveData;
-			_pendingSaveData = null;
-			_pendingSaveName = "";
-			await PerformInternalLoadSequence(data);
-		}
-		else
-		{
-			// Standard fresh setup of the current scene and managers.
-			await SetupCall(false);
-		}
+		_ = InitialBootSequence();
 	}
 
-	/// <summary>
-	/// Opens and reads the autosave file from the save directory, 
-	/// then initiates the internal loading sequence with its contents.
-	/// </summary>
-	private async Task LoadAutosaveInternal()
+	private async Task InitialBootSequence()
 	{
-		string fullName = AutosaveName + SaveExt;
-		var path = saveDir.PathJoin(fullName);
-
-		if (FileAccess.FileExists(path))
-		{
-			using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
-			if (file != null)
-			{
-				try
-				{
-					var root = file.GetVar().AsGodotDictionary<string, Variant>();
-					await PerformInternalLoadSequence(root);
-					return;
-				}
-				catch (Exception e)
-				{
-					GD.PrintErr($"Failed to load autosave: {e.Message}");
-				}
-			}
-		}
-		// Fallback if autosave fails or doesn't exist.
-		await SetupCall(false);
+		// Yielding ensures GetTree().CurrentScene is populated for the Autoload's first run
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		GatherManagersInCurrentScene();
+		await SetupAndExecuteSequence(false);
 	}
 
+	#region Lifecycle Implementation
+
 	/// <summary>
-	/// manages the initial setup of all child managers. 
+	/// GameManager's own setup. Orchestration of child managers is now handled in SetupAndExecuteSequence.
 	/// </summary>
 	protected override async Task _Setup(bool loadingData)
 	{
-		loadingState = LoadingState.SETTINGUPMANAGERS;
-		loadingPercent = 0;
-		loadingManagerName = "";
-
-		managers ??= new Array<ManagerBase>();
-		foreach (Node child in GetChildren())
-		{
-			if (child is ManagerBase m && !managers.Contains(m))
-			{
-				managers.Add(m);
-			}
-		}
-
-		int coreManagersCount = 0;
-		foreach (var m in managers) if (m.includeInLoadingCalculation) coreManagersCount++;
-		int totalSteps = coreManagersCount * 2;
-		int completedSteps = 0;
-
-		// Initialize each sub-manager.
-		foreach (ManagerBase manager in managers)
-		{
-			loadingManagerName = manager.GetManagerName();
-
-			if (DebugMode)
-			{
-				GD.Print($"Setting up manager: {loadingManagerName}");
-			}
-
-			await manager.SetupCall(loadingData);
-
-			if (manager.includeInLoadingCalculation)
-			{
-				completedSteps++;
-				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
-			}
-
-			// Yield to main thread to allow UI to update
-			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-		}
-
-		loadingManagerName = "";
-		await ExecuteCall(loadingData);
+		await Task.CompletedTask;
 	}
 
 	/// <summary>
-	/// Runs the execution phase for all  sub-managers, 
+	/// GameManager's own execution phase. Orchestration of child managers is now handled in SetupAndExecuteSequence.
 	/// </summary>
 	protected override async Task _Execute(bool loadingData)
 	{
-		loadingState = LoadingState.EXECUTINGMANAGERS;
-
-		int coreManagersCount = 0;
-		foreach (var m in managers) if (m.includeInLoadingCalculation) coreManagersCount++;
-		int totalSteps = coreManagersCount * 2;
-		int completedSteps = coreManagersCount; // Setup is already done
-
-		foreach (ManagerBase manager in managers)
-		{
-			loadingManagerName = manager.GetManagerName();
-
-			if (DebugMode)
-			{
-				GD.Print($"Executing manager: {loadingManagerName}");
-			}
-
-			await manager.ExecuteCall(loadingData);
-
-			if (manager.includeInLoadingCalculation)
-			{
-				completedSteps++;
-				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
-			}
-
-			// Yield to main thread to allow UI to update
-			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-		}
-		
-		loadingManagerName = "";
-		loadingState = LoadingState.NONE;
-		loadingPercent = 1.0f;
-		EmitSignal(SignalName.CoreManagersLoaded);
+		await Task.CompletedTask;
 	}
 
-	#region Scene Management
+	public override void Deinitialize()
+	{
+		GD.Print("[Cleanup] GameManager Autoload Deinitialized.");
+	}
 
-	/// <summary>
-	/// Attempts to change the current game scene, optionally saving state 
-	/// and invoking a callback after the transition.
-	/// </summary>
-	public bool TryChangeScene(
-		GameScene sceneName,
-		Callable? callback,
-		bool saveManagerData = true
-	)
+	public void CleanupManagers()
+	{
+		GD.Print($"[Cleanup] Deinitializing scene managers for currentScene...");
+		foreach (var m in activeSceneManagers)
+		{
+			if (GodotObject.IsInstanceValid(m))
+				m.Deinitialize();
+		}
+	}
+
+	#endregion
+
+	#region Scene Management & Transitions
+
+	public async Task<bool> StartNewGame(GameScene scene, string tempSaveName = "new SaveGame")
+	{
+		if (!scenePaths.ContainsKey(scene)) return false;
+
+		SavesManager.LoadFromAutosave = false;
+		SavesManager.PendingSaveData = null;
+		SavesManager.Instance.currentSavename = tempSaveName;
+
+		await ChangeSceneAsync(scene, false);
+		return true;
+	}
+
+	public async Task<bool> TryChangeScene(GameScene sceneName, bool saveManagerData = true, bool loadSceneData = true)
 	{
 		if (!scenePaths.ContainsKey(sceneName)) return false;
 
-		loadingState = LoadingState.CHANGINGSCENES;
-		loadingPercent = 0;
-		loadingManagerName = "Scene Transition";
-
-		UIManager.Instance?.ShowLoadingScreen();
-		currentScene = sceneName;
-
+		var sm = SavesManager.Instance;
 		if (saveManagerData)
 		{
-			// handle autosaving state based on current session type.
-			if (currentSavename.Contains("quickplay_internal"))
-			{
-				TryCreateSaveGame("quickplay_internal", sceneName);
-				_loadFromAutosave = true;
-			}
-			else
-			{
-				TryCreateSaveGame(AutosaveName, sceneName);
-				_loadFromAutosave = true;
-			}
-
-			_pendingSaveData = null;
+			string saveKey = sm.currentSavename.Contains("quickplay_internal") ? "quickplay_internal" : "autosave";
+			sm.SaveGame(saveKey, sceneName);
+			SavesManager.LoadFromAutosave = true;
 		}
 		else
 		{
-			// Store the current state in memory for the next scene instance to inherit.
-			_loadFromAutosave = false;
-			_pendingSaveData = PackageCurrentStateAsDictionary();
-			_pendingSaveName = currentSavename;
+			SavesManager.LoadFromAutosave = false;
+			SavesManager.PendingSaveData = sm.PackageFullState();
+			SavesManager.PendingSaveName = sm.currentSavename;
 		}
 
-		CleanupManagers();
-
-		if (GetTree().ChangeSceneToFile(scenePaths[sceneName]) != Error.Ok)
-		{
-			return false;
-		}
-
-		callback?.Call();
+		await ChangeSceneAsync(sceneName, true);
 		return true;
 	}
 
 	/// <summary>
-	/// Cycles through all child managers and the GameManager itself to 
-	/// disconnect signals and clean up state.
+	/// The core transition worker for the Autoload.
 	/// </summary>
-	private void CleanupManagers()
+	public async Task ChangeSceneAsync(GameScene scene, bool loadingData)
 	{
-		GD.Print($"[Cleanup] Deinitializing managers for {currentScene}...");
-		
-		foreach (var m in managers)
+		loadingState = LoadingState.CHANGINGSCENES;
+		loadingPercent = 0;
+		loadingManagerName = "Scene Transition";
+		UIManager.Instance?.ShowLoadingScreen();
+
+		CleanupManagers();
+		currentScene = scene;
+
+		Error err = GetTree().ChangeSceneToFile(scenePaths[scene]);
+		if (err != Error.Ok) return;
+
+		// Wait for nodes to enter tree
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		GatherManagersInCurrentScene();
+		await SetupAndExecuteSequence(loadingData);
+	}
+
+	public void RegisterGlobalManager(ManagerBase manager)
+	{
+		if (!_persistentGlobals.Contains(manager))
 		{
-			if (GodotObject.IsInstanceValid(m))
+			_persistentGlobals.Add(manager);
+			GD.Print($"[GameManager] Registered Global: {manager.GetManagerName()}");
+		}
+	}
+
+	private void GatherManagersInCurrentScene()
+	{
+		activeSceneManagers.Clear();
+
+		// Add the persistent globals first
+		foreach (var gm in _persistentGlobals)
+		{
+			if (IsInstanceValid(gm) && gm != this) activeSceneManagers.Add(gm);
+		}
+
+		// Find local managers only within the current scene root
+		var sceneRoot = GetTree().CurrentScene;
+		if (sceneRoot != null)
+		{
+			// Recursively find nodes, but skip them if they are the GameManager itself
+			foreach (var node in FindManagersRecursive(sceneRoot))
 			{
-				m.DeinitializeCall();
+				// Avoid adding same manager twice if discovery finds a global for some reason
+				if (!activeSceneManagers.Contains(node))
+				{
+					activeSceneManagers.Add(node);
+				}
 			}
 		}
-		
-		this.DeinitializeCall();
 	}
-	
-	public override void Deinitialize()
+
+	private List<ManagerBase> FindManagersRecursive(Node root)
 	{
-		GD.Print("[Cleanup] GameManager Deinitialized.");
+		List<ManagerBase> found = new();
+		if (root is ManagerBase mb && mb != this) found.Add(mb);
+		foreach (Node child in root.GetChildren())
+			found.AddRange(FindManagersRecursive(child));
+		return found;
 	}
 
-	private Godot.Collections.Dictionary<string, Variant> PackageCurrentStateAsDictionary()
+	private async Task SetupAndExecuteSequence(bool loadingData)
 	{
-		List<ManagerBase> saveList = new();
-		foreach (Node child in GetChildren())
-		{
-			if (child is ManagerBase mb) saveList.Add(mb);
-		}
-		saveList.Add(this);
+		var rootData = SavesManager.PendingSaveData;
+		var managersDict = (loadingData && rootData != null && rootData.ContainsKey("managers"))
+			? rootData["managers"].AsGodotDictionary<string, Variant>()
+			: null;
 
-		var managersDict = new Godot.Collections.Dictionary<string, Variant>();
-		foreach (var m in saveList)
+		// Load GameManager's own data
+		if (managersDict != null && managersDict.ContainsKey(GetManagerName()))
+			await LoadCall(managersDict[GetManagerName()].AsGodotDictionary<string, Variant>());
+
+		// Filter list
+		var cleanList = new List<ManagerBase>();
+		foreach (var m in activeSceneManagers)
+			if (IsInstanceValid(m) && !m.IsQueuedForDeletion())
+				cleanList.Add(m);
+
+		// Calculate progress for managers that are actually going to run
+		int stepsToCompute = 0;
+		foreach (var m in cleanList)
 		{
-			managersDict[m.GetManagerName()] = m.Save();
+			// We only count it in progress if it hasn't initialized OR if it repeats
+			if ((!m.HasInitialized || !m.ShouldExecuteOnlyOnce) && m.includeInLoadingCalculation)
+				stepsToCompute++;
 		}
 
-		return new Godot.Collections.Dictionary<string, Variant>
+		// +1 represents GameManager's own setup and execution steps
+		int totalSteps = (stepsToCompute + 1) * 2;
+		int completedSteps = 0;
+
+		// ---------- SETUP PHASE ----------
+		loadingState = LoadingState.SETTINGUPMANAGERS;
+		loadingPercent = 0f;
+
+		loadingManagerName = GetManagerName();
+		await this.SetupCall(loadingData);
+		completedSteps++;
+		loadingPercent = (float)completedSteps / totalSteps;
+
+		foreach (var m in cleanList)
 		{
-			["version"] = 1,
-			["scene"] = currentScene.ToString(),
-			["managers"] = managersDict
-		};
+			loadingManagerName = m.GetManagerName();
+
+			// 1. ALWAYS LOAD: Catch state changes even for persistent managers
+			if (managersDict != null && managersDict.ContainsKey(loadingManagerName))
+				await m.LoadCall(managersDict[loadingManagerName].AsGodotDictionary<string, Variant>());
+
+			if (!m.HasInitialized || !m.ShouldExecuteOnlyOnce)
+			{
+				if (DebugMode) GD.Print($"[GameManager] Setting up: {loadingManagerName}");
+				await m.SetupCall(loadingData);
+				if (m.includeInLoadingCalculation) completedSteps++;
+			}
+			else
+			{
+				if (DebugMode) GD.Print($"[GameManager] Skipping Setup (Already Initialized): {loadingManagerName}");
+			}
+
+			loadingPercent = (float)completedSteps / totalSteps;
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		}
+
+		// ---------- EXECUTION PHASE ----------
+		loadingState = LoadingState.EXECUTINGMANAGERS;
+
+		loadingManagerName = GetManagerName();
+		await this.ExecuteCall(loadingData);
+		completedSteps++;
+		loadingPercent = (float)completedSteps / totalSteps;
+
+		foreach (var m in cleanList)
+		{
+			loadingManagerName = m.GetManagerName();
+
+			// CONDITIONALLY EXECUTE
+			if (!m.HasInitialized || !m.ShouldExecuteOnlyOnce)
+			{
+				if (DebugMode) GD.Print($"[GameManager] Executing: {loadingManagerName}");
+				await m.ExecuteCall(loadingData);
+				m.HasInitialized = true; // Mark as done forever (if ShouldExecuteOnlyOnce is true)
+				if (m.includeInLoadingCalculation) completedSteps++;
+			}
+			else
+			{
+				if (DebugMode)
+					GD.Print($"[GameManager] Skipping Execution (Already Initialized): {loadingManagerName}");
+			}
+
+			loadingPercent = (float)completedSteps / totalSteps;
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		}
+
+		loadingManagerName = "";
+		loadingState = LoadingState.NONE;
+		loadingPercent = 1.0f;
+		EmitSignal(SignalName.CoreManagersLoaded);
+		SavesManager.PendingSaveData = null;
 	}
+
+	#endregion
+
+	#region Game Logic & Rules
 
 	public void CheckGameState(Turn currentTurn)
 	{
 		var teamHolders = GridObjectManager.Instance.GetGridObjectTeamHolders();
 		foreach (var kvp in teamHolders)
 		{
-			if (kvp.Value == null)
+			if (kvp.Value == null) continue;
+			if (kvp.Key == Enums.UnitTeam.Enemy || kvp.Key == Enums.UnitTeam.Player)
 			{
-				continue;
-			}
-
-			if (
-				kvp.Key == Enums.UnitTeam.Enemy || kvp.Key == Enums.UnitTeam.Player
-			)
-			{
-				// Check if any active units remain for the player or enemy team.
 				if (kvp.Value.GridObjects[Enums.GridObjectState.Active].Count < 1)
 				{
 					if (currentMission != null)
@@ -380,336 +335,68 @@ public partial class GameManager : Manager<GameManager>
 							? Enums.MissionStatus.Failed
 							: Enums.MissionStatus.Successful;
 					}
+
 					EndGame();
 				}
 			}
 		}
 	}
 
-
-	private void EndGame()
+	private async void EndGame()
 	{
-		if (currentSavename == "quickplay_internal")
+		if (SavesManager.Instance.currentSavename == "quickplay_internal")
 		{
-			Error err = Instance.GetTree()
-				.ChangeSceneToFile(scenePaths[GameScene.MainMenu]);
-			if (err != Error.Ok)
-				GD.PrintErr("Failed to switch back to Globe scene.");
+			await ChangeSceneAsync(GameScene.MainMenu, false);
 		}
 		else
 		{
-			EndBattleAndReturnToGlobe();
+			await EndBattleAndReturnToGlobe();
 		}
 	}
 
-	
-	public static void EndBattleAndReturnToGlobe()
+	public async Task EndBattleAndReturnToGlobe()
 	{
-		Instance.EnsureSaveDir();
-		string fullPath = Instance.saveDir.PathJoin(GlobeTransitionSaveName + SaveExt);
+		// Pull from memory instead of disk
+		var globeData = SavesManager.Instance.ConsumeSceneState("GlobeState");
+		if (globeData == null) return;
 
-		if (!FileAccess.FileExists(fullPath))
-		{
-			GD.PrintErr("Globe transition save not found.");
-			return;
-		}
-
-		Godot.Collections.Dictionary<string, Variant> globeData;
-		using (var file = FileAccess.Open(fullPath, FileAccess.ModeFlags.Read))
-		{
-			globeData = file.GetVar()
-				.AsGodotDictionary<string, Variant>();
-		}
-
-		//Remove the completed mission from GlobeMissionManager's activeMissions
-		int missionCellIndex = Instance.currentMission?.cellIndex ?? -1;
+		int missionCellIndex = currentMission?.cellIndex ?? -1;
 		if (missionCellIndex >= 0)
 			RemoveMissionFromSavedData(globeData, missionCellIndex);
 
-		// Clean up the temporary file
-		DirAccess.RemoveAbsolute(fullPath);
+		SavesManager.PendingSaveData = globeData;
+		SavesManager.LoadFromAutosave = false;
+		currentMission = null;
 
-		// Inject the updated data (craft still at mission cell, in Idle status)
-		_pendingSaveData = globeData;
-		_loadFromAutosave = false;
-		_pendingSaveName = Instance.currentSavename;
-
-		Instance.currentMission = null;
-
-		Error err = Instance.GetTree()
-			.ChangeSceneToFile(scenePaths[GameScene.GlobeScene]);
-		if (err != Error.Ok)
-			GD.PrintErr("Failed to switch back to Globe scene.");
-	}
-	
-	public static void ReturnToGlobe()
-	{
-		Instance.EnsureSaveDir();
-		string fullPath = Instance.saveDir.PathJoin(GlobeTransitionSaveName + SaveExt);
-
-		if (!FileAccess.FileExists(fullPath))
-		{
-			GD.PrintErr("Globe transition save not found.");
-			return;
-		}
-
-		Godot.Collections.Dictionary<string, Variant> globeData;
-		using (var file = FileAccess.Open(fullPath, FileAccess.ModeFlags.Read))
-		{
-			globeData = file.GetVar()
-				.AsGodotDictionary<string, Variant>();
-		}
-		
-		// Clean up the temporary file
-		DirAccess.RemoveAbsolute(fullPath);
-
-		// Inject the updated data (craft still at mission cell, in Idle status)
-		_pendingSaveData = globeData;
-		_loadFromAutosave = false;
-		_pendingSaveName = Instance.currentSavename;
-
-		Error err = Instance.GetTree()
-			.ChangeSceneToFile(scenePaths[GameScene.GlobeScene]);
-		if (err != Error.Ok)
-			GD.PrintErr("Failed to switch back to Globe scene.");
+		await ChangeSceneAsync(GameScene.GlobeScene, true);
 	}
 
-	private static void RemoveMissionFromSavedData(
-		Godot.Collections.Dictionary<string, Variant> root,
-		int cellIndex)
+	public async Task ReturnToGlobe()
 	{
-		if (!root.TryGetValue("managers", out var m))
-			return;
+		// Pull from memory instead of disk
+		var globeData = SavesManager.Instance.ConsumeSceneState("GlobeState");
+		if (globeData == null) return;
 
+		SavesManager.PendingSaveData = globeData;
+		SavesManager.LoadFromAutosave = false;
+
+		await ChangeSceneAsync(GameScene.GlobeScene, true);
+	}
+
+	private static void RemoveMissionFromSavedData(Godot.Collections.Dictionary<string, Variant> root, int cellIndex)
+	{
+		if (!root.TryGetValue("managers", out var m)) return;
 		var managers = m.AsGodotDictionary<string, Variant>();
-		if (!managers.TryGetValue("GlobeMissionManager", out var mm))
-			return;
-
+		if (!managers.TryGetValue("GlobeMissionManager", out var mm)) return;
 		var missionData = mm.AsGodotDictionary<string, Variant>();
-		if (!missionData.TryGetValue("activeMissions", out var am))
-			return;
-
+		if (!missionData.TryGetValue("activeMissions", out var am)) return;
 		var missions = am.AsGodotDictionary<string, Variant>();
 		missions.Remove(cellIndex.ToString());
 	}
 
 	#endregion
-	
 
 	#region Data Handling
-
-	/// <summary>
-	/// Initiates an asynchronous load of a specific game save file from disk.
-	/// Prepares the pending data and triggers the scene change to the saved scene.
-	/// </summary>
-	public async Task<bool> TryLoadGameSaveAsync(string saveName)
-	{
-		string fullName = saveName.EndsWith(SaveExt) ? saveName : saveName + SaveExt;
-		var path = saveDir.PathJoin(fullName);
-
-		if (!FileAccess.FileExists(path)) return false;
-
-		using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
-		if (file == null) return false;
-
-		try 
-		{
-			var root = file.GetVar().AsGodotDictionary<string, Variant>();
-			
-			// Store the loaded data to be injected into the new scene's managers.
-			_pendingSaveData = root;
-			_loadFromAutosave = false;
-			_pendingSaveName = saveName.Replace(SaveExt, "");
-
-			var sceneStr = root["scene"].AsString();
-			if (Enum.TryParse<GameScene>(sceneStr, out var scene))
-			{
-				currentScene = scene;
-				currentSavename = _pendingSaveName;
-
-				loadingState = LoadingState.CHANGINGSCENES;
-				loadingPercent = 0;
-				loadingManagerName = "Scene Transition";
-
-				CleanupManagers();
-
-				GD.Print($"Loading Save: {saveName} | Targeted Scene: {scene}");
-				UIManager.Instance?.ShowLoadingScreen();
-				Error err = GetTree().ChangeSceneToFile(scenePaths[scene]);
-				return err == Error.Ok;
-			}
-		}
-		catch (Exception e)
-		{
-			GD.PrintErr($"Failed to parse save: {e.Message}");
-		}
-    
-		return false;
-	}
-
-	/// <summary>
-	/// Injects loaded data into the current scene's sub-manager hierarchy.
-	/// Ensures correct initialization order and data hand-off.
-	/// </summary>
-	private async Task PerformInternalLoadSequence(Godot.Collections.Dictionary<string, Variant> root)
-	{
-		GD.Print($"[Load] New GameManager instance detected static data. Injecting...");
-		bool globalLoadingProcess = true;
-
-		if (!root.ContainsKey("managers")) return;
-		var managersDict = root["managers"].AsGodotDictionary<string, Variant>();
-		
-		// Load this GameManager's data first to establish base state.
-		string myKey = GetManagerName();
-		if (managersDict.ContainsKey(myKey))
-		{
-			this.Load(managersDict[myKey].AsGodotDictionary<string, Variant>());
-		}
-
-		// Identify managers in the new scene 
-		List<ManagerBase> managersNow = new();
-		foreach (Node child in GetChildren())
-		{
-			if (child is ManagerBase mb) managersNow.Add(mb);
-		}
-
-		managersNow.Sort((a, b) => {
-			if (a is GlobeHexGridManager) return -1;
-			if (b is GlobeHexGridManager) return 1;
-			return 0;
-		});
-
-		foreach (var m in managersNow)
-		{
-			string key = m.GetManagerName();
-			if (managersDict.ContainsKey(key))
-			{
-				m.Load(managersDict[key].AsGodotDictionary<string, Variant>());
-			}
-			else
-			{
-				// clear if no data was found for this manager.
-				m.Load(null); 
-			}
-		}
-    
-		// Run standard lifecycle (Setup -> Execute) for all managers in the new scene.
-		loadingState = LoadingState.SETTINGUPMANAGERS;
-		loadingPercent = 0;
-		loadingManagerName = "";
-
-		int coreManagersCount = 0;
-		foreach (var m in managersNow) if (m.includeInLoadingCalculation) coreManagersCount++;
-		int totalSteps = coreManagersCount * 2;
-		int completedSteps = 0;
-
-		foreach (var m in managersNow)
-		{
-			loadingManagerName = m.GetManagerName();
-
-			await m.SetupCall(globalLoadingProcess);
-
-			if (m.includeInLoadingCalculation)
-			{
-				completedSteps++;
-				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
-			}
-			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-		}
-
-		loadingState = LoadingState.EXECUTINGMANAGERS;
-		foreach (var m in managersNow)
-		{
-			loadingManagerName = m.GetManagerName();
-
-			await m.ExecuteCall(globalLoadingProcess);
-
-			if (m.includeInLoadingCalculation)
-			{
-				completedSteps++;
-				loadingPercent = totalSteps > 0 ? (float)completedSteps / totalSteps : 1.0f;
-			}
-			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-		}
-		
-		loadingManagerName = "";
-		loadingState = LoadingState.NONE;
-		loadingPercent = 1.0f;
-		EmitSignal(SignalName.CoreManagersLoaded);
-		GD.Print("[Load] Data hand-off complete.");
-	}
-
-	public bool TryCreateSaveGame(
-		string saveName,
-		GameScene scene,
-		bool isNewGame = false
-	)
-	{
-		EnsureSaveDir();
-		if (!saveName.EndsWith(SaveExt))
-		{
-			saveName += SaveExt;
-		}
-
-		if (
-			!this.TryGetAllComponentsInChildren<ManagerBase>(
-				out List<ManagerBase> saveList
-			)
-		)
-		{
-			return false;
-		}
-
-		saveList.Add(this);
-
-		Godot.Collections.Dictionary<string, Variant> managersDict = new();
-		
-		// 1. Try to load existing data to merge
-		string fullPath = saveDir + saveName;
-		if (!isNewGame && FileAccess.FileExists(fullPath))
-		{
-			using var fileRead = FileAccess.Open(fullPath, FileAccess.ModeFlags.Read);
-			if (fileRead != null)
-			{
-				try 
-				{
-					var oldRoot = fileRead.GetVar().AsGodotDictionary<string, Variant>();
-					if (oldRoot.ContainsKey("managers"))
-					{
-						managersDict = oldRoot["managers"].AsGodotDictionary<string, Variant>();
-					}
-				}
-				catch { /* Ignore corrupt existing saves, start fresh */ }
-			}
-		}
-
-		// 2. Overwrite/Update with current managers
-		foreach (var m in saveList)
-		{
-			managersDict[m.GetManagerName()] = m.Save();
-		}
-
-		var root = new Godot.Collections.Dictionary<string, Variant>
-		{
-			["version"] = 1,
-			["isNewGame"] = isNewGame,
-			["scene"] = scene.ToString(),
-			["managers"] = managersDict,
-		};
-
-		using var file = FileAccess.Open(
-			fullPath,
-			FileAccess.ModeFlags.Write
-		);
-		if (file == null)
-		{
-			return false;
-		}
-
-		file.StoreVar(root);
-		EmitSignal(SignalName.GameSavesChanged);
-		return true;
-	}
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
@@ -718,114 +405,23 @@ public partial class GameManager : Manager<GameManager>
 			["mapSize"] = mapSize,
 			["unitCounts"] = unitCounts,
 			["currentScene"] = (int)currentScene,
-			["currentBase"] = currentBase.Save()
+			["currentBase"] = currentBase?.Save(),
 		};
 	}
 
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		if (data.ContainsKey("mapSize"))
-		{
-			mapSize = (Vector2I)data["mapSize"];
-		}
-
-		if (data.ContainsKey("unitCounts"))
-		{
-			unitCounts = (Vector2I)data["unitCounts"];
-		}
-		
-		if (data.ContainsKey("currentBase"))
+		if (data == null) return Task.CompletedTask;
+		if (data.ContainsKey("mapSize")) mapSize = (Vector2I)data["mapSize"];
+		if (data.ContainsKey("unitCounts")) unitCounts = (Vector2I)data["unitCounts"];
+		if (data.ContainsKey("currentScene")) currentScene = (GameScene)(int)data["currentScene"];
+		if (data.ContainsKey("currentBase") && data["currentBase"].VariantType != Variant.Type.Nil)
 		{
 			currentBase = new TeamBaseCellDefinition(-1, "", Enums.UnitTeam.None, null);
-			currentBase.Load((Godot.Collections.Dictionary<string, Variant>)data["currentBase"]);
+			currentBase.Load(data["currentBase"].AsGodotDictionary<string, Variant>());
 		}
-		
-	}
-	
-	/// <summary>
-	/// Save the current (Globe) state into a dedicated file that battle will never overwrite.
-	/// </summary>
-	public static void SaveGlobeTransitionState()
-	{
-		if (Instance == null || Instance.currentScene != GameScene.GlobeScene)
-		{
-			GD.PrintErr("SaveGlobeTransitionState can only be called from the Globe scene.");
-			return;
-		}
-
-		Instance.EnsureSaveDir();
-		string fullPath = Instance.saveDir.PathJoin(GlobeTransitionSaveName + SaveExt);
-
-		var data = Instance.PackageCurrentStateAsDictionary();
-		data["scene"] = GameScene.GlobeScene.ToString(); // ensure it points back to globe
-
-		using var file = FileAccess.Open(fullPath, FileAccess.ModeFlags.Write);
-		if (file == null)
-		{
-			GD.PrintErr("Failed to open globe transition save file.");
-			return;
-		}
-		file.StoreVar(data);
+		return Task.CompletedTask;
 	}
 
-	#endregion
-
-	#region Utilities
-
-	private void EnsureSaveDir()
-	{
-		if (!DirAccess.DirExistsAbsolute(saveDir))
-		{
-			DirAccess.MakeDirRecursiveAbsolute(saveDir);
-		}
-	}
-
-	public List<string> GetSaveFileDisplayNames()
-	{
-		List<string> names = new();
-		using var dir = DirAccess.Open(saveDir);
-		if (dir == null)
-		{
-			return names;
-		}
-
-		dir.ListDirBegin();
-		string f = dir.GetNext();
-		while (f != "")
-		{
-			if (!dir.CurrentIsDir() && f.EndsWith(SaveExt))
-			{
-				names.Add(f.Replace(SaveExt, ""));
-			}
-
-			f = dir.GetNext();
-		}
-
-		return names;
-	}
-
-	public bool TryDeleteSaveGame(string saveName)
-	{
-		string f = saveName.EndsWith(SaveExt) ? saveName : saveName + SaveExt;
-		using var dir = DirAccess.Open(saveDir);
-		if (dir == null || dir.Remove(f) != Error.Ok)
-		{
-			return false;
-		}
-
-		EmitSignal(SignalName.GameSavesChanged);
-		return true;
-	}
-
-	#endregion
-
-	#region Get/Set Functions
-
-	public string GetCurrentSaveName() => currentSavename;
-	
-	public void SetCurrentSaveName(string saveName) => currentSavename = saveName;
-
-	#endregion
-	
 	#endregion
 }

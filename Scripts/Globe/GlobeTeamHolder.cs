@@ -1,12 +1,14 @@
 using Godot;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 
+[GlobalClass]
 public partial class GlobeTeamHolder : Node
 {
 	public Enums.UnitTeam Team;
 	public int funds;
-	public List<TeamBaseCellDefinition> Bases;
+	public List<TeamBaseCellDefinition> Bases = new List<TeamBaseCellDefinition>();
 	
 	public Craft SelectedCraft { get; protected set; }
 	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, int currentFunds);
@@ -57,16 +59,14 @@ public partial class GlobeTeamHolder : Node
 		};
 	}
 	
-	public void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public async Task LoadAsync(Godot.Collections.Dictionary<string, Variant> data, Node unitParent)
 	{
-		// 1. Load basic stats
 		if (data.ContainsKey("team"))
 			Team = (Enums.UnitTeam)data["team"].AsInt32();
 
 		if (data.ContainsKey("funds"))
 			funds = data["funds"].AsInt32();
 
-		// 2. Load Bases
 		if (data.ContainsKey("bases"))
 		{
 			var basesData = data["bases"].AsGodotDictionary<string, Variant>();
@@ -81,22 +81,17 @@ public partial class GlobeTeamHolder : Node
 					? baseData["definitionName"].AsString()
 					: "Loaded Base";
 
-				// Create new definition - pass null for craftList, Load() will populate it
 				TeamBaseCellDefinition newBase = new TeamBaseCellDefinition(
-					cellIndex, 
-					baseName, 
-					Team, 
-					null
+					cellIndex, baseName, Team, null
 				);
 
-				// This now correctly loads crafts from the "crafts" array
-				newBase.Load(baseData);
+				await newBase.LoadAsync(baseData, unitParent); // <-- the actual fix
 				GD.Print("Loaded Base: " + baseName);
 				Bases.Add(newBase);
 			}
 		}
 	}
-
+	
 	public bool TryGetBaseAtIndex(int cellIndex, out TeamBaseCellDefinition teamBase)
 	{
 		teamBase = null;

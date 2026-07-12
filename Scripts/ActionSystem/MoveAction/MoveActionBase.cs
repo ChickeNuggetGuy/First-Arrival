@@ -5,14 +5,14 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public partial class MoveAction : Action, ICompositeAction
+public partial class MoveActionBase : ActionBase, ICompositeAction
 {
-	public Action ParentAction { get; set; }
-	public List<Action> SubActions { get; set; }
+	public ActionBase ParentActionBase { get; set; }
+	public List<ActionBase> SubActions { get; set; }
 
 	private List<GridCell> path = new List<GridCell>();
 
-	public MoveAction(
+	public MoveActionBase(
 		GridObject parentGridObject,
 		GridCell startingGridCell,
 		GridCell targetGridCell,
@@ -40,7 +40,7 @@ public partial class MoveAction : Action, ICompositeAction
 
 	protected override async Task Setup()
 	{
-		ParentAction = this;
+		ParentActionBase = this;
 		if (path == null || path.Count == 0)
 			return;
 
@@ -71,7 +71,7 @@ public partial class MoveAction : Action, ICompositeAction
 					stepStart,
 					stepEnd,
 					stepCosts
-				) as MoveStepAction;
+				) as MoveStepActionBase;
 
 			AddSubAction(moveStepAction);
 		}

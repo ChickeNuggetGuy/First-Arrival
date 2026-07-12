@@ -13,10 +13,10 @@ public partial class ExplodeActionDefinition : TurnBasedActionDefinition
     [Export] public int explosionRadius = 2;
     [Export] public Godot.Collections.Dictionary<Enums.Stat, int> affectedStats = new();
 	
-    public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
+    public override ActionBase InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
         Godot.Collections.Dictionary<Enums.Stat, int> costs)
     {
-        return new ExplodeAction(
+        return new ExplodeActionBase(
             parent,
             startGridCell,
             targetGridCell,

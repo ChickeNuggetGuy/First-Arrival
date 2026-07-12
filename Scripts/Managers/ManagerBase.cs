@@ -5,6 +5,13 @@ namespace FirstArrival.Scripts.Managers;
 
 public abstract partial class ManagerBase : Node
 {
+	
+	// Inside ManagerBase.cs
+	public bool HasInitialized { get; set; } = false;
+
+	// If this is an Autoload, we usually want to run Setup/Execute only once at game start.
+	[Export] public bool ShouldExecuteOnlyOnce { get; set; } = false;
+	
 	[Export] protected bool DebugMode = false;
 	[Export] public bool includeInLoadingCalculation = true;
 	public bool SetupComplete { get; protected set; }
@@ -37,18 +44,17 @@ public abstract partial class ManagerBase : Node
 
 	public abstract Godot.Collections.Dictionary<string, Variant> Save();
 	
-	public virtual void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public virtual async Task LoadCall(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		if (data != null && data.Count > 0)
+		if (data is { Count: > 0 })
 			HasLoadedData = true;
 		else
 			HasLoadedData = false;
+
+		await Load(data);
 	}
-	
-	public void DeinitializeCall()
-	{
-		Deinitialize();
-	}
+
+	public abstract Task Load(Godot.Collections.Dictionary<string, Variant> data);
 	
 	public abstract void Deinitialize();
 }

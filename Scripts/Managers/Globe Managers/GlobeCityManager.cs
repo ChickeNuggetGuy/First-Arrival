@@ -118,15 +118,15 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 	    return data;
     }
 
-    public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+    public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
     {
-	    base.Load(data);
-	    if (!HasLoadedData) return;
+	    if (!HasLoadedData) return Task.CompletedTask;
 
 	    if (data.ContainsKey("cityData"))
 	    {
 		    citiesData = data["cityData"].AsGodotDictionary<int, Dictionary>();
 	    }
+	    return Task.CompletedTask;
     }
 
 

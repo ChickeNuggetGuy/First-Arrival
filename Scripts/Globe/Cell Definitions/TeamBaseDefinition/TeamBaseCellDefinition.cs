@@ -408,6 +408,7 @@ public async Task LoadAsync(
     {
         // Arrived at a mission – go idle and launch the battle
         TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+        
         missionManager.LoadMissionScene(missionCellDefinition);
     }
     else if (teamBaseCellDefinition != null)

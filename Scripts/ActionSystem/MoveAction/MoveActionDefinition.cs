@@ -9,14 +9,14 @@ public partial class MoveActionDefinition : ActionDefinition
 {
   public List<GridCell> path = new List<GridCell>();
 
-  public override Action InstantiateAction(
+  public override ActionBase InstantiateAction(
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
     Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
   {
-    return new MoveAction(parent, startGridCell, targetGridCell, this, costs);
+    return new MoveActionBase(parent, startGridCell, targetGridCell, this, costs);
   }
 
   protected override bool OnValidateAndBuildCosts(

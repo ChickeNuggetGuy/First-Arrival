@@ -22,25 +22,29 @@ public partial class GlobeUI : UIWindow
 	protected override Task _Setup()
 	{
 		
-		if (buildBaseButton != null && !buildBaseButton.IsConnected(Button.SignalName.Pressed, Callable.From(BuildBaseButtonOnPressed)))
+		if (buildBaseButton != null && !buildBaseButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(BuildBaseButtonOnPressed)))
 		{
 			buildBaseButton.Pressed += BuildBaseButtonOnPressed;
 		}
 		
-		if (sendMissionButton != null&& !sendMissionButton.IsConnected(Button.SignalName.Pressed, Callable.From(sendMissionButtonOnPressed)))
+		if (sendMissionButton != null&& !sendMissionButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(sendMissionButtonOnPressed)))
 		{
 			sendMissionButton.Pressed += sendMissionButtonOnPressed;
 		}
 		
+
 		GlobeTimeManager.Instance.DateChanged += TimeManagerOnDateChanged;
+		
 		
 		
 		if(!buyCraftButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(BuyCraftButtonOnPressed)))
 			buyCraftButton.Pressed += BuyCraftButtonOnPressed;
 		
+	
 		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
 		if (teamManager != null)
 		{
+			GD.Print(" found!");
 			GlobeTeamHolder teamHolder = teamManager.GetTeamData(Enums.UnitTeam.Player);
 
 			if (teamHolder == null)
@@ -48,13 +52,16 @@ public partial class GlobeUI : UIWindow
 				GD.Print("Team Data not found!");
 				return Task.CompletedTask;
 			}
-			
+
 			currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
 			teamHolder.FundsChanged += TeamHolderOnFundsChanged;
 			teamHolder.BaseAdded += TeamHolderOnBaseAdded;
 			teamHolder.BaseRemoved += TeamHolderOnBaseRemoved;
 		}
-
+		else
+		{
+			GD.Print("not found!");
+		}
 		RefreshUI();
 		return base._Setup();
 	}
@@ -90,21 +97,22 @@ public partial class GlobeUI : UIWindow
 			{
 				Button baseButton = new Button();
 				baseButton.Text = baseCellDefinition.definitionName;
-				baseButton.Pressed += () =>
+            
+				// Mark as async to await the scene change
+				baseButton.Pressed += async () => 
 				{
 					OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
 					GameManager.Instance.currentBase = baseCellDefinition;
-					GameManager.SaveGlobeTransitionState();
+                
+					SavesManager.Instance.StashSceneState("GlobeState");
 
-					GameManager.Instance.TryChangeScene(GameManager.GameScene.BaseScene, null, true);
+					await GameManager.Instance.ChangeSceneAsync(GameManager.GameScene.BaseScene, false);
 				};
+            
 				baseButtonHolder.AddChild(baseButton);
 				baseButtons.Add(cellIndex, baseButton);
 			}
 		}
-		
-
-		
 	}
 
 	#region Signal Listeners
@@ -159,9 +167,6 @@ public partial class GlobeUI : UIWindow
 		baseManager.buildBaseMode = !baseManager.buildBaseMode;
 		GD.Print($"Build Base Mode set to {baseManager.buildBaseMode}");
 	}
-	
-	
-
 
 	#endregion
 	

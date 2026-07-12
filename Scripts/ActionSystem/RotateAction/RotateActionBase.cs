@@ -3,14 +3,14 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 using Godot;
 
-public partial class RotateAction : Action
+public partial class RotateActionBase : ActionBase
 {
   private Enums.Direction _targetDirection;
 
   private const float TurnSpeedDegPerSec = 540f;
   private const bool UseTween = true;
 
-  public RotateAction(
+  public RotateActionBase(
     GridObject parentGridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,

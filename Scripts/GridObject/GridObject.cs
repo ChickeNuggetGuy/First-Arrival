@@ -115,12 +115,11 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			gridObjectNode.Name = "Grid Object Node Holder";
 			AddChild(gridObjectNode);
 		}
-		else
+		else if (gridObjectNodes.Count == 0)
 		{
-			if (!GridObjectNodeHolder.TryGetAllComponentsInChildrenRecursive<GridObjectNode>(
-				    out List<GridObjectNode> gridObjectNodesList))
+			if (!this.TryGetAllComponentsInChildrenRecursive(out List<GridObjectNode> gridObjectNodesList))
 			{
-				GD.Print("Error: GridObjectNodeHolder doesn't contain any GridObjectNode");
+				GD.PrintErr("Error: GridObjectNodeHolder doesn't contain any GridObjectNode");
 			}
 			else
 			{

@@ -137,7 +137,33 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 	public override Dictionary<string, Variant> Save()
 	{
-		return new();
+		return new()
+		{
+			{"timeSpeed", timeSpeed},
+			{"currenyYear", CurrentYear},
+			{"CurrentMonth", (int)CurrentMonth},
+			{"CurrentDayOfMonth", CurrentDayOfMonth},
+			{"CurrentDayOfYear", CurrentDayOfYear},
+			{"CurrentDay", (int)CurrentDay},
+			{"CurrentHour", CurrentHour},
+			{"CurrentMinute", CurrentMinute},
+			{"CurrentSeconds", CurrentSeconds},
+		};
+	}
+
+
+	public override Task Load(Dictionary<string, Variant> data)
+	{
+		timeSpeed = data["timeSpeed"].AsInt32();
+		CurrentYear = data["currenyYear"].AsInt32();
+		CurrentMonth = (Enums.Month)data["CurrentMonth"].AsInt32();
+		CurrentDayOfMonth = data["CurrentDayOfMonth"].AsInt32();
+		CurrentDayOfYear = data["CurrentDayOfYear"].AsInt32();
+		CurrentDay = (Enums.Day)data["CurrentDay"].AsInt32();
+		CurrentHour = data["CurrentHour"].AsInt32();
+		CurrentMinute = data["CurrentMinute"].AsInt32();
+		CurrentSeconds = data["CurrentSeconds"].AsInt32();
+		return Task.CompletedTask;
 	}
 
 	public override void _Process(double delta)

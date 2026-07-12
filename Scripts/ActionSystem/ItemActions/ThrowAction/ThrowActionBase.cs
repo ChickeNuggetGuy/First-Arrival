@@ -7,20 +7,20 @@ using FirstArrival.Scripts.Utility;
 using Godot;
 
 
-public class ThrowAction : Action, ICompositeAction, IItemAction
+public class ThrowActionBase : ActionBase, ICompositeAction, IItemAction
 {
-  public Action ParentAction { get; set; }
+  public ActionBase ParentActionBase { get; set; }
 
-  public List<Action> SubActions { get; set; } = new();
+  public List<ActionBase> SubActions { get; set; } = new();
   
   public Item Item { get; set; }
 
   protected GridCell[] path;
   protected Vector3[] vectorPath;
 
-  public ThrowAction() { }
+  public ThrowActionBase() { }
 
-  public ThrowAction(
+  public ThrowActionBase(
     GridObject parentGridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
@@ -65,7 +65,7 @@ public class ThrowAction : Action, ICompositeAction, IItemAction
       {
         var zeroCosts = new  Godot.Collections.Dictionary<Enums.Stat, int>();
         var rotateAction =
-          (RotateAction)rotateActionDefinition.InstantiateAction(
+          (RotateActionBase)rotateActionDefinition.InstantiateAction(
             parentGridObject,
             startingGridCell,
             targetGridCell,

@@ -6,12 +6,12 @@ using Godot;
 
 namespace FirstArrival.Scripts.ActionSystem.AIActions;
 
-public class Rotate360Action : Action, ICompositeAction
+public class Rotate360ActionBase : ActionBase, ICompositeAction
 {
-	public Action ParentAction { get; set; }
-	public List<Action> SubActions { get; set; }
+	public ActionBase ParentActionBase { get; set; }
+	public List<ActionBase> SubActions { get; set; }
 	
-	public Rotate360Action(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
+	public Rotate360ActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
 		ActionDefinition parent,  Godot.Collections.Dictionary<Enums.Stat, int> costs) 
 		: base(parentGridObject, startingGridCell, targetGridCell, parent, costs)
 	{
@@ -19,7 +19,7 @@ public class Rotate360Action : Action, ICompositeAction
 
 	protected override async Task Setup()
 	{
-		ParentAction = this;
+		ParentActionBase = this;
 		
 		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))return;
 		

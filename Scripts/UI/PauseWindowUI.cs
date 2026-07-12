@@ -87,7 +87,7 @@ public partial class PauseWindowUI : UIWindow
 	
 	private void QuitmenuButtonPressed()
 	{
-		GameManager.Instance.TryChangeScene(GameManager.GameScene.MainMenu, null, false);
+		GameManager.Instance.TryChangeScene(GameManager.GameScene.MainMenu, false);
 	}
 	
 	private void QuitGameButtonPressed()

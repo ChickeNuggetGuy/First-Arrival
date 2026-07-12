@@ -16,7 +16,7 @@ public partial class ActionManager : Manager<ActionManager>
 
 	private GridCell currentGridCell;
 
-	private List<(Action action, GridObject gridObject)> delayedActions = new();
+	private List<(ActionBase action, GridObject gridObject)> delayedActions = new();
 
 	[Signal]
 	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
@@ -69,7 +69,6 @@ public partial class ActionManager : Manager<ActionManager>
 			GridCell currentGridCell = InputManager.Instance.currentGridCell;
 			if (currentGridCell == null)
 			{
-				GD.Print("_Input: CurrentGridCell == null");
 				return;
 			}
 
@@ -294,12 +293,12 @@ public partial class ActionManager : Manager<ActionManager>
 		}
 	}
 
-	public void RegisterDelayedAction(Action action, GridObject gridObject)
+	public void RegisterDelayedAction(ActionBase actionBase, GridObject gridObject)
 	{
-		delayedActions.Add((action, gridObject));
+		delayedActions.Add((actionBase, gridObject));
 	}
 
-	public void ActionCompleteCall(ActionDefinition actionDef, global::Action actionInst)
+	public void ActionCompleteCall(ActionDefinition actionDef, global::ActionBase actionBaseInst)
 	{
 		if (actionDef?.parentGridObject != null)
 		{
@@ -326,7 +325,7 @@ public partial class ActionManager : Manager<ActionManager>
 				break;
 		}
 
-		bool isRoot = actionInst == null || actionInst.Parent == null;
+		bool isRoot = actionBaseInst == null || actionBaseInst.Parent == null;
 
 		if (isRoot)
 		{
@@ -350,10 +349,10 @@ public partial class ActionManager : Manager<ActionManager>
 
 	#region manager Data
 
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		base.Load(data);
-		if (!HasLoadedData) return;
+		if (!HasLoadedData)  return Task.CompletedTask;
+		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()

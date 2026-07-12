@@ -17,24 +17,31 @@ public partial class GameSaveUI : UIWindow
 
 	protected override Task _Setup()
 	{
-		if(!_saveButton.IsConnected(Button.SignalName.Pressed, Callable.From(SaveButtonOnPressed)))
+		if(!_saveButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(SaveButtonOnPressed)))
 			_saveButton.Pressed += SaveButtonOnPressed;
 		
-		if(!_loadButton.IsConnected(Button.SignalName.Pressed, Callable.From(LoadButtonOnPressed)))
+		if(!_loadButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(LoadButtonOnPressed)))
 			_loadButton.Pressed += LoadButtonOnPressed;
 		
-		if(!_deleteButton.IsConnected(Button.SignalName.Pressed, Callable.From(DeleteButtonOnPressed)))
+		if(!_deleteButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(DeleteButtonOnPressed)))
 			_deleteButton.Pressed += DeleteButtonOnPressed;
 		
-		GameManager.Instance.GameSavesChanged += LoadSaveGameData;
+		SavesManager.Instance.GameSavesChanged += LoadSaveGameData;
 		LoadSaveGameData();
 		return base._Setup();
+	}
+
+
+	protected override void _Show()
+	{
+		LoadSaveGameData();
+		base._Show();
 	}
 
 	private void LoadSaveGameData()
 	{
 		_itemList.Clear();
-		List<string> saveFileNames = GameManager.Instance.GetSaveFileDisplayNames();
+		List<string> saveFileNames = SavesManager.Instance.GetSaveFileDisplayNames();
 
 		if (saveFileNames == null || saveFileNames.Count <= 0)
 			return;
@@ -51,12 +58,13 @@ public partial class GameSaveUI : UIWindow
 		string saveName =_itemList.GetItemText(_itemList.GetSelectedItems()[0]);
 
 		GD.Print("Test");
-		GameManager.Instance.TryDeleteSaveGame(saveName);
+		SavesManager.Instance.DeleteSave(saveName);
 		
 	}
 
 	private async void LoadButtonOnPressed()
 	{
+
 		if (_itemList.GetSelectedItems().Length < 1)
 		{
 			GD.Print($"selected item null");
@@ -65,7 +73,7 @@ public partial class GameSaveUI : UIWindow
 
 		string saveName = _itemList.GetItemText(_itemList.GetSelectedItems()[0]);
 		GD.Print($"Load {saveName}:");
-		bool ok = await GameManager.Instance.TryLoadGameSaveAsync(saveName);
+		bool ok = await  SavesManager.Instance.LoadSaveAsync(saveName);
 		
 	}
 
@@ -76,7 +84,7 @@ public partial class GameSaveUI : UIWindow
 		{
 			
 			saveName = _itemList.GetItemText(_itemList.GetSelectedItems()[0]);
-			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName, targetScene));
+			GD.Print(SavesManager.Instance.SaveGame(saveName, targetScene));
 			return;
 		}
 		else if (_saveNameEdit.Text.Length > 0)
@@ -86,18 +94,32 @@ public partial class GameSaveUI : UIWindow
 		
 		if (saveName.Length > 0)
 		{
-			GD.Print(GameManager.Instance.TryCreateSaveGame(saveName, targetScene));
+			GD.Print(SavesManager.Instance.SaveGame(saveName, targetScene));
 		}
 	}
 
 	public override void _ExitTree()
 	{
 		base._ExitTree();
-		_saveButton.Pressed -= SaveButtonOnPressed;
-		_loadButton.Pressed -= LoadButtonOnPressed;
-		_deleteButton.Pressed -= DeleteButtonOnPressed;
+		if (_saveButton != null &&
+		    _saveButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(SaveButtonOnPressed)))
+		{
+			_saveButton.Pressed -= SaveButtonOnPressed;
+		}
+
+		if (_loadButton != null &&
+		    _loadButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(LoadButtonOnPressed)))
+		{
+			_loadButton.Pressed -= LoadButtonOnPressed;
+		}
+
+		if (_deleteButton != null &&
+		    _deleteButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(DeleteButtonOnPressed)))
+		{
+			_deleteButton.Pressed -= DeleteButtonOnPressed;
+		}
 
 		if (GameManager.Instance != null)
-			GameManager.Instance.GameSavesChanged -= LoadSaveGameData;
+			SavesManager.Instance.GameSavesChanged -= LoadSaveGameData;
 	}
 }

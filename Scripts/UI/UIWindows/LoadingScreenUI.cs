@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 
 [GlobalClass]
-public partial class LoadingSCcreenUI : UIWindow
+public partial class LoadingScreenUI : UIWindow
 {
 	[Export] private Label loadingPercentLabel;
 	[Export] private ProgressBar loadingBar;
@@ -27,11 +27,11 @@ public partial class LoadingSCcreenUI : UIWindow
 
 		bool isLoading = GameManager.Instance.loadingState != GameManager.LoadingState.NONE;
 
-		if (isLoading && !IsShown)
-		{
-			_ = ShowCall();
-		}
-		else if (!isLoading && IsShown)
+		// if (isLoading && !IsShown)
+		// {
+		// 	_ = ShowCall();
+		// }
+		if (!isLoading && IsShown)
 		{
 			_ = HideCall();
 		}
@@ -55,7 +55,19 @@ public partial class LoadingSCcreenUI : UIWindow
 
 		if (percent >= 1f)
 		{
-			HideCall();
+			_ =HideCall();
 		}
+	}
+
+	protected override void _Hide()
+	{
+		base._Hide();
+		MouseFilter = MouseFilterEnum.Ignore;
+	}
+
+	protected override void _Show()
+	{
+		base._Show();
+		MouseFilter = MouseFilterEnum.Stop;
 	}
 }

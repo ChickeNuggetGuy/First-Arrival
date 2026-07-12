@@ -12,7 +12,7 @@ public partial class ThrowActionDefinition : ItemActionDefinition
   private List<GridCell> _path = new List<GridCell>();
   private Vector3[] _vectorPath;
 
-  public override Action InstantiateAction(
+  public override ActionBase InstantiateAction(
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
@@ -20,7 +20,7 @@ public partial class ThrowActionDefinition : ItemActionDefinition
   )
   {
     GD.Print($"Vector path {(_vectorPath?.Length ?? 0)} path: {(_path?.Count ?? 0)}");
-    return new ThrowAction(parent, startGridCell, targetGridCell, this, Item, _path, _vectorPath, costs);
+    return new ThrowActionBase(parent, startGridCell, targetGridCell, this, Item, _path, _vectorPath, costs);
   }
 
   protected override bool OnValidateAndBuildCosts(

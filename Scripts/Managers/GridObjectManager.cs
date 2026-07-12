@@ -10,9 +10,11 @@ namespace FirstArrival.Scripts.Managers;
 [GlobalClass]
 public partial class GridObjectManager : Manager<GridObjectManager>
 {
-	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, int> spawnCounts = new Godot.Collections.Dictionary<Enums.UnitTeam, int>();
-	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> gridObjectTeams = new Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder>();
-	
+	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, int> spawnCounts = new();
+	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> gridObjectTeams = new();
+	[Export] private StartingEuipmentUI startingEuipmentUI;
+
+
 	public GridObject CurrentPlayerGridObject
 	{
 		get
@@ -69,7 +71,6 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-
 		if (HasLoadedData)
 		{
 			//loaded saved units for this scene
@@ -86,7 +87,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		
 		try
 		{
-			// Either New Game or  loaded a Globe save and entered a new Battle.
+			// Either New Game or loaded a Globe save and entered a new Battle.
 			foreach (KeyValuePair<Enums.UnitTeam, int> kvp in spawnCounts)
 			{
 				for (int i = 0; i < kvp.Value; i++)
@@ -108,6 +109,10 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			}
 		}
 		catch (Exception e) { GD.PrintErr(e); throw; }
+		
+		await ToSignal(GetTree().CreateTimer(1.0f), "timeout");
+		await startingEuipmentUI.ShowCall();
+		await ToSignal(startingEuipmentUI, StartingEuipmentUI.SignalName.AcceptPressed);
 	}
 
 	private async Task TrySpawnGridObject(PackedScene gridObjectScene, Enums.UnitTeam team)
@@ -152,7 +157,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		return gridObjectTeams[team];
 	}
 
-	public Action SetCurrentGridObject(Enums.UnitTeam team, GridObject gridObject)
+	public ActionBase SetCurrentGridObject(Enums.UnitTeam team, GridObject gridObject)
 	{
 		if (!gridObjectTeams.ContainsKey(team))
 			return null;
@@ -167,9 +172,8 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	public Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> GetGridObjectTeamHolders() => gridObjectTeams;
 
 	#region Manager Data
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		base.Load(data);
 
 		gridObjectTeams.Clear();
 		foreach (Node child in GetChildren())
@@ -178,7 +182,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 				gridObjectTeams.Add(teamHolder.Team, teamHolder);
 		}
 
-		if (data == null) return;
+		if (data == null) return Task.CompletedTask;
 
 		foreach (var dataKVP in data)
 		{
@@ -188,6 +192,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 				gridObjectTeams[team].Load(holderData);
 			}
 		}
+		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()

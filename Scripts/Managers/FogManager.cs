@@ -121,12 +121,10 @@ public partial class FogManager : Manager<FogManager>
         return new Godot.Collections.Dictionary<string, Variant>();
     }
 
-    public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+    public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
     {
-        base.Load(data);
-        // Fog state is usually recalculated by the GridObjectTeamHolder on load,
-        // so we just re-init the connections here.
         InitFogGlobals();
+        return Task.CompletedTask;
     }
     #endregion
 }

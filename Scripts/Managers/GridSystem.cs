@@ -415,7 +415,7 @@ public partial class GridSystem : Manager<GridSystem>
 				}
 			}
 		}
-
+		
 		await Task.CompletedTask;
 		return gridObjects;
 	}
@@ -1632,10 +1632,10 @@ public partial class GridSystem : Manager<GridSystem>
 
 	#region manager Data
 
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		base.Load(data);
-		if (!HasLoadedData) return;
+		if (!HasLoadedData)  return Task.CompletedTask;
+		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()

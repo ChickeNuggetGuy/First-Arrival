@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 using Godot;
 
-public class MoveStepAction : Action, ICompositeAction
+public class MoveStepActionBase : ActionBase, ICompositeAction
 {
-  public Action ParentAction { get; set; }
-  public List<Action> SubActions { get; set; }
+  public ActionBase ParentActionBase { get; set; }
+  public List<ActionBase> SubActions { get; set; }
   public Enums.Direction targetDirection { get; set; }
 
   public Vector3 TargetWorldPos => targetGridCell.WorldCenter;
@@ -17,7 +17,7 @@ public class MoveStepAction : Action, ICompositeAction
 
   public Vector2 blendSpaceValue;
 
-  public MoveStepAction(
+  public MoveStepActionBase(
     GridObject parentGridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
@@ -30,7 +30,7 @@ public class MoveStepAction : Action, ICompositeAction
 
   protected override async Task Setup()
   {
-    ParentAction = this;
+    ParentActionBase = this;
 
     // Use actual transform-facing, not cached direction state
     Enums.Direction currentDirection =
@@ -81,7 +81,7 @@ public class MoveStepAction : Action, ICompositeAction
       }
 
       var rotateAction =
-        (RotateAction)rotateActionDefinition.InstantiateAction(
+        (RotateActionBase)rotateActionDefinition.InstantiateAction(
           parentGridObject,
           startingGridCell,
           targetGridCell,
@@ -141,7 +141,7 @@ public class MoveStepAction : Action, ICompositeAction
   {
 	  parentGridObject.GridPositionData.SetGridCell(targetGridCell);
 
-	  if (NextAction is MoveStepAction nextStep)
+	  if (NextActionBase is MoveStepActionBase nextStep)
 	  {
 		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
 		  parentGridObject.animationNode.TrySetParameter(

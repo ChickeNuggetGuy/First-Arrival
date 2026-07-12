@@ -6,13 +6,13 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public partial class InteractAction : Action, ICompositeAction
+public partial class InteractActionBase : ActionBase, ICompositeAction
 {
-	public Action ParentAction { get; set; }
-	public List<Action> SubActions { get; set; }
+	public ActionBase ParentActionBase { get; set; }
+	public List<ActionBase> SubActions { get; set; }
 	
 	IInteractableGridobject targetGridObject;
-	public InteractAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
+	public InteractActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
 		ActionDefinition parentAction, Godot.Collections.Dictionary<Enums.Stat, int> costs)
 		: base(parentGridObject, startingGridCell, targetGridCell ,parentAction, costs)
 	{
@@ -22,7 +22,7 @@ public partial class InteractAction : Action, ICompositeAction
 	
 	protected override async Task Setup()
 	{
-		ParentAction = this;
+		ParentActionBase = this;
 
 		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell,false, false, out var neighbors))
 		{
@@ -60,10 +60,10 @@ public partial class InteractAction : Action, ICompositeAction
 			return;
 		}
 		
-		MoveAction moveAction = moveActionDefinition.InstantiateAction(parentGridObject,
+		MoveActionBase moveActionBase = moveActionDefinition.InstantiateAction(parentGridObject,
 			startingGridCell, moveDestination, 
-			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveAction;
-		AddSubAction(moveAction);
+			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveActionBase;
+		AddSubAction(moveActionBase);
 	}
 
 	protected override async Task Execute()

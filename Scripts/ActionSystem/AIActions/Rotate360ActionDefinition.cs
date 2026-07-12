@@ -9,10 +9,10 @@ namespace FirstArrival.Scripts.ActionSystem.AIActions;
 public partial class Rotate360ActionDefinition : ActionDefinition
 {
 	private int exectutionCount;
-	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell, 
+	public override ActionBase InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell, 
 		Godot.Collections.Dictionary<Enums.Stat, int> costs)
 	{
-		return new Rotate360Action(parent, startGridCell, targetGridCell, this, costs);
+		return new Rotate360ActionBase(parent, startGridCell, targetGridCell, this, costs);
 	}
 
 	protected override bool OnValidateAndBuildCosts(GridObject gridObject, GridCell startingGridCell,

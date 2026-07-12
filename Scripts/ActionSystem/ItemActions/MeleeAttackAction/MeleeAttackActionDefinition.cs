@@ -11,14 +11,14 @@ public partial class MeleeAttackActionDefinition
 {
 	[Export] public int damage;
 	
-	public override Action InstantiateAction(
+	public override ActionBase InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,
 		GridCell targetGridCell,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 	{
-		return new MeleeAttackAction(parent, startGridCell, targetGridCell, this, costs)
+		return new MeleeAttackActionBase(parent, startGridCell, targetGridCell, this, costs)
 		{
 			Item = Item
 		};

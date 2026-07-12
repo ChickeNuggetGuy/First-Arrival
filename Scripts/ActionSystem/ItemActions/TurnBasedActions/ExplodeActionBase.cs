@@ -8,10 +8,10 @@ using Godot;
 
 namespace FirstArrival.Scripts.ActionSystem.ItemActions;
 
-public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, IItemAction
+public partial class ExplodeActionBase : ActionBase, ICompositeAction, IDelayedAction, IItemAction
 {
-    public Action ParentAction { get; set; }
-    public List<Action> SubActions { get; set; } = new();
+    public ActionBase ParentActionBase { get; set; }
+    public List<ActionBase> SubActions { get; set; } = new();
     public Item Item { get; set; }
     
     public int TurnsRemaining { get; set; }
@@ -19,9 +19,9 @@ public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, I
     private CsgSphere3D grenadeVisual;
     private float grenadeDamage;
 
-    public ExplodeAction() { }
+    public ExplodeActionBase() { }
 
-    public ExplodeAction(
+    public ExplodeActionBase(
         GridObject parentGridObject,
         GridCell startingGridCell,
         GridCell targetGridCell,
@@ -74,7 +74,7 @@ public partial class ExplodeAction : Action, ICompositeAction, IDelayedAction, I
 		    return Task.CompletedTask;
 	    }
 	    
-	    var throwAction = new ThrowAction(
+	    var throwAction = new ThrowActionBase(
 		    parentGridObject,
 		    startingGridCell,
 		    targetGridCell,

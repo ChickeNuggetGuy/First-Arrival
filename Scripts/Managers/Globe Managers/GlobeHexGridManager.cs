@@ -47,8 +47,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 	{
 		if (!_gridCreated)
 			CreateHexGrid();
-
-		EmitSignal(ManagerBase.SignalName.SetupCompleted);
+		
 		await Task.CompletedTask;
 	}
 
@@ -92,24 +91,24 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return data;
 	}
 
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		_loadedCountryKeysFromSave = null;
 
 		if (data == null || data.Count == 0)
-			return;
+			return Task.CompletedTask;
 
 		if (!data.TryGetValue("country_keys", out var v))
-			return;
+			return Task.CompletedTask;
 
 		if (v.VariantType == Variant.Type.Nil)
-			return;
+			return Task.CompletedTask;
 
 		if (v.VariantType == Variant.Type.PackedInt64Array)
 		{
 			var arr = v.AsInt64Array();
 			_loadedCountryKeysFromSave = arr ?? Array.Empty<long>();
-			return;
+			return Task.CompletedTask;
 		}
 
 		if (v.VariantType == Variant.Type.PackedInt32Array)
@@ -118,21 +117,21 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			if (ints == null)
 			{
 				_loadedCountryKeysFromSave = Array.Empty<long>();
-				return;
+				return Task.CompletedTask;
 			}
 
 			_loadedCountryKeysFromSave = new long[ints.Length];
 			for (int i = 0; i < ints.Length; i++)
 				_loadedCountryKeysFromSave[i] = ints[i];
 
-			return;
+			return Task.CompletedTask;
 		}
 
 		if (v.VariantType == Variant.Type.PackedByteArray)
 		{
 			var bytes = v.AsByteArray();
 			if (bytes == null || bytes.Length == 0 || (bytes.Length % 8) != 0)
-				return;
+				return Task.CompletedTask;
 
 			int n = bytes.Length / 8;
 			_loadedCountryKeysFromSave = new long[n];
@@ -140,6 +139,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			for (int i = 0; i < n; i++)
 				_loadedCountryKeysFromSave[i] = BitConverter.ToInt64(bytes, i * 8);
 		}
+		return Task.CompletedTask;
 	}
 
 	public void CreateHexGrid()

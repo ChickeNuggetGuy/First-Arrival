@@ -201,7 +201,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     public void LoadMissionScene(MissionCellDefinition missionDefinition)
     {
 	    // Save the complete Globe state NOW, before leaving
-	    GameManager.SaveGlobeTransitionState();
+	    SavesManager.Instance.SetSessionData("GlobeState", SavesManager.Instance.GetSceneTransitionState());
 
 	    // Set up battle parameters
 	    GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), missionDefinition.mission.EnemySpawnCount);
@@ -210,13 +210,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    missionDefinition.missionStatus |= Enums.MissionStatus.Visited;
 
 	    // Switch to battle scene WITHOUT saving anything else
-	    GameManager._loadFromAutosave = false;
-	    GameManager._pendingSaveData = null;
-	    GameManager._pendingSaveName = "";
+	    SavesManager.LoadFromAutosave = false;
+	    SavesManager.PendingSaveData = null;
+	    SavesManager.PendingSaveName = "";
 
 	    GameManager.Instance.TryChangeScene(
 		    GameManager.GameScene.BattleScene,
-		    null,
 		    saveManagerData: false  
 	    );
     }
@@ -290,11 +289,10 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         return data;
     }
 
-    public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+    public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
     {
-        base.Load(data);
         if (!HasLoadedData)
-            return;
+	        return Task.CompletedTask;
 
         if (missionContainer != null)
         {
@@ -311,7 +309,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             : missionInterval;
 
         if (!data.ContainsKey("activeMissions"))
-            return;
+	        return Task.CompletedTask;
 
         var missionListData = data["activeMissions"].AsGodotDictionary<string, Variant>();
 
@@ -346,6 +344,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
                 );
             }
         }
+        return Task.CompletedTask;
     }
 
     public override void Deinitialize()

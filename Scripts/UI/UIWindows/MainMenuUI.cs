@@ -8,10 +8,11 @@ public partial class MainMenuUI : UIWindow
 {
 	#region Variables
 	[Export] public Button newGameButton;
+	[Export] public Button loadGameButton;
 	[Export] public Button quickPlayButton;
 	[Export] public Button quitButton;
 	[Export] public UIWindow gameSettingsMenu;
-	[Export] public UIWindow gameSavesWindow;
+	[Export] public GameSaveUI gameSavesWindow;
 	#endregion
 	
 	#region Functions
@@ -23,9 +24,11 @@ public partial class MainMenuUI : UIWindow
 	{
 		base._EnterTree();
 		newGameButton.Pressed += NewGameButtonOnPressed;
+		loadGameButton.Pressed += LoadGameButtonOnPressed;
 		quickPlayButton.Pressed += QuickPlayButtonOnPressed;
 		quitButton.Pressed += QuitButtonOnPressed;
 	}
+
 
 
 
@@ -43,21 +46,21 @@ public partial class MainMenuUI : UIWindow
 		return Task.CompletedTask;
 	}
 
+	private void LoadGameButtonOnPressed()
+	{
+		gameSavesWindow.Toggle();
+	}
 	
 	private void QuickPlayButtonOnPressed()
 	{
-		GD.Print("Quick Play");
-		GameManager.Instance.SetCurrentSaveName("quickplay_internal");
-		GameManager.Instance.mapSize = new Vector2I(GD.RandRange(1,3), GD.RandRange(1,3));
+		SavesManager.Instance.currentSavename = "quickplay_internal";
+		GameManager.Instance.mapSize = new Vector2I(GD.RandRange(2,3), GD.RandRange(2,3));
 		GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), GD.RandRange(2,5));
 		
-		GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene, null, false);
+		GameManager.Instance.TryChangeScene(GameManager.GameScene.BattleScene, false);
 	}
-
-	private void Test()
-	{
-		
-	}
+	
+	
 	private void QuitButtonOnPressed()
 	{
 		GetTree().Quit();
@@ -67,8 +70,9 @@ public partial class MainMenuUI : UIWindow
 
 	private void NewGameButtonOnPressed()
 	{
-		gameSavesWindow.Toggle();
+		GameManager.Instance.StartNewGame(GameManager.GameScene.GlobeScene);
 	}
+
 
 	#endregion
 	

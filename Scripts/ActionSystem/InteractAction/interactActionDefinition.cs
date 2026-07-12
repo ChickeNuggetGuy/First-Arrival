@@ -9,10 +9,10 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class interactActionDefinition : ActionDefinition
 {
-	public override Action InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
+	public override ActionBase InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs)
 	{
-		return new InteractAction(parent, startGridCell, targetGridCell,this, costs);
+		return new InteractActionBase(parent, startGridCell, targetGridCell,this, costs);
 	}
 
 	protected override bool OnValidateAndBuildCosts(GridObject gridObject, GridCell startingGridCell, GridCell targetGridCell,

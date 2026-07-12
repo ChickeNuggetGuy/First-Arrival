@@ -7,14 +7,14 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class MoveStepActionDefinition : ActionDefinition
 {
-  public override Action InstantiateAction(
+  public override ActionBase InstantiateAction(
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,
     Godot.Collections.Dictionary<Enums.Stat, int> costs
   )
   {
-    return new MoveStepAction(parent, startGridCell, targetGridCell, this, costs);
+    return new MoveStepActionBase(parent, startGridCell, targetGridCell, this, costs);
   }
 
   protected override bool OnValidateAndBuildCosts(

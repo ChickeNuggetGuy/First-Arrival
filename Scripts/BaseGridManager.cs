@@ -23,7 +23,6 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		GD.Print("AAAAAAAA");
 		CreateGrid();
 		await Task.CompletedTask;
 	}
@@ -50,6 +49,11 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 		return cell;
 	}
 
+	public override void Deinitialize()
+	{
+		return;
+	}
+
 	#region Save/Loading
 
 	public override Dictionary<string, Variant> Save()
@@ -57,9 +61,9 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 		return new Dictionary<string, Variant>();
 	}
 
-	public override void Deinitialize()
+	public override Task Load(Dictionary<string, Variant> data)
 	{
-		return;
+		return Task.CompletedTask;
 	}
 
 	#endregion

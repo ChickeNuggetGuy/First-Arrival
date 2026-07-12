@@ -7,11 +7,11 @@ using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public partial class RangedAttackAction : Action, IItemAction
+public partial class RangedAttackActionBase : ActionBase, IItemAction
 {
 	public Item Item { get; set; }
 
-	public RangedAttackAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
+	public RangedAttackActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
 		ActionDefinition parentAction,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs) : base(parentGridObject, startingGridCell, targetGridCell, parentAction,
 		costs)

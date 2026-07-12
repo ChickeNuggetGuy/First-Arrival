@@ -1185,19 +1185,18 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		};
 	}
 
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		base.Load(data);
 		if (!HasLoadedData)
-			return;
+			return Task.CompletedTask;
 
 		if (!generateTerrainMesh)
-			return;
+			return Task.CompletedTask;
 
 		if (data == null || !data.ContainsKey("Heights"))
 		{
 			HasLoadedData = false;
-			return;
+			return Task.CompletedTask;
 		}
 
 		int width = data["GridWidth"].As<int>();
@@ -1229,6 +1228,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		}
 
 		GD.Print("MeshTerrainGenerator: Terrain heightmap loaded successfully.");
+		return Task.CompletedTask;
 	}
 
 	#endregion

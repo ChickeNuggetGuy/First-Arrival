@@ -4,34 +4,34 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public abstract partial class Action
+public abstract partial class ActionBase
 {
   protected GridObject parentGridObject;
   protected GridCell startingGridCell;
   protected GridCell targetGridCell;
   protected ActionDefinition parentActionDefinition;
-  public Action NextAction {get; protected set;}
+  public ActionBase NextActionBase {get; protected set;}
 
   protected Godot.Collections.Dictionary<Enums.Stat, int> costs = new();
-  public Action Parent { get; private set; } = null;
+  public ActionBase Parent { get; private set; } = null;
   private bool costsDeducted = false;
 
-  protected void SetParent(Action parent) => Parent = parent;
+  protected void SetParent(ActionBase parent) => Parent = parent;
 
-  protected void AddSubAction(Action child)
+  protected void AddSubAction(ActionBase child)
   {
     if (child == null) return;
     child.SetParent(this);
     if (this is ICompositeAction composite)
     {
-      composite.SubActions ??= new List<Action>();
+      composite.SubActions ??= new List<ActionBase>();
       composite.SubActions.Add(child);
     }
   }
 
-  public Action() { }
+  public ActionBase() { }
 
-  public Action(
+  public ActionBase(
     GridObject parentGridObject,
     GridCell startingGridCell,
     GridCell targetGridCell,
@@ -52,7 +52,7 @@ public abstract partial class Action
   {
     if (this is ICompositeAction compositeAction)
     {
-      compositeAction.SubActions ??= new List<Action>();
+      compositeAction.SubActions ??= new List<ActionBase>();
       compositeAction.SubActions.Clear();
     }
     await Setup();
@@ -119,5 +119,5 @@ public abstract partial class Action
   protected abstract Task ActionComplete();
   
   
-  public void SetNextAction(Action nextAction) => NextAction = nextAction;
+  public void SetNextAction(ActionBase nextActionBase) => NextActionBase = nextActionBase;
 }

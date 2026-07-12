@@ -31,6 +31,12 @@ public partial class GridObjectStat : GridObjectNode
 	[Signal] public delegate void CurrentValueMinEventHandler(int value, GridObject gridObject);
 	[Signal] public delegate void CurrentValueMaxEventHandler(int value, GridObject gridObject);
 
+	
+	public GridObjectStat()
+	{
+		Stat = Enums.Stat.None;
+		CurrentValue = 0;
+	}
 	public GridObjectStat(Enums.Stat statType, float currentValue, int minValue, int maxValue)
 	{
 		Stat = statType;

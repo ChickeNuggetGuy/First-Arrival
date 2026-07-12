@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.Utility;
 using Godot.Collections;
 
 public partial class UnitsPanelUI : UIWindow
@@ -27,7 +28,7 @@ public partial class UnitsPanelUI : UIWindow
 
 	protected override Task _Setup()
 	{
-		if (hireButton != null)
+		if (hireButton != null )
 		{
 			hireButton.Pressed += HireButtonOnPressed;
 		}
@@ -39,17 +40,36 @@ public partial class UnitsPanelUI : UIWindow
 		return base._Setup();
 	}
 
+	public override void _ExitTree()
+	{
+		if (hireButton != null )
+		{
+			hireButton.Pressed -= HireButtonOnPressed;
+		}
+		
+		if (fireButton != null)
+		{
+			fireButton.Pressed -= FireButtonOnPressed;
+		}
+		base._ExitTree();
+	}
+
 	private void FireButtonOnPressed()
 	{
-		throw new NotImplementedException();
 	}
 
 	private void HireButtonOnPressed()
 	{
+		if (CurrentBase == null) return;
+
 		GridObject newUnit = unitScene.Instantiate<GridObject>();
-		GD.Print(newUnit.Name);
+		
 		CurrentBase.TryAddStationedGridObject(newUnit);
+    
+		// Refresh UI
 		ContstructUnitList();
+    
+		GD.Print($"Hired {newUnit.Name}. Total units in manager: {CurrentBase.GetStationedGridObjects().Count}");
 	}
 
 	protected override void _Show()
@@ -82,4 +102,5 @@ public partial class UnitsPanelUI : UIWindow
 		
 		unitItemList.AddItem(gridObject.Name, unitIcon );
 	}
+	
 }

@@ -7,14 +7,14 @@ public partial class RotateActionDefinition : ActionDefinition
 {
 	public RotateActionDefinition() { }
 
-	public override Action InstantiateAction(
+	public override ActionBase InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,
 		GridCell targetGridCell,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 	{
-		return new RotateAction(
+		return new RotateActionBase(
 			parent,
 			startGridCell,
 			targetGridCell,

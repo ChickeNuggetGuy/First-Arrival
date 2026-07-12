@@ -8,15 +8,15 @@ using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
+public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItemAction
 {
 	public Item Item { get; set; }
-	public Action ParentAction { get; set; }
-	public List<Action> SubActions { get; set; }
+	public ActionBase ParentActionBase { get; set; }
+	public List<ActionBase> SubActions { get; set; }
 
 	public List<GridCell> path = new List<GridCell>();
 
-	public MeleeAttackAction(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
+	public MeleeAttackActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
 		ActionDefinition parentAction,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs) :
 		base(parentGridObject, startingGridCell, targetGridCell, parentAction,
@@ -26,7 +26,7 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 
 	protected override async Task Setup()
 	{
-		ParentAction = this;
+		ParentActionBase = this;
 
 
 		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, true, false, out var neighbors))
@@ -66,10 +66,10 @@ public partial class MeleeAttackAction : Action, ICompositeAction, IItemAction
 			return;
 		}
 
-		MoveAction moveAction = moveActionDefinition.InstantiateAction(parentGridObject,
+		MoveActionBase moveActionBase = moveActionDefinition.InstantiateAction(parentGridObject,
 			startingGridCell, moveDestination, 
-			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveAction;
-		AddSubAction(moveAction);
+			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveActionBase;
+		AddSubAction(moveActionBase);
 	}
 
 	protected override async Task Execute()

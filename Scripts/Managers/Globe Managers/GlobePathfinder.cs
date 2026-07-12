@@ -24,18 +24,18 @@ public partial class GlobePathfinder : Manager<GlobePathfinder>
 	protected override async Task _Setup(bool loadingData)
 	{
 		_gridManager = GlobeHexGridManager.Instance;
-		
-		if (!_gridManager.SetupComplete)
-			await ToSignal(_gridManager, "SetupCompleted");
-
-		GenerateNeighborMap();
-		
 		SetupComplete = true;
 		EmitSignal(SignalName.SetupCompleted);
+		await Task.CompletedTask;
 	}
 
 	protected override async Task _Execute(bool loadingData)
 	{
+		if (!_gridManager.SetupComplete)
+			await ToSignal(_gridManager, SignalName.SetupCompleted);
+
+		GenerateNeighborMap();
+
 		ExecuteComplete = true;
 		EmitSignal(SignalName.ExecuteCompleted);
 		await Task.CompletedTask;
@@ -47,7 +47,11 @@ public partial class GlobePathfinder : Manager<GlobePathfinder>
 		return;
 	}
 	public override Godot.Collections.Dictionary<string, Variant> Save() => new();
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data) { }
+
+	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
+	{
+		return Task.CompletedTask;
+	}
 
 	#endregion
 

@@ -9,30 +9,42 @@ using Godot.Collections;
 [GlobalClass]
 public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 {
-	[Export] private PackedScene baseScene;
-	[Export] private Node baseContainer;
+	private PackedScene baseScene;
+	private Node baseContainer;
 	
-	[Export] public PackedScene shipScene;
-	[Export] public Node shipContainer;
+	public PackedScene shipScene;
+	public Node shipContainer;
 	
 	public bool buildBaseMode = false;
 	public bool buyCraftMode = false;
 	private bool _sendCraftMode = false;
 	
 
+	[Export] public bool overridePreviousInstance = false; 
 	[Export] private Enums.UnitTeam teamsConfig = Enums.UnitTeam.None;
 	
 	[Export(PropertyHint.ResourceType,"Craft")] private Craft testCraft;
 	
 
-	private System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder> teamData = 
-		new System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
+	[Export]private Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder> teamData = 
+		new Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
 	
 	public override string GetManagerName() => "GlobeTeamManager";
-	
+
+
+	public override void _Ready()
+	{
+		baseScene = ResourceLoader.Load<PackedScene>("res://Scenes/base.tscn");
+		shipScene =  ResourceLoader.Load<PackedScene>("res://Scenes/ship.tscn");
+		testCraft = ResourceLoader.Load<Craft>("res://Data/Items/Troop_Transport_Item.tres");
+		teamsConfig = Enums.UnitTeam.Player | Enums.UnitTeam.Enemy;
+		ShouldExecuteOnlyOnce = true;
+		base._Ready();
+	}
+
 	protected override async Task _Setup(bool loadingData)
 	{
-		teamData ??= new System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
+		teamData ??= new Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
 		
 		// Only run default setup if we aren't loading existing data.
 		if (loadingData && teamData.Count != 0) return;
@@ -204,9 +216,8 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		return new Godot.Collections.Dictionary<string, Variant> { ["teamData"] = teamHolderData };
 	}
 
-	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
+	public override async Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		base.Load(data);
 		if (!HasLoadedData) return;
 
 		Godot.Collections.Dictionary<string, Variant> teamsDict = null;
@@ -220,7 +231,6 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		{
 			foreach (var kvp in teamsDict)
 			{
-				// FIX: Now this will work because we're saving as int
 				if (!int.TryParse(kvp.Key, out int teamInt))
 				{
 					GD.PrintErr($"Failed to parse team key: {kvp.Key}");
@@ -238,7 +248,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 					teamData.Add(teamType, newTeam);
 				}
 
-				teamData[teamType].Load(specificTeamSaveData);
+				await teamData[teamType].LoadAsync(specificTeamSaveData, shipContainer ?? this);
 			}
 		}
 		else
@@ -379,7 +389,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		if(label != null) label.Text = name;
 	}
 
-	public System.Collections.Generic.Dictionary<Enums.UnitTeam, GlobeTeamHolder> GetAllTeamData() => teamData;
+	public Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder> GetAllTeamData() => teamData;
 
 	public GlobeTeamHolder GetTeamData(Enums.UnitTeam team) => teamData.GetValueOrDefault(team, null);
 	

@@ -6,7 +6,7 @@ using FirstArrival.Scripts.Utility;
 
 public interface ICompositeAction
 {
-	public Action ParentAction { get; set; }
-	public List<Action> SubActions { get; set; }
+	public ActionBase ParentActionBase { get; set; }
+	public List<ActionBase> SubActions { get; set; }
 	
 }

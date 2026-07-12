@@ -24,14 +24,14 @@ public abstract partial class ActionDefinition : Resource
     bool executeAfterCreation = true
   )
   {
-    Action action = InstantiateAction(parent, startGridCell, targetGridCell, costs);
+    ActionBase actionBase = InstantiateAction(parent, startGridCell, targetGridCell, costs);
     if (executeAfterCreation)
     {
-      await action.ExecuteCall();
+      await actionBase.ExecuteCall();
     }
   }
 
-  public abstract Action InstantiateAction(
+  public abstract ActionBase InstantiateAction(
     GridObject parent,
     GridCell startGridCell,
     GridCell targetGridCell,

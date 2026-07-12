@@ -11,7 +11,9 @@ public partial class UIManager : Manager<UIManager>
 	[Export] public bool BlockingInput { get; private set; } = false;
 	public UIWindow CurrentWindow { get; private set; }
 	[Export] private Control uiHolder;
-	[Export] private LoadingSCcreenUI loadingSCcreenUI;
+	[Export] private LoadingScreenUI loadingSCcreenUI;
+	
+	
 	#region Functions
 
 	public void ShowLoadingScreen()
@@ -31,6 +33,7 @@ public partial class UIManager : Manager<UIManager>
 	/// <param name="loadingData"></param>
 	protected override async Task _Setup(bool loadingData)
 	{
+		_windows.Clear();
 		foreach (var child in uiHolder.GetChildren())
 		{
 			if (child is UIWindow window)
@@ -48,7 +51,11 @@ public partial class UIManager : Manager<UIManager>
 	/// <param name="loadingData"></param>
 	protected override async Task _Execute(bool loadingData)
 	{
-		if (_windows.Count == 0) return;
+		if (_windows.Count == 0)
+		{
+			GD.Print("No UI windows found");
+			return;
+		}
 
 		foreach (var window in _windows)
 		{
@@ -87,10 +94,10 @@ public partial class UIManager : Manager<UIManager>
 	}
 	
 	#region manager Data
-	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		base.Load(data);
-		if(!HasLoadedData) return;
+		if(!HasLoadedData)  return Task.CompletedTask;
+		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()

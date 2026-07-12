@@ -9,9 +9,17 @@ public partial class MainBaseUI : UIWindow
 	[Export] private Button _unitDetailsButton;
 	[Export] private UnitsPanelUI _unitsPanelUi;
 
+	private TeamBaseCellDefinition CurrentBase
+	{
+		get
+		{
+			return GameManager.Instance.currentBase;
+		}
+	}
+	
 	protected override async Task _Setup()
 	{
-		base._Setup();
+		await base._Setup();
 
 		if (_returnToGlobeButton != null)
 		{
@@ -20,20 +28,24 @@ public partial class MainBaseUI : UIWindow
 		
 		if (_unitDetailsButton != null)
 		{
-			_unitDetailsButton.Pressed += UnitDetailsButtonOnPressed  ;
+			_unitDetailsButton.Pressed += UnitDetailsButtonOnPressed;
 		}
 	}
 
-	private void UnitDetailsButtonOnPressed()
+	private async void UnitDetailsButtonOnPressed()
 	{
-		if (_unitsPanelUi != null)
+		try
 		{
-			_unitsPanelUi.Toggle();
+			await _unitsPanelUi.Toggle();
+		}
+		catch (Exception e)
+		{
+			GD.PrintErr($"Failed to toggle Units Panel: {e.Message}\n{e.StackTrace}");
 		}
 	}
 
-	private void ReturnToGlobeButtonOnPressed()
+	private async void ReturnToGlobeButtonOnPressed()
 	{
-		GameManager.ReturnToGlobe();
+		await GameManager.Instance.ReturnToGlobe();
 	}
 }

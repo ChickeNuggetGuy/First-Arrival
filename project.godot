@@ -18,6 +18,8 @@ config/icon="res://icon.svg"
 [autoload]
 
 PhantomCameraManager="*uid://duq6jhf6unyis"
+GameManager="*uid://dr5vsk7v685hc"
+SavesManager="*uid://c8ng3y8sls6ck"
 
 [debug_draw_3d]
 
@@ -57,6 +59,7 @@ item_db_last_path="res://Data/InventorySystem/ItemsDatabase.tres"
 GridObjects=""
 GridCellOverride=""
 Persist=""
+Manager=""
 
 [input]
 

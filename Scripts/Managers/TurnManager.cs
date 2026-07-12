@@ -158,8 +158,7 @@ public partial class TurnManager : Manager<TurnManager>
 
 	public override void _Process(double delta)
 	{
-		base._Process(delta);
-
+		if(!ExecuteComplete) return;
 
 		if (!IsBusy)
 		{
@@ -178,10 +177,10 @@ public partial class TurnManager : Manager<TurnManager>
 
 	#region Manager Data
 
-	public override void Load(Godot.Collections.Dictionary<string,Variant> data)
+	public override Task Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		base.Load(data);
-		if(!HasLoadedData) return;
+		if(!HasLoadedData)  return Task.CompletedTask;
+		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()

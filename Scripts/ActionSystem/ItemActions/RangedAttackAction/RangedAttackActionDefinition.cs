@@ -16,14 +16,14 @@ public partial class RangedAttackActionDefinition
 	[Export] public int damage;
 	[Export] public Godot.Collections.Dictionary<Enums.Stat, int> damagingStats = new();
 	
-	public override Action InstantiateAction(
+	public override ActionBase InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,
 		GridCell targetGridCell,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs
 	)
 	{
-		return new RangedAttackAction(parent, startGridCell, targetGridCell, this, costs)
+		return new RangedAttackActionBase(parent, startGridCell, targetGridCell, this, costs)
 		{
 			Item = Item
 		};
