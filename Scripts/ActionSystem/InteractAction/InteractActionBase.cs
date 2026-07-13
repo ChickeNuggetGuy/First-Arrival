@@ -37,7 +37,7 @@ public partial class InteractActionBase : ActionBase, ICompositeAction
 
 		if (isAdjacent)
 		{
-			// No move needed.
+			AddRotateSubActionIfNeeded(startingGridCell, targetGridCell);
 			return;
 		}
 		
@@ -64,6 +64,7 @@ public partial class InteractActionBase : ActionBase, ICompositeAction
 			startingGridCell, moveDestination, 
 			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveActionBase;
 		AddSubAction(moveActionBase);
+		AddRotateSubActionIfNeeded(moveDestination, targetGridCell, force: true);
 	}
 
 	protected override async Task Execute()

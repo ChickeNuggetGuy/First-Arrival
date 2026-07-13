@@ -42,7 +42,7 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 
 		if (isAdjacent)
 		{
-			// No move needed.
+			AddRotateSubActionIfNeeded(startingGridCell, targetGridCell);
 			return;
 		}
 
@@ -70,6 +70,10 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 			startingGridCell, moveDestination, 
 			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveActionBase;
 		AddSubAction(moveActionBase);
+
+		// This runs after movement, so force the final face-target rotation even
+		// when the unit happened to face the target before it started moving.
+		AddRotateSubActionIfNeeded(moveDestination, targetGridCell, force: true);
 	}
 
 	protected override async Task Execute()

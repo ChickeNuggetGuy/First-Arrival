@@ -17,6 +17,7 @@ public partial class GridObjectTeamHolder : Node
 
     [Export] public PackedScene unitPrefab;
     public int VisibilityMinX { get; private set; }
+    public int VisibilityMinY { get; private set; }
     public int VisibilityMinZ { get; private set; }
     public int VisibilityWidth { get; private set; }
     public int VisibilityHeight { get; private set; } 
@@ -136,6 +137,7 @@ public partial class GridObjectTeamHolder : Node
         int maxY = allCells.Max(c => c.GridCoordinates.Y);
 
         VisibilityMinX = minX;
+        VisibilityMinY = minY;
         VisibilityMinZ = minZ;
         VisibilityWidth = maxX - minX + 1;
         VisibilityHeight = maxZ - minZ + 1; 
@@ -221,10 +223,14 @@ public partial class GridObjectTeamHolder : Node
 
     public void UpdateGridObjects(ActionDefinition actionCompleted, ActionDefinition currentAction)
     {
-        if (CurrentGridObject != null && CurrentGridObject.IsInitialized)
+        GridObject sightSource = actionCompleted?.parentGridObject ?? CurrentGridObject;
+        if (sightSource != null && sightSource.IsInitialized)
         {
-            if (CurrentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sight))
-                sight.CalculateSightArea();
+            if (sightSource.TryGetGridObjectNode<GridObjectSight>(out var sight))
+            {
+                sight.MarkDirty();
+                sight.EnsureUpToDate();
+            }
         }
         UpdateVisibility();
     }

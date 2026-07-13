@@ -71,7 +71,6 @@ public partial class GameManager : Manager<GameManager>
 
 	private async Task InitialBootSequence()
 	{
-		// Yielding ensures GetTree().CurrentScene is populated for the Autoload's first run
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 		GatherManagersInCurrentScene();
 		await SetupAndExecuteSequence(false);
@@ -170,6 +169,14 @@ public partial class GameManager : Manager<GameManager>
 
 		GatherManagersInCurrentScene();
 		await SetupAndExecuteSequence(loadingData);
+
+		// SetupAndExecuteSequence may call GameManager.Load() with a state snapshot that
+		// was captured BEFORE this transition started (see TryChangeScene's
+		// saveManagerData:false branch, which packages full state pre-transition). That
+		// snapshot's "currentScene" reflects the OLD scene, so it can clobber the
+		// assignment above. The scene we were actually asked to switch to is always the
+		// source of truth here, so re-assert it.
+		currentScene = scene;
 	}
 
 	public void RegisterGlobalManager(ManagerBase manager)
@@ -331,7 +338,11 @@ public partial class GameManager : Manager<GameManager>
 				{
 					if (currentMission != null)
 					{
-						currentMission.missionStatus = kvp.Key == Enums.UnitTeam.Player
+						// Preserve the visit flag recorded when the battle began, while
+						// replacing the temporary OnRoute flag with the final outcome.
+						currentMission.missionStatus &= ~Enums.MissionStatus.OnRoute;
+						currentMission.missionStatus |= Enums.MissionStatus.Visited;
+						currentMission.missionStatus |= kvp.Key == Enums.UnitTeam.Player
 							? Enums.MissionStatus.Failed
 							: Enums.MissionStatus.Successful;
 					}
@@ -360,9 +371,8 @@ public partial class GameManager : Manager<GameManager>
 		var globeData = SavesManager.Instance.ConsumeSceneState("GlobeState");
 		if (globeData == null) return;
 
-		int missionCellIndex = currentMission?.cellIndex ?? -1;
-		if (missionCellIndex >= 0)
-			RemoveMissionFromSavedData(globeData, missionCellIndex);
+		if (currentMission != null)
+			UpdateMissionStatusInSavedData(globeData, currentMission);
 
 		SavesManager.PendingSaveData = globeData;
 		SavesManager.LoadFromAutosave = false;
@@ -383,7 +393,10 @@ public partial class GameManager : Manager<GameManager>
 		await ChangeSceneAsync(GameScene.GlobeScene, true);
 	}
 
-	private static void RemoveMissionFromSavedData(Godot.Collections.Dictionary<string, Variant> root, int cellIndex)
+	private static void UpdateMissionStatusInSavedData(
+		Godot.Collections.Dictionary<string, Variant> root,
+		MissionCellDefinition mission
+	)
 	{
 		if (!root.TryGetValue("managers", out var m)) return;
 		var managers = m.AsGodotDictionary<string, Variant>();
@@ -391,7 +404,10 @@ public partial class GameManager : Manager<GameManager>
 		var missionData = mm.AsGodotDictionary<string, Variant>();
 		if (!missionData.TryGetValue("activeMissions", out var am)) return;
 		var missions = am.AsGodotDictionary<string, Variant>();
-		missions.Remove(cellIndex.ToString());
+		if (!missions.TryGetValue(mission.cellIndex.ToString(), out var savedMission)) return;
+
+		var savedMissionData = savedMission.AsGodotDictionary<string, Variant>();
+		savedMissionData["missionStatus"] = (int)mission.missionStatus;
 	}
 
 	#endregion

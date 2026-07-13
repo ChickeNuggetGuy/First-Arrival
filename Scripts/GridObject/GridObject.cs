@@ -9,7 +9,7 @@ using Godot;
 using Godot.Collections;
 
 [GlobalClass]
-public partial class GridObject : Node3D, IContextUser<GridObject>
+public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 {
 	public GridObject parent
 	{
@@ -28,7 +28,7 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 	[Export] public BoneAttachment3D LeftHandBoneAttachment;
 	[Export] public BoneAttachment3D RightHandBoneAttachment;
 	public GridObjectTeamHolder TeamHolder { get; protected set; }
-	[Export] public Array<GridObjectNode> gridObjectNodes = new Array<GridObjectNode>();
+	[Export] private Array<GridObjectNode> gridObjectNodes = new();
 
 	[Export] public Enums.GridObjectSettings gridObjectSettings = Enums.GridObjectSettings.None;
 
@@ -108,14 +108,14 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 
 	private void InitializeGridObjectNodes()
 	{
-		Array<GridObjectNode> gridObjectNodesArray = new Array<GridObjectNode>() { };
 		if (GridObjectNodeHolder == null)
 		{
-			Node gridObjectNode = new Node();
-			gridObjectNode.Name = "Grid Object Node Holder";
-			AddChild(gridObjectNode);
+			GridObjectNodeHolder = new Node3D();
+			GridObjectNodeHolder.Name = "GridObjectNodeHolder";
+			AddChild(GridObjectNodeHolder);
 		}
-		else if (gridObjectNodes.Count == 0)
+
+		if (gridObjectNodes == null || gridObjectNodes.Count == 0)
 		{
 			if (!this.TryGetAllComponentsInChildrenRecursive(out List<GridObjectNode> gridObjectNodesList))
 			{
@@ -123,18 +123,23 @@ public partial class GridObject : Node3D, IContextUser<GridObject>
 			}
 			else
 			{
+				gridObjectNodes = new Array<GridObjectNode>();
 				foreach (var node in gridObjectNodesList)
 				{
 					if (node == null) continue;
-					gridObjectNodesArray.Add(node);
-					node.SetupCall(this);
+					gridObjectNodes.Add(node);
 				}
 			}
 		}
 
-		this.gridObjectNodes = gridObjectNodesArray;
+		foreach (var node in gridObjectNodes)
+		{
+			if (node == null) continue;
+			node.SetupCall(this);
+		}
 	}
-
+	
+	
 	public System.Collections.Generic.Dictionary<String, Callable> GetContextActions()
 	{
 		System.Collections.Generic.Dictionary<String, Callable> actions = new();

@@ -7,11 +7,20 @@ public partial class OrbitalCamera : Node3D
 	public static OrbitalCamera Instance;
     [ExportGroup("Settings")]
     [Export] public float MouseSensitivity = 0.3f;
-    [Export] public float KeySensitivity = 2.0f; // Speed for keyboard rotation
+    [Export] public float KeySensitivity = 2.0f;
     [Export] public bool InvertY = false;
     [Export] public float ScrollSpeed = 2.0f;
     [Export] public bool UseSmoothing = true;
     [Export] public float SmoothSpeed = 10.0f;
+
+    [ExportGroup("Panning")]
+    [Export] public float PanSpeed = 90.0f;
+    [Export(PropertyHint.Range, "0, 2, 0.01")] public float MinZoomPanSpeedMultiplier = 0.5f;
+    [Export(PropertyHint.Range, "0, 2, 0.01")] public float MaxZoomPanSpeedMultiplier = 1.0f;
+
+    [ExportGroup("Auto Orbit")]
+    [Export] public bool AutoOrbit = false;
+    [Export] public float AutoOrbitSpeed = 8.0f;
 
     [ExportGroup("Limits")]
     [Export] public float MinPitch = -89.0f; // Prevent looking straight up/flipping
@@ -43,7 +52,13 @@ public partial class OrbitalCamera : Node3D
         // Initialize values based on current editor transform
         _yaw = RotationDegrees.Y;
         _pitch = RotationDegrees.X;
-        _targetDistance = _camera.Position.Z;
+        _targetDistance = Mathf.Clamp(_camera.Position.Z, MinZoom, MaxZoom);
+
+        // Apply the limit immediately so smoothing cannot leave the camera
+        // inside the orbited object during the first frames of the scene.
+        Vector3 initialCameraPosition = _camera.Position;
+        initialCameraPosition.Z = _targetDistance;
+        _camera.Position = initialCameraPosition;
         Instance = this;
     }
 
@@ -104,6 +119,35 @@ public partial class OrbitalCamera : Node3D
             else _pitch += pitchChange; // Looks up when pressing up
 
             ClampPitch();
+        }
+
+        // Explicit WASD controls let the globe be panned without requiring
+        // custom Input Map actions. Movement speeds up as the camera zooms out.
+        float panHorizontal = (Input.IsKeyPressed(Key.D) ? 1.0f : 0.0f) -
+                              (Input.IsKeyPressed(Key.A) ? 1.0f : 0.0f);
+        float panVertical = (Input.IsKeyPressed(Key.S) ? 1.0f : 0.0f) -
+                            (Input.IsKeyPressed(Key.W) ? 1.0f : 0.0f);
+
+        if (!Mathf.IsZeroApprox(panHorizontal) || !Mathf.IsZeroApprox(panVertical))
+        {
+            float zoomRange = MaxZoom - MinZoom;
+            float zoomT = Mathf.IsZeroApprox(zoomRange)
+                ? 0.0f
+                : Mathf.Clamp((_targetDistance - MinZoom) / zoomRange, 0.0f, 1.0f);
+            float zoomAdjustedPanSpeed = PanSpeed * Mathf.Lerp(
+                MinZoomPanSpeedMultiplier,
+                MaxZoomPanSpeedMultiplier,
+                zoomT);
+
+            Vector2 panInput = new Vector2(panHorizontal, panVertical).Normalized();
+            _yaw += panInput.X * zoomAdjustedPanSpeed * delta;
+            _pitch += panInput.Y * zoomAdjustedPanSpeed * delta;
+            ClampPitch();
+        }
+
+        if (AutoOrbit)
+        {
+            _yaw += AutoOrbitSpeed * delta;
         }
     }
 

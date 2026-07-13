@@ -1,5 +1,4 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
@@ -58,6 +57,22 @@ public partial class GridCell
         return (gridObjects != null && gridObjects.Count > 0);
     }
 
+    // GridCellStateOverride instances are map metadata. They can set a cell's
+    // state (including Obstructed), but must not by themselves consume a spawn
+    // slot. Real GridObjects, including walk-through units, still block spawns.
+    public bool HasSpawnBlockingGridObject()
+    {
+        if (gridObjects == null) return false;
+
+        foreach (var gridObject in gridObjects)
+        {
+            if (gridObject is not GridCellStateOverride)
+                return true;
+        }
+
+        return false;
+    }
+
     public void SetFogState(Enums.FogState state)
     {
         this.fogState = state;
@@ -66,47 +81,19 @@ public partial class GridCell
 
     public void UpdateGridObjectVisibility()
     {
-	    if (HasGridObject())
-	    {
-		    switch (this.fogState)
-		    {
-			    case Enums.FogState.Unseen:
-				    foreach (var gridObject in gridObjects)
-				    {
-					    if (gridObject.scenery || gridObject.Team == Enums.UnitTeam.Player)
-					    {
-						    continue;
-					    }
+        if (!HasGridObject())
+            return;
 
-					    gridObject.Hide();
-				    }
-				    break;
-			    case Enums.FogState.PreviouslySeen:
-				    foreach (var gridObject in gridObjects)
-				    {
-					    if (gridObject.scenery || gridObject.Team == Enums.UnitTeam.Player)
-					    {
-						    continue;
-					    }
+        foreach (var gridObject in gridObjects)
+        {
+            if (gridObject == null || gridObject.GridPositionData?.AnchorCell != this)
+                continue;
 
-					    gridObject.Show();
-				    }
-				    break;
-			    case Enums.FogState.Visible:
-				    foreach (var gridObject in gridObjects)
-				    {
-					    if (gridObject.scenery || gridObject.Team == Enums.UnitTeam.Player)
-					    {
-						    continue;
-					    }
-
-					    gridObject.Show();
-				    }
-				    break;
-			    default:
-				    throw new ArgumentOutOfRangeException();
-		    }
-	    }
+            if (fogState == Enums.FogState.Visible)
+                gridObject.Show();
+            else
+                gridObject.Hide();
+        }
     }
 
     public void SetUnitSpawnState(Enums.UnitTeam state)

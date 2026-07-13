@@ -11,9 +11,12 @@ public partial class GlobeTeamHolder : Node
 	public List<TeamBaseCellDefinition> Bases = new List<TeamBaseCellDefinition>();
 	
 	public Craft SelectedCraft { get; protected set; }
+	
+	public int monthlyScore {get; private set;}
 	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, int currentFunds);
 	[Signal] public delegate void BaseAddedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
 	[Signal] public delegate void BaseRemovedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
+	[Signal] public delegate void MonthlyScoreChangedEventHandler(int score);
 	
 	public GlobeTeamHolder(Enums.UnitTeam affiliation, List<TeamBaseCellDefinition> bases, int startingFunds = 1000000)
 	{
@@ -34,6 +37,26 @@ public partial class GlobeTeamHolder : Node
 		EmitSignal(SignalName.FundsChanged, this, funds);
 		return true;
 	}
+
+
+	public void AddMonthlyScore(int amount)
+	{
+		monthlyScore += amount;
+		EmitSignal(SignalName.MonthlyScoreChanged, monthlyScore);
+	}
+
+	public void RemoveMonthlyScore(int amount)
+	{
+		monthlyScore -= amount;
+		EmitSignal(SignalName.MonthlyScoreChanged, monthlyScore);
+	}
+
+	public void SetMonthlyScore(int amount)
+	{
+		monthlyScore = amount;
+		EmitSignal(SignalName.MonthlyScoreChanged, monthlyScore);
+	}
+	
 	
 	public bool TryBuildBase( HexCellData cell, int baseIndex,  int cost)
 	{

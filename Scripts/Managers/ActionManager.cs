@@ -54,7 +54,7 @@ public partial class ActionManager : Manager<ActionManager>
 	{
 		if (IsBusy) return;
 		if (TurnManager.Instance.CurrentTurn.team != Enums.UnitTeam.Player) return;
-		if (InputManager.Instance.MouseOverUI) return;
+		if (BattleInputManager.Instance.MouseOverUI) return;
 
 		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
 		{
@@ -66,7 +66,7 @@ public partial class ActionManager : Manager<ActionManager>
 				return;
 			}
 
-			GridCell currentGridCell = InputManager.Instance.currentGridCell;
+			GridCell currentGridCell = BattleInputManager.Instance.currentGridCell;
 			if (currentGridCell == null)
 			{
 				return;

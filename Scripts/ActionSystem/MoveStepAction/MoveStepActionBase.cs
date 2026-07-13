@@ -32,12 +32,10 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
   {
     ParentActionBase = this;
 
-    // Use actual transform-facing, not cached direction state
-    Enums.Direction currentDirection =
-	    RotationHelperFunctions.GetDirectionFromRotation3D(
-		    parentGridObject.Rotation.Y
-	    );
-	targetDirection =
+    // Direction is the authoritative gameplay state; rotations are applied to
+    // visualMesh, not necessarily to the GridObject transform.
+    Enums.Direction currentDirection = parentGridObject.GridPositionData.Direction;
+    targetDirection =
       RotationHelperFunctions.GetDirectionBetweenCells(
         startingGridCell,
         targetGridCell

@@ -59,9 +59,7 @@ public partial class MoveActionDefinition : ActionDefinition
   }
 
   // Cost simulation (same logic you already had)
-  var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-	  gridObject.Rotation.Y
-  );
+  var facing = gridObject.GridPositionData.Direction;
 
   for (int i = 0; i < tempPath.Count - 1; i++)
   {

@@ -7,9 +7,11 @@ using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public partial class RangedAttackActionBase : ActionBase, IItemAction
+public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IItemAction
 {
 	public Item Item { get; set; }
+	public ActionBase ParentActionBase { get; set; }
+	public List<ActionBase> SubActions { get; set; }
 
 	public RangedAttackActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
 		ActionDefinition parentAction,
@@ -22,7 +24,9 @@ public partial class RangedAttackActionBase : ActionBase, IItemAction
 
 	protected override async Task Setup()
 	{
-		return;
+		ParentActionBase = this;
+		AddRotateSubActionIfNeeded(startingGridCell, targetGridCell);
+		await Task.CompletedTask;
 	}
 
 	protected override async Task Execute()
@@ -35,54 +39,69 @@ public partial class RangedAttackActionBase : ActionBase, IItemAction
 
 
 		if (!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder parentStatHolder))
-			return;
-
-
-		GridObjectStat rangedAccuracy = parentStatHolder.Stats.First(stat =>
 		{
-			if (stat is not GridObjectStat gridObjectStat) return false;
-			if (gridObjectStat.Stat != Enums.Stat.RangedAccuracy) return false;
-			return true;
-		});
+			GD.PrintErr("RangedAttack: shooter has no GridObjectStatHolder");
+			return;
+		}
 
 		RangedAttackActionDefinition rangedAttackActionDefinition =
 			parentActionDefinition as RangedAttackActionDefinition;
+		if (rangedAttackActionDefinition == null)
+		{
+			GD.PrintErr("RangedAttack: parent action definition is invalid");
+			return;
+		}
+
+		if (!parentStatHolder.TryGetStat(Enums.Stat.RangedAccuracy, out GridObjectStat rangedAccuracy))
+		{
+			GD.PrintErr("RangedAttack: shooter has no RangedAccuracy stat");
+			return;
+		}
+
+		Vector3 origin = parentGridObject.objectCenter?.GlobalPosition
+			?? parentGridObject.GlobalPosition + Vector3.Up;
+		if (parentGridObject.objectCenter == null)
+			GD.PushWarning("RangedAttack: objectCenter is not assigned; using the GridObject origin instead");
+
 		int damage = rangedAttackActionDefinition.damage;
+		GD.Print($"RangedAttack: firing {rangedAttackActionDefinition.attackCount} shot(s) from {origin}");
 
 		for (int i = 0; i < rangedAttackActionDefinition.attackCount; i++)
 		{
 			var visual = new CsgSphere3D { Radius = 0.125f };
 			parentGridObject.GetTree().Root.AddChild(visual);
-			visual.GlobalPosition = parentGridObject.objectCenter.GlobalPosition;
+			visual.GlobalPosition = origin;
 
 			Tween tween = parentGridObject.CreateTween();
 			tween.SetTrans(Tween.TransitionType.Linear);
 			tween.SetEase(Tween.EaseType.InOut);
 
 
-			Vector3 tweenPos = Vector3.Zero;
+			Vector3 tweenPos = origin;
 			float tweenDuration = 0.5f;
 			GridObject targetGridObject = null;
 
 			Vector3 direction =
-				((targetGridCell.WorldCenter + Vector3.Up) - parentGridObject.objectCenter.GlobalPosition).Normalized();
+				((targetGridCell.WorldCenter + Vector3.Up) - origin).Normalized();
 			Vector2 deviationMax = mathUtils.GetMaxDeviation(rangedAccuracy.CurrentValue, 1, true);
 			Vector3 newDirection = CalculateProjectileDirection(direction, deviationMax.X, deviationMax.Y);
 
-			if (RaycastCheck(parentGridObject.objectCenter.GlobalPosition, newDirection, out var results))
+			if (RaycastCheck(origin, newDirection, out var results))
 			{
 				tweenPos = results["position"].As<Vector3>();
 				GD.Print($"Hit {tweenPos}");
 
-				targetGridObject = results["collider"].As<Node>().FindParentByTypeRecursive<GridObject>();
+				Node collider = results["collider"].As<Node>();
+				targetGridObject = collider as GridObject
+					?? collider?.FindParentByTypeRecursive<GridObject>();
 			}
 			else
 			{
-				tweenPos = parentGridObject.objectCenter.Position + newDirection * 25;
+				tweenPos = origin + newDirection * 25;
 			}
 
-			tweenDuration = tweenPos.DistanceTo(parentGridObject.objectCenter.Position) / 100 ;
-			tween.TweenProperty(visual, "position", tweenPos, tweenDuration);
+			tweenDuration = origin.DistanceTo(tweenPos) / 100f;
+			tween.TweenProperty(visual, "global_position", tweenPos, tweenDuration);
 			await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
 			visual.QueueFree();
 
@@ -162,15 +181,7 @@ public partial class RangedAttackActionBase : ActionBase, IItemAction
 		query.CollideWithBodies = true;
 
 
-		if (parentGridObject.collisionShape != null)
-		{
-			query.Exclude = new Godot.Collections.Array<Rid> { parentGridObject.collisionShape.GetRid() };
-		}
-		else
-		{
-			GD.PrintErr("collisionShape is null, raycast exclusion disabled");
-			query.Exclude = new Godot.Collections.Array<Rid>();
-		}
+		query.Exclude = new Godot.Collections.Array<Rid> { parentGridObject.GetRid() };
 
 		result = spaceState.IntersectRay(query);
 

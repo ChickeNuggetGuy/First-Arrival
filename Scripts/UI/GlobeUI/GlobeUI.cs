@@ -13,6 +13,7 @@ public partial class GlobeUI : UIWindow
 	[Export] private Button sendMissionButton;
 	[Export] private Button buyCraftButton;
 	[Export] private SelectCraftUI selectCraftUI;
+	[Export] private Label monthlyScoreLabel;
 	
 	[ExportGroup("Time"), Export] private Label currentDateUI;
 	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
@@ -54,7 +55,9 @@ public partial class GlobeUI : UIWindow
 			}
 
 			currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
+			monthlyScoreLabel.Text = $"Monthly Score: {teamHolder.monthlyScore}";
 			teamHolder.FundsChanged += TeamHolderOnFundsChanged;
+			teamHolder.MonthlyScoreChanged += TeamHolderOnMonthlyScoreChanged;
 			teamHolder.BaseAdded += TeamHolderOnBaseAdded;
 			teamHolder.BaseRemoved += TeamHolderOnBaseRemoved;
 		}
@@ -64,6 +67,11 @@ public partial class GlobeUI : UIWindow
 		}
 		RefreshUI();
 		return base._Setup();
+	}
+
+	private void TeamHolderOnMonthlyScoreChanged(int score)
+	{
+		monthlyScoreLabel.Text = $"Monthly Score: {score}";
 	}
 
 

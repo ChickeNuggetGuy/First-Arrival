@@ -72,9 +72,9 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 
 	public Dictionary<string, Callable> GetContextActions()
 	{
-		if (parentGridUI.InventoryGrid == null)
+		if (parentGridUI == null || parentGridUI.InventoryGrid == null)
 		{
-			GD.Print("ItemSlotUI.GetContextActions(): parentGridUI.inventoryGrid == null");
+			GD.Print("ItemSlotUI.GetContextActions(): parentGridUI or InventoryGrid is null");
 			return null;
 		}
 
@@ -84,6 +84,6 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 			return null;
 		}
 
-		return itemInfo.item.GetContextActions();
+		return itemInfo.item?.GetContextActions();
 	}
 }

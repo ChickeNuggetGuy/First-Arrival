@@ -22,6 +22,19 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	[Export] private int minHeightY = 0;
 	[Export] private int maxHeightY = 6;
 
+	[ExportGroup("Procedural Foothills")]
+	[Export] private int terrainSeed = 0;
+	[Export(PropertyHint.Range, "0.1,4.0,0.1")]
+	private float terrainHeightStep = 0.5f;
+	[Export(PropertyHint.Range, "6,64,1")]
+	private float foothillFeatureSizeCells = 18f;
+	[Export(PropertyHint.Range, "0.5,2.0,0.05")]
+	private float foothillShape = 0.85f;
+	[Export(PropertyHint.Range, "1,32,1")]
+	private int terrainValidationPasses = 12;
+	[Export(PropertyHint.Range, "1,8,1")]
+	private int maxAdjacentHeightSteps = 3;
+
 	[Export] private Enums.ChunkType mapType;
 	[Export] private Material chunkMaterial { get; set; }
 
@@ -129,10 +142,13 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				if (node != null)
 				{
 					float chunkWorldSize = chunkSize * cellSize.X;
+					float chunkBaseHeight = cData.chunkType == ChunkData.ChunkType.ManMade
+						? GetManmadeBaseHeight()
+						: 0f;
 
 					node.Position = new Vector3(
 						chunkX * chunkWorldSize,
-						0f,
+						chunkBaseHeight,
 						chunkZ * chunkWorldSize
 					);
 				}
@@ -157,11 +173,15 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			{
 				await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 
-				BlendHeightsToZeroAroundManmade();
-
-				ValidateHeights(terrainHeights, 1, cellSize.Y * 2f);
+				BlendHeightsToManmadeBaseAroundManmade();
 
 				ClampHeightsToMin(minHeightY, includeManMade: false);
+
+				ValidateHeights(
+					terrainHeights,
+					terrainValidationPasses,
+					GetTerrainHeightStep() * maxAdjacentHeightSteps
+				);
 			}
 
 			for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
@@ -417,11 +437,13 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 		FastNoiseLite noise = new FastNoiseLite
 		{
-			Seed = (int)GD.Randi(),
+			Seed = terrainSeed == 0 ? (int)GD.Randi() : terrainSeed,
 			NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin,
-			Frequency = 1.0f / (80f * cellSize.X),
+			// This is expressed in grid cells, not chunks, so the terrain shape
+			// stays continuous across every chunk boundary.
+			Frequency = 1.0f / (foothillFeatureSizeCells * cellSize.X),
 			FractalType = FastNoiseLite.FractalTypeEnum.Fbm,
-			FractalOctaves = 2, 
+			FractalOctaves = 3,
 			FractalLacunarity = 2.0f,
 			FractalGain = 0.5f
 		};
@@ -457,15 +479,15 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				float y;
 				if (isManmade)
 				{
-					y = 0f;
+					y = GetManmadeBaseHeight();
 					lockedVertices[x, z] = true;
 				}
 				else
 				{
 					float rawNoise = noise.GetNoise2D(worldX, worldZ);
 					float normalized = (rawNoise + 1f) * 0.5f;
-					float shaped = Mathf.Pow(normalized, 1.8f);
-					 y = shaped * maxHeightY * 0.6f;   
+					float shaped = Mathf.Pow(normalized, foothillShape);
+					y = QuantizeHeight(Mathf.Lerp(minHeightY, maxHeightY, shaped));
 				}
 
 				terrainHeights[x, z] = new Vector3(worldX, y, worldZ);
@@ -481,7 +503,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		int vertsX = terrainHeights.GetLength(0);
 		int vertsZ = terrainHeights.GetLength(1);
 
-		float step = cellSize.Y;
+		float step = GetTerrainHeightStep();
 		float minYQuantized = step > 0f ? Mathf.Ceil(minY / step) * step : minY;
 
 		for (int z = 0; z < vertsZ; z++)
@@ -587,191 +609,185 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	{
 		int vertsX = verts.GetLength(0);
 		int vertsZ = verts.GetLength(1);
-		float step = cellSize.Y;
+		QuantizeUnlockedHeights(verts);
 
-		for (int pass = 0; pass < passes; pass++)
+		for (int pass = 0; pass < Mathf.Max(1, passes); pass++)
 		{
-			for (int z = 0; z < vertsZ; z++)
-			{
-				for (int x = 0; x < vertsX; x++)
-				{
-					if (lockedVertices[x, z])
-						continue;
-
-					float h = verts[x, z].Y;
-
-					if (x + 1 < vertsX)
-						h = ClampTowardNeighbor(
-							h,
-							verts[x + 1, z].Y,
-							maxStepHeight,
-							step
-						);
-
-					if (z + 1 < vertsZ)
-						h = ClampTowardNeighbor(
-							h,
-							verts[x, z + 1].Y,
-							maxStepHeight,
-							step
-						);
-
-					if (x - 1 >= 0)
-						h = ClampTowardNeighbor(
-							h,
-							verts[x - 1, z].Y,
-							maxStepHeight,
-							step
-						);
-
-					if (z - 1 >= 0)
-						h = ClampTowardNeighbor(
-							h,
-							verts[x, z - 1].Y,
-							maxStepHeight,
-							step
-						);
-
-					verts[x, z] = new Vector3(verts[x, z].X, h, verts[x, z].Z);
-				}
-			}
-
+			bool changed = false;
 			for (int z = 0; z < vertsZ - 1; z++)
 			{
 				for (int x = 0; x < vertsX - 1; x++)
 				{
-					float bl = verts[x, z].Y;
-					float br = verts[x + 1, z].Y;
-					float tl = verts[x, z + 1].Y;
-					float tr = verts[x + 1, z + 1].Y;
+					if (!IsCellValid(verts, x, z, maxStepHeight))
+						changed |= ResolveCellToValidPattern(verts, x, z, maxStepHeight);
+				}
+			}
 
-					float[] heights = { bl, br, tl, tr };
-					int uniqueCount = heights.Distinct().Count();
+			if (!changed)
+				return;
+		}
 
-					if (uniqueCount <= 1)
-						continue;
-
-					if (uniqueCount >= 3)
-					{
-						FixCellToMajority(verts, x, z, heights);
-						continue;
-					}
-
-					var groups = heights
-						.GroupBy(h => h)
-						.OrderByDescending(g => g.Count())
-						.ToList();
-
-					if (groups[0].Count() == 3)
-					{
-						FixCellToMajority(verts, x, z, heights);
-						continue;
-					}
-
-					bool isSaddle =
-						Mathf.IsEqualApprox(bl, tr)
-						&& Mathf.IsEqualApprox(br, tl)
-						&& !Mathf.IsEqualApprox(bl, br);
-
-					if (isSaddle)
-					{
-						float keep = Mathf.Min(bl, br);
-						SetCellHeight(verts, x, z, keep);
-					}
+		for (int z = 0; z < vertsZ - 1; z++)
+		{
+			for (int x = 0; x < vertsX - 1; x++)
+			{
+				if (!IsCellValid(verts, x, z, maxStepHeight))
+				{
+					GD.PushWarning(
+						"MeshTerrainGenerator: height validation reached its pass limit. "
+						+ "Increase Terrain Validation Passes if an unusually large map still has invalid cells."
+					);
+					return;
 				}
 			}
 		}
 	}
 
-	private float ClampTowardNeighbor(
-		float current,
-		float neighbor,
-		float maxDiff,
-		float quantizeStep
-	)
+	private float QuantizeHeight(float height)
 	{
-		float diff = current - neighbor;
-
-		if (Mathf.Abs(diff) <= maxDiff)
-			return current;
-
-		float clamped = diff > 0 ? neighbor + maxDiff : neighbor - maxDiff;
-
-		if (quantizeStep > 0f)
-			clamped = Mathf.Round(clamped / quantizeStep) * quantizeStep;
-
-		return clamped;
+		float step = GetTerrainHeightStep();
+		return Mathf.Round(height / step) * step;
 	}
 
-	private void FixCellToMajority(
-		Vector3[,] verts,
-		int x,
-		int z,
-		float[] heights
-	)
+	private float GetTerrainHeightStep() => Mathf.Max(terrainHeightStep, 0.0001f);
+
+	private float GetManmadeBaseHeight() => QuantizeHeight(minHeightY);
+
+	private void QuantizeUnlockedHeights(Vector3[,] verts)
 	{
-		float majority = heights
-			.GroupBy(h => h)
-			.OrderByDescending(g => g.Count())
-			.First()
-			.Key;
+		for (int z = 0; z < verts.GetLength(1); z++)
+		{
+			for (int x = 0; x < verts.GetLength(0); x++)
+			{
+				if (lockedVertices[x, z])
+					continue;
 
-		if (!lockedVertices[x, z] && !Mathf.IsEqualApprox(heights[0], majority))
-			verts[x, z] = new Vector3(verts[x, z].X, majority, verts[x, z].Z);
-
-		if (
-			!lockedVertices[x + 1, z]
-			&& !Mathf.IsEqualApprox(heights[1], majority)
-		)
-			verts[x + 1, z] = new Vector3(
-				verts[x + 1, z].X,
-				majority,
-				verts[x + 1, z].Z
-			);
-
-		if (
-			!lockedVertices[x, z + 1]
-			&& !Mathf.IsEqualApprox(heights[2], majority)
-		)
-			verts[x, z + 1] = new Vector3(
-				verts[x, z + 1].X,
-				majority,
-				verts[x, z + 1].Z
-			);
-
-		if (
-			!lockedVertices[x + 1, z + 1]
-			&& !Mathf.IsEqualApprox(heights[3], majority)
-		)
-			verts[x + 1, z + 1] = new Vector3(
-				verts[x + 1, z + 1].X,
-				majority,
-				verts[x + 1, z + 1].Z
-			);
+				Vector3 vertex = verts[x, z];
+				vertex.Y = QuantizeHeight(vertex.Y);
+				verts[x, z] = vertex;
+			}
+		}
 	}
 
-	private void SetCellHeight(Vector3[,] verts, int x, int z, float height)
+	private bool IsCellValid(Vector3[,] verts, int x, int z, float maxStepHeight)
 	{
-		if (!lockedVertices[x, z])
-			verts[x, z] = new Vector3(verts[x, z].X, height, verts[x, z].Z);
-		if (!lockedVertices[x + 1, z])
-			verts[x + 1, z] = new Vector3(
-				verts[x + 1, z].X,
-				height,
-				verts[x + 1, z].Z
-			);
-		if (!lockedVertices[x, z + 1])
-			verts[x, z + 1] = new Vector3(
-				verts[x, z + 1].X,
-				height,
-				verts[x, z + 1].Z
-			);
-		if (!lockedVertices[x + 1, z + 1])
-			verts[x + 1, z + 1] = new Vector3(
-				verts[x + 1, z + 1].X,
-				height,
-				verts[x + 1, z + 1].Z
-			);
+		float bl = verts[x, z].Y;
+		float br = verts[x + 1, z].Y;
+		float tl = verts[x, z + 1].Y;
+		float tr = verts[x + 1, z + 1].Y;
+
+		if (Mathf.IsEqualApprox(bl, br) && Mathf.IsEqualApprox(bl, tl) && Mathf.IsEqualApprox(bl, tr))
+			return true;
+
+		bool leftRightSplit =
+			Mathf.IsEqualApprox(bl, tl)
+			&& Mathf.IsEqualApprox(br, tr)
+			&& Mathf.Abs(bl - br) <= maxStepHeight;
+		bool bottomTopSplit =
+			Mathf.IsEqualApprox(bl, br)
+			&& Mathf.IsEqualApprox(tl, tr)
+			&& Mathf.Abs(bl - tl) <= maxStepHeight;
+
+		return leftRightSplit || bottomTopSplit;
+	}
+
+	private bool ResolveCellToValidPattern(Vector3[,] verts, int x, int z, float maxStepHeight)
+	{
+		float[] current =
+		{
+			verts[x, z].Y,
+			verts[x + 1, z].Y,
+			verts[x, z + 1].Y,
+			verts[x + 1, z + 1].Y
+		};
+		bool[] isLocked =
+		{
+			lockedVertices[x, z],
+			lockedVertices[x + 1, z],
+			lockedVertices[x, z + 1],
+			lockedVertices[x + 1, z + 1]
+		};
+
+		var levels = BuildCandidateLevels(current, maxStepHeight);
+		float[] best = null;
+		float bestCost = float.PositiveInfinity;
+
+		foreach (float level in levels)
+			ConsiderPattern(new[] { level, level, level, level });
+
+		foreach (float firstLevel in levels)
+		{
+			foreach (float secondLevel in levels)
+			{
+				if (Mathf.IsEqualApprox(firstLevel, secondLevel)
+					|| Mathf.Abs(firstLevel - secondLevel) > maxStepHeight)
+					continue;
+
+				// The only non-flat shapes allowed are side-by-side 2/2 splits.
+				ConsiderPattern(new[] { firstLevel, secondLevel, firstLevel, secondLevel });
+				ConsiderPattern(new[] { firstLevel, firstLevel, secondLevel, secondLevel });
+			}
+		}
+
+		if (best == null)
+			return false; // Locked vertices contain an impossible configuration.
+
+		bool changed = false;
+		SetVertexHeight(verts, x, z, best[0], isLocked[0], ref changed);
+		SetVertexHeight(verts, x + 1, z, best[1], isLocked[1], ref changed);
+		SetVertexHeight(verts, x, z + 1, best[2], isLocked[2], ref changed);
+		SetVertexHeight(verts, x + 1, z + 1, best[3], isLocked[3], ref changed);
+		return changed;
+
+		void ConsiderPattern(float[] pattern)
+		{
+			float cost = 0f;
+			for (int i = 0; i < 4; i++)
+			{
+				if (isLocked[i] && !Mathf.IsEqualApprox(current[i], pattern[i]))
+					return;
+				cost += Mathf.Abs(current[i] - pattern[i]);
+			}
+
+			if (cost < bestCost)
+			{
+				bestCost = cost;
+				best = pattern;
+			}
+		}
+	}
+
+	private List<float> BuildCandidateLevels(float[] current, float maxStepHeight)
+	{
+		var levels = new HashSet<float>();
+		float step = GetTerrainHeightStep();
+		int adjustmentSteps = Mathf.Max(1, Mathf.CeilToInt(maxStepHeight / step));
+		float minHeight = QuantizeHeight(minHeightY);
+
+		foreach (float height in current)
+		{
+			levels.Add(QuantizeHeight(height));
+			for (int offset = -adjustmentSteps; offset <= adjustmentSteps; offset++)
+			{
+				float candidate = QuantizeHeight(height + offset * step);
+				levels.Add(Mathf.Max(minHeight, candidate));
+			}
+		}
+
+		var result = levels.ToList();
+		result.Sort();
+		return result;
+	}
+
+	private void SetVertexHeight(Vector3[,] verts, int x, int z, float height, bool isLocked, ref bool changed)
+	{
+		if (isLocked || Mathf.IsEqualApprox(verts[x, z].Y, height))
+			return;
+
+		Vector3 vertex = verts[x, z];
+		vertex.Y = height;
+		verts[x, z] = vertex;
+		changed = true;
 	}
 
 	#endregion
@@ -897,13 +913,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		return t * t * (3f - 2f * t);
 	}
 
-	private void BlendHeightsToZeroAroundManmade()
+	private void BlendHeightsToManmadeBaseAroundManmade()
 	{
 		if (terrainHeights == null || chunkTypes == null || chunkTypes.Count == 0)
 			return;
 
 		int vertsX = terrainHeights.GetLength(0);
 		int vertsZ = terrainHeights.GetLength(1);
+		float baseHeight = GetManmadeBaseHeight();
 
 		float[,] weights = new float[vertsX, vertsZ];
 		for (int z = 0; z < vertsZ; z++)
@@ -979,9 +996,9 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				if (lockedVertices[x, z])
 				{
 					var v0 = terrainHeights[x, z];
-					if (!Mathf.IsZeroApprox(v0.Y))
+					if (!Mathf.IsEqualApprox(v0.Y, baseHeight))
 					{
-						v0.Y = 0f;
+						v0.Y = baseHeight;
 						terrainHeights[x, z] = v0;
 					}
 
@@ -991,9 +1008,9 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				if (w < 1f)
 				{
 					var v = terrainHeights[x, z];
-					float newY = v.Y * w;
+					float newY = baseHeight + (v.Y - baseHeight) * w;
 
-					newY = Mathf.Round(newY / cellSize.Y) * cellSize.Y;
+					newY = QuantizeHeight(newY);
 					v.Y = newY;
 					terrainHeights[x, z] = v;
 
@@ -1004,7 +1021,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		}
 
 		GD.Print(
-			$"MeshTerrainGenerator: Applied zero-blend radius {radius} cells "
+			$"MeshTerrainGenerator: Applied base-height blend radius {radius} cells "
 			+ $"around {manmadeChunks.Count} man-made chunk(s)."
 		);
 	}

@@ -53,9 +53,10 @@ public partial class MoveActionBase : ActionBase, ICompositeAction
 		if (moveStepActionDefinition == null)
 			return;
 		
-		var facing = RotationHelperFunctions.GetDirectionFromRotation3D(
-			parentGridObject.Rotation.Y
-		);
+		// Pre-build each child with the facing it will have when that child runs.
+		// TryBuildCostsOnly otherwise sees the initial facing for every step.
+		var initialFacing = parentGridObject.GridPositionData.Direction;
+		var facing = initialFacing;
 
 		// Build step actions using the correct cell for each step
 		for (int i = 0; i < path.Count - 1; i++)
@@ -64,6 +65,31 @@ public partial class MoveActionBase : ActionBase, ICompositeAction
 			GridCell stepEnd = path[i + 1];
 
 			moveStepActionDefinition.TryBuildCostsOnly(parentGridObject, stepStart, stepEnd, out var stepCosts, out _);
+
+			var stepDirection = RotationHelperFunctions.GetDirectionBetweenCells(
+				stepStart,
+				stepEnd
+			);
+			int initialRotationSteps = Mathf.Abs(
+				RotationHelperFunctions.GetRotationStepsBetweenDirections(
+					initialFacing,
+					stepDirection
+				)
+			);
+			int requiredRotationSteps = Mathf.Abs(
+				RotationHelperFunctions.GetRotationStepsBetweenDirections(
+					facing,
+					stepDirection
+				)
+			);
+			int rotationCostAdjustment = requiredRotationSteps - initialRotationSteps;
+			if (!stepCosts.ContainsKey(Enums.Stat.TimeUnits))
+				stepCosts[Enums.Stat.TimeUnits] = 0;
+			if (!stepCosts.ContainsKey(Enums.Stat.Stamina))
+				stepCosts[Enums.Stat.Stamina] = 0;
+			stepCosts[Enums.Stat.TimeUnits] += rotationCostAdjustment;
+			stepCosts[Enums.Stat.Stamina] += rotationCostAdjustment;
+			facing = stepDirection;
 
 			var moveStepAction =
 				moveStepActionDefinition.InstantiateAction(

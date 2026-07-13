@@ -6,11 +6,9 @@ namespace FirstArrival.Scripts.Utility
 {
   public static class RotationHelperFunctions
   {
-    // Godot default: Models usually face -Z (Forward). 
-    // If your imported models face +Z, set this to 180.
-    // If they face -Z natively, set this to 0.
-    // Assuming standard Godot convention where Forward is -Z:
-    public const float ModelForwardYawOffsetDeg = 0f; 
+    // Godot's Forward vector is -Z. If an imported mesh faces +Z instead,
+    // set this to 180 so the logical and visual headings stay aligned.
+    public const float ModelForwardYawOffsetDeg = 180f; 
 
     // Ordered clockwise starting at North (-Z)
     private static readonly Enums.Direction[] Ordered8 =
@@ -57,16 +55,15 @@ namespace FirstArrival.Scripts.Utility
       return NormalizeDeg(Mathf.RadToDeg(Mathf.Atan2(v.X, v.Z)));
     }
 
-    // Node yaw (deg) to face the given direction.
+    // Node yaw (deg) to face the given direction. With Godot's -Z forward,
+    // zero yaw faces North and positive yaw turns toward West.
     private static float GetNodeYawDegForDirection(Enums.Direction dir)
     {
-      Vector3 v = GetWorldVector3FromDirection(dir);
-      if (v == Vector3.Zero) return 0f;
+      if (!DirectionIndices.TryGetValue(dir, out int index)) return 0f;
 
-      float yawWorldDeg = VectorToYawWorldDeg(v);
-      // If the model faces -Z, and we want it to face South (+Z), 
-      // the rotation should be 180.
-      return NormalizeDeg(yawWorldDeg + ModelForwardYawOffsetDeg);
+      // Ordered8 runs clockwise, while positive Godot yaw runs
+      // counter-clockwise when viewed from above.
+      return NormalizeDeg(-45f * index + ModelForwardYawOffsetDeg);
     }
 
     // Returns rotation.y (radians) to face the given compass direction.
@@ -79,37 +76,11 @@ namespace FirstArrival.Scripts.Utility
     // Given a Node3D rotation.y (radians), returns the nearest 8-way direction.
     public static Enums.Direction GetDirectionFromRotation3D(float rotationY)
     {
-      // Convert rotationY to degrees
+      // Remove the imported-mesh forward correction before snapping.
       float rotDeg = NormalizeDeg(Mathf.RadToDeg(rotationY) - ModelForwardYawOffsetDeg);
-      
-      // Map degrees to sectors. 
-      // 0 deg (+Z) = South. 
-      // 180 deg (-Z) = North.
-      // Logic:
-      // South (0) -> Sector 0
-      // SW (45) -> Sector 1
-      // West (90) -> Sector 2
-      // NW (135) -> Sector 3
-      // North (180) -> Sector 4
-      // NE (225) -> Sector 5
-      // East (270) -> Sector 6
-      // SE (315) -> Sector 7
-      
-      int sector = Mathf.RoundToInt(rotDeg / 45f);
-      sector = Mod8(sector);
 
-      return sector switch
-      {
-        0 => Enums.Direction.South,
-        1 => Enums.Direction.SouthWest,
-        2 => Enums.Direction.West,
-        3 => Enums.Direction.NorthWest,
-        4 => Enums.Direction.North,
-        5 => Enums.Direction.NorthEast,
-        6 => Enums.Direction.East,
-        7 => Enums.Direction.SouthEast,
-        _ => Enums.Direction.South
-      };
+      int yawSteps = Mod8(Mathf.RoundToInt(rotDeg / 45f));
+      return Ordered8[Mod8(-yawSteps)];
     }
 
     // Calculates an 8-way direction from one grid cell to another based
@@ -165,27 +136,18 @@ namespace FirstArrival.Scripts.Utility
     // Converts a Vector3 direction to the nearest 8-way compass direction.
     public static Enums.Direction GetDirectionFromVector3(Vector3 direction)
     {
-      if (direction.LengthSquared() < 0.001f)
+      Vector3 flatDirection = new Vector3(direction.X, 0f, direction.Z);
+      if (flatDirection.LengthSquared() < 0.001f)
         return Enums.Direction.None;
 
-      float yawWorldDeg = VectorToYawWorldDeg(direction.Normalized());
-      
-      int sector = Mathf.RoundToInt(yawWorldDeg / 45f);
-      sector = Mod8(sector);
+      float yawWorldDeg = VectorToYawWorldDeg(flatDirection.Normalized());
 
-      // Same switch mapping as GetDirectionFromRotation3D (yaw 0 = South)
-      return sector switch
-      {
-        0 => Enums.Direction.South,
-        1 => Enums.Direction.SouthWest,
-        2 => Enums.Direction.West,
-        3 => Enums.Direction.NorthWest,
-        4 => Enums.Direction.North,
-        5 => Enums.Direction.NorthEast,
-        6 => Enums.Direction.East,
-        7 => Enums.Direction.SouthEast,
-        _ => Enums.Direction.South
-      };
+      // World yaw is 0 at South and increases toward East; Ordered8 is
+      // clockwise from North.
+      int clockwiseIndex = Mod8(
+        Mathf.RoundToInt((180f - yawWorldDeg) / 45f)
+      );
+      return Ordered8[clockwiseIndex];
     }
 
     // Direction to normalized world-space Vector3.

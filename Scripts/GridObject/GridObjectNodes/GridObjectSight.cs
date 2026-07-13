@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.Utility;
 using Godot;
 
 [GlobalClass]
@@ -41,6 +42,7 @@ public partial class GridObjectSight : GridObjectNode
     public IReadOnlyList<GridCell> VisibleCells => _visibleCells.AsReadOnly();
 
     private readonly HashSet<GridCell> _tempCellSet = new();
+    private GridPositionData _positionData;
 
     
     public bool HasCalculated { get; private set; }
@@ -59,7 +61,22 @@ public partial class GridObjectSight : GridObjectNode
     
     protected override void Setup()
     {
+        if (_positionData != null)
+            _positionData.DirectionChanged -= OnDirectionChanged;
+
+        _positionData = parentGridObject?.GridPositionData;
+        if (_positionData != null)
+            _positionData.DirectionChanged += OnDirectionChanged;
+
         CalculateSightArea();
+    }
+
+    public override void _ExitTree()
+    {
+        if (_positionData != null)
+            _positionData.DirectionChanged -= OnDirectionChanged;
+
+        base._ExitTree();
     }
 
     public override Godot.Collections.Dictionary<string, Variant> Save()
@@ -90,7 +107,10 @@ public partial class GridObjectSight : GridObjectNode
 
         var newlySeenObjects = new List<GridObject>();
 
-        Vector3 forwardVector = (parentGridObject.GlobalBasis.Z).Normalized();
+        // Rotation actions animate visualMesh, so its world basis is the
+        // authoritative visual/gameplay facing when one is present.
+        Node3D facingNode = parentGridObject.visualMesh ?? parentGridObject;
+        Vector3 forwardVector = facingNode.GlobalBasis.Z.Normalized();
 
         var mainConeCells = gridSystem.GetGridCellsInCone(
             startCell,
@@ -179,6 +199,15 @@ public partial class GridObjectSight : GridObjectNode
         
         HasCalculated = true;
         IsDirty = false;
+    }
+
+    private void OnDirectionChanged(Enums.Direction _)
+    {
+        MarkDirty();
+
+        // A direction can change outside the action system too. Rebuild now
+        // so both gameplay visibility and the terrain texture stay in sync.
+        parentGridObject?.TeamHolder?.UpdateVisibility();
     }
 
     private Vector3 GetViewerEyePosition()

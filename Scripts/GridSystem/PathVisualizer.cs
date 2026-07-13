@@ -43,7 +43,7 @@ public partial class PathVisualizer : Node3D
             return;
         }
 
-        GridCell hoveredCell = InputManager.Instance.currentGridCell;
+        GridCell hoveredCell = BattleInputManager.Instance.currentGridCell;
 
         if (hoveredCell == null || hoveredCell == GridCell.Null)
         {
@@ -77,7 +77,7 @@ public partial class PathVisualizer : Node3D
         if (holder?.CurrentGridObject == null)
             return false;
 
-        if (InputManager.Instance.MouseOverUI)
+        if (BattleInputManager.Instance.MouseOverUI)
             return false;
 
         return true;

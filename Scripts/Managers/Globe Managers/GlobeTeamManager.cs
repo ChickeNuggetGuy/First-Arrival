@@ -268,7 +268,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed &&
 			    mouseButton.ButtonIndex == MouseButton.Left)
 			{
-				HexCellData? cell = InputManager.Instance.CurrentCell;
+				HexCellData? cell = GlobeInputManager.Instance.CurrentCell;
 				
 				int baseIndex = GetTeamData(Enums.UnitTeam.Player).Bases.Count + 1;
 
@@ -290,7 +290,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed &&
 			    mouseButton.ButtonIndex == MouseButton.Left)
 			{
-				HexCellData? cell = InputManager.Instance.CurrentCell;
+				HexCellData? cell = GlobeInputManager.Instance.CurrentCell;
 
 				if (cell == null) return;
 				
@@ -315,7 +315,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			    && mouseButton.ButtonIndex == MouseButton.Left
 			)
 			{
-				HexCellData? cell = InputManager.Instance.CurrentCell;
+				HexCellData? cell = GlobeInputManager.Instance.CurrentCell;
 				if (cell == null) return;
 				
 				GlobeTeamHolder playerTeamHolder = GetTeamData(Enums.UnitTeam.Player);

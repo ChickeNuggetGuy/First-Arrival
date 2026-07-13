@@ -11,6 +11,7 @@ public partial class FogManager : Manager<FogManager>
     [Export] public ShaderMaterial FowMaterial { get; set; }
 	
     private ImageTexture3D _visibilityTexture3DCache;
+    private GridObjectTeamHolder _playerHolder;
 
     public override string GetManagerName() => "FogManager";
 
@@ -40,21 +41,17 @@ public partial class FogManager : Manager<FogManager>
             return;
         }
         
-        var playerHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
-        if (playerHolder == null)
+        _playerHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+        if (_playerHolder == null)
         {
             GD.PrintErr("FogManager: Player GridObjectTeamHolder not found!");
             return;
         }
         
-        playerHolder.VisibilityChanged -= OnVisibilityChanged;
-        playerHolder.VisibilityChanged += OnVisibilityChanged;
-        
-        Vector3I mapSize = MeshTerrainGenerator.Instance.GetMapCellSize();
-        
-        Vector2 cellSize = MeshTerrainGenerator.Instance.cellSize; 
+        _playerHolder.VisibilityChanged -= OnVisibilityChanged;
+        _playerHolder.VisibilityChanged += OnVisibilityChanged;
 
-        var playerTexture = playerHolder.VisibilityTexture3D;
+        var playerTexture = _playerHolder.VisibilityTexture3D;
 
         if (playerTexture == null)
         {
@@ -62,19 +59,7 @@ public partial class FogManager : Manager<FogManager>
             return;
         }
 		
-        if(DebugMode)
-        {
-	        GD.Print("--- FOG MANAGER INIT ---");
-	        GD.Print($"Texture Resolution: {mapSize}");
-	        GD.Print($"Cell Size (World): {cellSize}");
-	        GD.Print("------------------------");
-        }
-        
-        SetGlobalVisibilityTexture(playerTexture);
-        
-        RenderingServer.GlobalShaderParameterSet("texture_resolution", (Vector3)mapSize);
-        RenderingServer.GlobalShaderParameterSet("cell_size_world", cellSize);
-        RenderingServer.GlobalShaderParameterSet("grid_origin_world", Vector3.Zero);
+        SetVisibilityTexture(playerTexture);
     }
 
     /// <summary>
@@ -84,22 +69,46 @@ public partial class FogManager : Manager<FogManager>
     {
         if (team == Enums.UnitTeam.Player)
         {
-            SetGlobalVisibilityTexture(texture);
+            SetVisibilityTexture(texture);
         }
     }
 
-    private void SetGlobalVisibilityTexture(ImageTexture3D texture)
+    private void SetVisibilityTexture(ImageTexture3D texture)
     {
         _visibilityTexture3DCache = texture;
         
-        if (_visibilityTexture3DCache != null)
+        if (_visibilityTexture3DCache == null || FowMaterial == null || _playerHolder == null)
+            return;
+
+        Vector2 cellSize = GridSystem.Instance?.CellSize ?? MeshTerrainGenerator.Instance.cellSize;
+        Vector3 cellSizeWorld = new Vector3(cellSize.X, cellSize.Y, cellSize.X);
+        Vector3 gridOrigin = GridSystem.Instance?.GridWorldOrigin ?? Vector3.Zero;
+        Vector3 visibilityMin = new Vector3(
+            _playerHolder.VisibilityMinX,
+            _playerHolder.VisibilityMinY,
+            _playerHolder.VisibilityMinZ
+        );
+        Vector3 visibilitySize = new Vector3(
+            _playerHolder.VisibilityWidth,
+            _playerHolder.VisibilityDepth,
+            _playerHolder.VisibilityHeight
+        );
+
+        if (visibilitySize.X <= 0 || visibilitySize.Y <= 0 || visibilitySize.Z <= 0)
+            return;
+
+        FowMaterial.SetShaderParameter("visibility_texture", _visibilityTexture3DCache);
+        FowMaterial.SetShaderParameter("grid_origin_world", gridOrigin);
+        FowMaterial.SetShaderParameter("cell_size_world", cellSizeWorld);
+        FowMaterial.SetShaderParameter("visibility_grid_min", visibilityMin);
+        FowMaterial.SetShaderParameter("visibility_grid_size", visibilitySize);
+
+        if (DebugMode)
         {
-            RenderingServer.GlobalShaderParameterSet("visibility_grid_texture", _visibilityTexture3DCache);
-            
-            if (FowMaterial != null)
-            {
-                FowMaterial.SetShaderParameter("visibility_texture", _visibilityTexture3DCache);
-            }
+            GD.Print(
+                $"FogManager: updated {visibilitySize} visibility grid at {visibilityMin}; " +
+                $"origin {gridOrigin}, cell size {cellSizeWorld}."
+            );
         }
     }
 
@@ -107,12 +116,13 @@ public partial class FogManager : Manager<FogManager>
     {
         if (GridObjectManager.Instance != null)
         {
-            var playerHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
-            if (playerHolder != null)
+            if (_playerHolder != null)
             {
-                playerHolder.VisibilityChanged -= OnVisibilityChanged;
+                _playerHolder.VisibilityChanged -= OnVisibilityChanged;
             }
         }
+
+        _playerHolder = null;
     }
 
     #region Manager Data (Save/Load - Not needed for Fog visual state usually)

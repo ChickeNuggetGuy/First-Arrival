@@ -55,6 +55,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         {
             foreach (var missionDef in _activeMissions.Values)
             {
+                if (missionDef.missionStatus.HasFlag(Enums.MissionStatus.Visited))
+                {
+                    ResolveVisitedMission(missionDef);
+                    continue;
+                }
+
                 var cell = GlobeHexGridManager.Instance.GetCellFromIndex(
                     missionDef.cellIndex
                 );
@@ -82,7 +88,10 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     private void AttemptSpawnMissionNearPlayer()
     {
-        if (_activeMissions.Count >= maxActiveMissions)
+        int unresolvedMissionCount = _activeMissions.Values.Count(mission =>
+            !mission.missionStatus.HasFlag(Enums.MissionStatus.Visited)
+        );
+        if (unresolvedMissionCount >= maxActiveMissions)
             return;
 
         var gridManager = GlobeHexGridManager.Instance;
@@ -253,6 +262,76 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    _activeMissions.Remove(cellIndex);
     }
 
+    /// <summary>
+    /// Completed mission definitions remain in the save as history. When the
+    /// globe is rebuilt, apply their result and return the craft that visited
+    /// the site instead of restoring a live mission marker.
+    /// </summary>
+    private void ResolveVisitedMission(MissionCellDefinition missionDefinition)
+    {
+        GlobeTeamManager teamManager = GlobeTeamManager.Instance;
+        GlobeTeamHolder playerTeam = teamManager?.GetTeamData(Enums.UnitTeam.Player);
+        if (playerTeam == null)
+            return;
+
+        Enums.MissionStatus outcome = GetMissionOutcome(missionDefinition.missionStatus);
+        if (outcome != Enums.MissionStatus.None &&
+            missionDefinition.scoreChange.TryGetValue(outcome, out int scoreChange))
+        {
+            playerTeam.AddMonthlyScore(scoreChange);
+        }
+
+        Craft craft = FindMissionCraft(playerTeam, missionDefinition.onRouteCraft);
+        if (craft == null || craft.CurrentCellIndex == craft.HomeBaseIndex)
+            return;
+
+        TeamBaseCellDefinition homeBase = craft.GetBaseCellDefinition();
+        if (homeBase == null)
+            return;
+
+        _ = homeBase.SendCraft(
+            craft.CurrentCellIndex,
+            craft.HomeBaseIndex,
+            craft,
+            teamManager
+        );
+    }
+
+    private static Enums.MissionStatus GetMissionOutcome(Enums.MissionStatus status)
+    {
+        if (status.HasFlag(Enums.MissionStatus.Successful))
+            return Enums.MissionStatus.Successful;
+        if (status.HasFlag(Enums.MissionStatus.Failed))
+            return Enums.MissionStatus.Failed;
+        return Enums.MissionStatus.None;
+    }
+
+    private static Craft FindMissionCraft(GlobeTeamHolder playerTeam, Craft savedCraft)
+    {
+        if (savedCraft == null)
+            return null;
+
+        // Craft indices are scoped to a base, so use the saved home-base index
+        // first and fall back to checking every player base for older saves.
+        foreach (TeamBaseCellDefinition baseDefinition in playerTeam.Bases)
+        {
+            if (baseDefinition.cellIndex == savedCraft.HomeBaseIndex &&
+                baseDefinition.TryGetCraftFromIndex(savedCraft.Index, out Craft craft))
+            {
+                return craft;
+            }
+        }
+
+        foreach (TeamBaseCellDefinition baseDefinition in playerTeam.Bases)
+        {
+            if (baseDefinition.TryGetCraftFromIndex(savedCraft.Index, out Craft craft))
+                return craft;
+        }
+
+        GD.PrintErr($"Could not find craft {savedCraft.Index} for visited mission {savedCraft.TargetCellIndex}.");
+        return null;
+    }
+
     private void DestroyMissionVisual(int cellIndex)
     {
 	    MissionCellDefinition missionDefinition = _activeMissions[cellIndex];
@@ -327,8 +406,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             Craft onRouteCraft = null;
             if (mDefData.ContainsKey("onRouteCraft"))
             {
-	            onRouteCraft = new Craft();
-	            onRouteCraft.Load(mDefData["onRouteCraft"].AsGodotDictionary<String, Variant>());
+	            var savedCraftData = mDefData["onRouteCraft"].AsGodotDictionary<string, Variant>();
+	            if (savedCraftData.Count > 0)
+	            {
+	                onRouteCraft = new Craft();
+	                onRouteCraft.Load(savedCraftData);
+	            }
             }
             int count = mData["enemyCount"].AsInt32();
 

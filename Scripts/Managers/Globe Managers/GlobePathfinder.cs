@@ -148,7 +148,7 @@ public partial class GlobePathfinder : Manager<GlobePathfinder>
 
 	public override void _Input(InputEvent @event)
 	{
-		var inputManager = InputManager.Instance;
+		var inputManager = GlobeInputManager.Instance;
 		if (_gridManager == null || inputManager == null || inputManager.CurrentCell == null) return;
 
 		if (DebugMode)

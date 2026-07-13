@@ -37,10 +37,9 @@ public partial class RotateActionDefinition : ActionDefinition
 			targetGridCell
 		);
 
-		// Determine current facing from the actual transform (Rotation.Y)
-		var currentFacing = RotationHelperFunctions.GetDirectionFromRotation3D(
-			gridObject.Rotation.Y
-		);
+		// GridPositionData is the authoritative gameplay facing. The visual mesh
+		// is animated separately and may be a child of the GridObject.
+		var currentFacing = gridObject.GridPositionData.Direction;
 
 		if (currentFacing == targetDirection)
 		{

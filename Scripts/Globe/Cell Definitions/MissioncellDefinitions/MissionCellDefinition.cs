@@ -11,6 +11,13 @@ public partial class MissionCellDefinition : HexCellDefinition
 	
 	public Enums.MissionStatus missionStatus = Enums.MissionStatus.None;
 
+	[Export] public Dictionary<Enums.MissionStatus, int> scoreChange = new()
+	{
+		{ Enums.MissionStatus.None, 0 },
+		{ Enums.MissionStatus.Failed, -250 },
+		{ Enums.MissionStatus.Successful, 325 },
+	};
+
 	public Craft onRouteCraft; 
 
 	public MissionCellDefinition(
@@ -37,7 +44,7 @@ public partial class MissionCellDefinition : HexCellDefinition
 	
 	
 
-	public override Godot.Collections.Dictionary<string, Variant> Save()
+	public override Dictionary<string, Variant> Save()
 	{
 		Dictionary<string, Variant> craftData = new Dictionary<string, Variant>() { };
 		if (onRouteCraft != null)

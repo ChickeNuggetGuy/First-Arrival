@@ -80,7 +80,8 @@ public partial class GridPositionData : GridObjectNode
 		if (parentGridObject == null)
 			parentGridObject = GetParent() as GridObject;
 
-		Direction = GetDirectionFromRotation(GlobalRotation.Y);
+		var facingNode = parentGridObject?.visualMesh ?? parentGridObject;
+		Direction = GetDirectionFromRotation(facingNode?.Rotation.Y ?? GlobalRotation.Y);
 
 		if (Engine.IsEditorHint())
 			return;
@@ -176,6 +177,7 @@ public partial class GridPositionData : GridObjectNode
 		if (Direction == newDirection) return;
 
 		Direction = newDirection;
+		ApplyDirectionToVisualMesh();
 
 		if (AutoCalculateShape)
 			RecalculateShape();
@@ -201,27 +203,24 @@ public partial class GridPositionData : GridObjectNode
 	
 	#region Direction Utilities
 
+	private void ApplyDirectionToVisualMesh()
+	{
+		if (Direction == Enums.Direction.None || parentGridObject?.visualMesh == null)
+			return;
+
+		var rotation = parentGridObject.visualMesh.Rotation;
+		rotation.Y = RotationHelperFunctions.GetRotationRadians(Direction);
+		parentGridObject.visualMesh.Rotation = rotation;
+	}
+
 	public Enums.Direction GetDirectionFromRotation(float yRadians)
 	{
-		float angle = Mathf.PosMod(yRadians, Mathf.Tau);
-		float deg = Mathf.RadToDeg(angle);
-
-		if (deg < 45 || deg >= 315) return Enums.Direction.South;
-		if (deg < 135) return Enums.Direction.West;
-		if (deg < 225) return Enums.Direction.North;
-		return Enums.Direction.East;
+		return RotationHelperFunctions.GetDirectionFromRotation3D(yRadians);
 	}
 
 	public static float DirectionToRadians(Enums.Direction dir)
 	{
-		return dir switch
-		{
-			Enums.Direction.South => 0f,
-			Enums.Direction.West => Mathf.Pi * 0.5f,
-			Enums.Direction.North => Mathf.Pi,
-			Enums.Direction.East => Mathf.Pi * 1.5f,
-			_ => 0f
-		};
+		return RotationHelperFunctions.GetRotationRadians(dir);
 	}
 
 	#endregion

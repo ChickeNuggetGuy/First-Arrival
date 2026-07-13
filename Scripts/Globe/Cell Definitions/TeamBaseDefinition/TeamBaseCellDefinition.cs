@@ -13,11 +13,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	private Godot.Collections.Array<GridObject> stationedGridObjects = new Godot.Collections.Array<GridObject>();
 
 	private int maxCraft = 3;
-	private Godot.Collections.Dictionary<Enums.CraftStatus,  Godot.Collections.Array<Craft>> craft = new();
+	private Godot.Collections.Dictionary<Enums.CraftStatus, Godot.Collections.Array<Craft>> craft = new();
 
-	public Godot.Collections.Dictionary<Enums.CraftStatus,  Godot.Collections.Array<Craft>> GetAllCraftData() => craft;
+	public Godot.Collections.Dictionary<Enums.CraftStatus, Godot.Collections.Array<Craft>> GetAllCraftData() => craft;
 	protected Godot.Collections.Dictionary<int, int> itemCounts = new();
-	
+
 	public List<Craft> CraftList
 	{
 		get
@@ -30,9 +30,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 					if (!uniqueCraft.Contains(craft)) uniqueCraft.Add(craft);
 				}
 			}
+
 			return uniqueCraft;
 		}
 	}
+
 	public int CraftCount
 	{
 		get
@@ -45,16 +47,18 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 					if (!uniqueCraft.Contains(craft)) uniqueCraft.Add(craft);
 				}
 			}
+
 			return uniqueCraft.Count;
 		}
 	}
 
-	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(cellIndex, name)
+	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(
+		cellIndex, name)
 	{
 		this.teamAffiliation = team;
-		if(craftList != null)
+		if (craftList != null)
 		{
-			craft.Add(Enums.CraftStatus.Idle, new  Godot.Collections.Array<Craft>());
+			craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
 			craft.Add(Enums.CraftStatus.EnRoute, new Godot.Collections.Array<Craft>());
 			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 			foreach (var c in craftList)
@@ -69,156 +73,156 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 		}
 	}
-	
 
-   public Godot.Collections.Array<GridObject> GetStationedGridObjects() =>
-	stationedGridObjects;
 
-public bool TryAddStationedGridObject(GridObject gridObject)
-{
-	if (gridObject == null) return false;
-	if (stationedGridObjects.Contains(gridObject)) return false;
+	public Godot.Collections.Array<GridObject> GetStationedGridObjects() =>
+		stationedGridObjects;
 
-	gridObject.SetIsActive(false);
-	gridObject.Visible = false;
-	stationedGridObjects.Add(gridObject);
-	return true;
-}
-
-public bool TryRemoveStationedGridObject(GridObject gridObject)
-{
-	if (gridObject == null) return false;
-	if (!stationedGridObjects.Contains(gridObject)) return false;
-
-	stationedGridObjects.Remove(gridObject);
-	return true;
-}
-
-public override Godot.Collections.Dictionary<string, Variant> Save()
-{
-	var data = base.Save();
-
-	var serializedCrafts =
-		new Godot.Collections.Array<
-			Godot.Collections.Dictionary<string, Variant>>();
-
-	foreach (var c in CraftList)
+	public bool TryAddStationedGridObject(GridObject gridObject)
 	{
-		if (c == null) continue;
-		serializedCrafts.Add(c.Save());
+		if (gridObject == null) return false;
+		if (stationedGridObjects.Contains(gridObject)) return false;
+
+		gridObject.SetIsActive(false);
+		gridObject.Visible = false;
+		stationedGridObjects.Add(gridObject);
+		return true;
 	}
 
-	data["crafts"] = serializedCrafts;
-	data["units"] = GridObjectSerializationUtility.SaveGridObjects(
-		stationedGridObjects
-	);
-	data["teamAffiliation"] = (int)teamAffiliation;
-	data["itemCounts"] = itemCounts;
-
-	return data;
-}
-
-public async Task LoadAsync(
-	Godot.Collections.Dictionary<string, Variant> data,
-	Node unitParent
-)
-{
-	base.Load(data);
-
-	if (data.ContainsKey("teamAffiliation"))
+	public bool TryRemoveStationedGridObject(GridObject gridObject)
 	{
-		teamAffiliation =
-			(Enums.UnitTeam)data["teamAffiliation"].AsInt32();
+		if (gridObject == null) return false;
+		if (!stationedGridObjects.Contains(gridObject)) return false;
+
+		stationedGridObjects.Remove(gridObject);
+		return true;
 	}
 
-	craft.Clear();
-	craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
-	craft.Add(
-		Enums.CraftStatus.EnRoute,
-		new Godot.Collections.Array<Craft>()
-	);
-	craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
-
-	itemCounts.Clear();
-	if (data.ContainsKey("itemCounts"))
+	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
-		var rawItemCounts = data["itemCounts"].AsGodotDictionary();
+		var data = base.Save();
 
-		foreach (Variant key in rawItemCounts.Keys)
+		var serializedCrafts =
+			new Godot.Collections.Array<
+				Godot.Collections.Dictionary<string, Variant>>();
+
+		foreach (var c in CraftList)
 		{
-			int itemId = key.AsInt32();
-			int count = rawItemCounts[key].AsInt32();
-			itemCounts[itemId] = count;
+			if (c == null) continue;
+			serializedCrafts.Add(c.Save());
+		}
+
+		data["crafts"] = serializedCrafts;
+		data["units"] = GridObjectSerializationUtility.SaveGridObjects(
+			stationedGridObjects
+		);
+		data["teamAffiliation"] = (int)teamAffiliation;
+		data["itemCounts"] = itemCounts;
+
+		return data;
+	}
+
+	public async Task LoadAsync(
+		Godot.Collections.Dictionary<string, Variant> data,
+		Node unitParent
+	)
+	{
+		base.Load(data);
+
+		if (data.ContainsKey("teamAffiliation"))
+		{
+			teamAffiliation =
+				(Enums.UnitTeam)data["teamAffiliation"].AsInt32();
+		}
+
+		craft.Clear();
+		craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
+		craft.Add(
+			Enums.CraftStatus.EnRoute,
+			new Godot.Collections.Array<Craft>()
+		);
+		craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
+
+		itemCounts.Clear();
+		if (data.ContainsKey("itemCounts"))
+		{
+			var rawItemCounts = data["itemCounts"].AsGodotDictionary();
+
+			foreach (Variant key in rawItemCounts.Keys)
+			{
+				int itemId = key.AsInt32();
+				int count = rawItemCounts[key].AsInt32();
+				itemCounts[itemId] = count;
+			}
+		}
+
+		stationedGridObjects.Clear();
+		if (data.ContainsKey("units"))
+		{
+			var unitsArray =
+				data["units"]
+					.AsGodotArray<
+						Godot.Collections.Dictionary<string, Variant>>();
+
+			stationedGridObjects =
+				await GridObjectSerializationUtility.LoadGridObjectsAsync(
+					unitsArray,
+					unitParent,
+					true
+				);
+		}
+
+		if (data.ContainsKey("crafts"))
+		{
+			var craftsArray =
+				data["crafts"]
+					.AsGodotArray<
+						Godot.Collections.Dictionary<string, Variant>>();
+
+			foreach (var craftData in craftsArray)
+			{
+				if (craftData == null) continue;
+
+				int itemID = craftData.ContainsKey("itemID")
+					? craftData["itemID"].AsInt32()
+					: -1;
+
+				if (itemID == -1)
+				{
+					GD.PrintErr("Craft data missing itemID, skipping.");
+					continue;
+				}
+
+				ItemData originalData = InventoryManager.Instance.GetItemData(
+					itemID
+				);
+
+				if (originalData is not Craft craftResource)
+				{
+					GD.PrintErr(
+						$"ItemID {itemID} did not resolve to a Craft " +
+						$"resource."
+					);
+					continue;
+				}
+
+				Craft newInstance = (Craft)craftResource.Duplicate(true);
+
+				await newInstance.LoadAsync(craftData, unitParent);
+				newInstance.Setup(newInstance.Index, cellIndex, this);
+
+				if (!craft.ContainsKey(newInstance.Status))
+				{
+					craft.Add(
+						newInstance.Status,
+						new Godot.Collections.Array<Craft>()
+					);
+				}
+
+				craft[newInstance.Status].Add(newInstance);
+			}
 		}
 	}
-
-	stationedGridObjects.Clear();
-	if (data.ContainsKey("units"))
-	{
-		var unitsArray =
-			data["units"]
-				.AsGodotArray<
-					Godot.Collections.Dictionary<string, Variant>>();
-
-		stationedGridObjects =
-			await GridObjectSerializationUtility.LoadGridObjectsAsync(
-				unitsArray,
-				unitParent,
-				true
-			);
-	}
-
-	if (data.ContainsKey("crafts"))
-	{
-		var craftsArray =
-			data["crafts"]
-				.AsGodotArray<
-					Godot.Collections.Dictionary<string, Variant>>();
-
-		foreach (var craftData in craftsArray)
-		{
-			if (craftData == null) continue;
-
-			int itemID = craftData.ContainsKey("itemID")
-				? craftData["itemID"].AsInt32()
-				: -1;
-
-			if (itemID == -1)
-			{
-				GD.PrintErr("Craft data missing itemID, skipping.");
-				continue;
-			}
-
-			ItemData originalData = InventoryManager.Instance.GetItemData(
-				itemID
-			);
-
-			if (originalData is not Craft craftResource)
-			{
-				GD.PrintErr(
-					$"ItemID {itemID} did not resolve to a Craft " +
-					$"resource."
-				);
-				continue;
-			}
-
-			Craft newInstance = (Craft)craftResource.Duplicate(true);
-
-			await newInstance.LoadAsync(craftData, unitParent);
-			newInstance.Setup(newInstance.Index, cellIndex, this);
-
-			if (!craft.ContainsKey(newInstance.Status))
-			{
-				craft.Add(
-					newInstance.Status,
-					new Godot.Collections.Array<Craft>()
-				);
-			}
-
-			craft[newInstance.Status].Add(newInstance);
-		}
-	}
-}
 
 	#region Craft Functions
 
@@ -230,22 +234,21 @@ public async Task LoadAsync(
 
 	public bool TryAddCraft(Enums.CraftStatus status, Craft craftToAdd)
 	{
-		if(craftToAdd == null) return false;
-		if(!craft.ContainsKey(status)) return false;
-		if(craft[status].Contains(craftToAdd)) return false;
+		if (craftToAdd == null) return false;
+		if (!craft.ContainsKey(status)) return false;
+		if (craft[status].Contains(craftToAdd)) return false;
 
 		GlobeTeamHolder team = GlobeTeamManager.Instance.GetTeamData(teamAffiliation);
 		if (team == null) return false;
-		if(CraftCount >= maxCraft) return false;
-		
-		if(!team.TryRemoveFunds(craftToAdd.buyPrice)) return false;
+		if (CraftCount >= maxCraft) return false;
+
+		if (!team.TryRemoveFunds(craftToAdd.buyPrice)) return false;
 		AddCraft(status, craftToAdd);
 		return true;
 	}
-	
+
 	private void RemoveCraft(Enums.CraftStatus status, Craft craftToRemove)
 	{
-		
 		craft[status].Remove(craftToRemove);
 
 		if (craftToRemove.visual != null)
@@ -256,10 +259,10 @@ public async Task LoadAsync(
 
 	public bool TryRemoveCraft(Enums.CraftStatus status, Craft craftToRemove)
 	{
-		if(craftToRemove == null) return false;
-		if(!craft.ContainsKey(status)) return false;
-		if(!craft[status].Contains(craftToRemove)) return false;
-		
+		if (craftToRemove == null) return false;
+		if (!craft.ContainsKey(status)) return false;
+		if (!craft[status].Contains(craftToRemove)) return false;
+
 		RemoveCraft(status, craftToRemove);
 		return true;
 	}
@@ -285,162 +288,166 @@ public async Task LoadAsync(
 	{
 		if (newStatus == Enums.CraftStatus.None || craft == null) return false;
 		if (!this.craft.ContainsKey(newStatus)) return false;
-		
+
 		if (!this.craft.ContainsKey(craft.Status)) return false;
 		if (!this.craft[craft.Status].Contains(craft)) return false;
-		
+
 		this.craft[craft.Status].Remove(craft);
 		this.craft[newStatus].Add(craft);
 		craft.Status = newStatus;
 
 		return true;
 	}
-	
-	
+
+
 	public async Task SendCraft(
-    int startCellIndex,
-    int targetCellIndex,
-    Craft craft,
-    GlobeTeamManager teamManager)
-{
-    // Early out: craft is already at its home base 
-    if (startCellIndex == targetCellIndex && targetCellIndex == craft.HomeBaseIndex)
-    {
-        // Move craft directly into Home status
-        TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
-        craft.TargetCellIndex = -1;
+		int startCellIndex,
+		int targetCellIndex,
+		Craft craft,
+		GlobeTeamManager teamManager)
+	{
+		// Early out: craft is already at its home base 
+		if (startCellIndex == targetCellIndex && targetCellIndex == craft.HomeBaseIndex)
+		{
+			// Move craft directly into Home status
+			TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
+			craft.TargetCellIndex = -1;
 
-        // Clean up the visual
-        if (craft.visual != null)
-        {
-            craft.visual.QueueFree();
-            craft.SetVisual(null);
-        }
+			// Clean up the visual
+			if (craft.visual != null)
+			{
+				craft.visual.QueueFree();
+				craft.SetVisual(null);
+			}
 
-        return;
-    }
-	
-    GlobePathfinder pathfinder = GlobePathfinder.Instance;
-    GlobeHexGridManager manager = GlobeHexGridManager.Instance;
-    GlobeMissionManager missionManager = GlobeMissionManager.Instance;
+			return;
+		}
 
-    if (pathfinder == null || manager == null || missionManager == null)
-    {
-        GD.PrintErr("manager is null");
-        return;
-    }
+		GlobePathfinder pathfinder = GlobePathfinder.Instance;
+		GlobeHexGridManager manager = GlobeHexGridManager.Instance;
+		GlobeMissionManager missionManager = GlobeMissionManager.Instance;
 
-    List<int> path = pathfinder.GetPath(startCellIndex, targetCellIndex);
+		if (pathfinder == null || manager == null || missionManager == null)
+		{
+			GD.PrintErr("manager is null");
+			return;
+		}
 
-    if (path == null || path.Count == 0)
-    {
-        GD.PrintErr("No path found for mission!");
-        return;
-    }
+		List<int> path = pathfinder.GetPath(startCellIndex, targetCellIndex);
 
-    if (!TryChangeCraftStatus(Enums.CraftStatus.EnRoute, craft))
-    {
-        GD.PrintErr("Failed to change craft status!");
-        return;
-    }
+		if (path == null || path.Count == 0)
+		{
+			GD.PrintErr("No path found for mission!");
+			return;
+		}
 
-    MissionCellDefinition missionCellDefinition = null;
-    if (missionManager.GetActiveMissions().ContainsKey(targetCellIndex))
-        missionCellDefinition = missionManager.GetActiveMissions()[targetCellIndex];
+		if (!TryChangeCraftStatus(Enums.CraftStatus.EnRoute, craft))
+		{
+			GD.PrintErr("Failed to change craft status!");
+			return;
+		}
 
-    TeamBaseCellDefinition teamBaseCellDefinition = null;
-    teamManager.GetTeamData(Enums.UnitTeam.Player).TryGetBaseAtIndex(
-        targetCellIndex,
-        out teamBaseCellDefinition
-    );
+		MissionCellDefinition missionCellDefinition = null;
+		if (missionManager.GetActiveMissions().ContainsKey(targetCellIndex))
+		{
+			MissionCellDefinition possibleMission = missionManager.GetActiveMissions()[targetCellIndex];
+			if (!possibleMission.missionStatus.HasFlag(Enums.MissionStatus.Visited))
+				missionCellDefinition = possibleMission;
+		}
 
-    MeshInstance3D shipNode = craft.visual
-        ?? teamManager.shipScene.Instantiate<MeshInstance3D>();
+		TeamBaseCellDefinition teamBaseCellDefinition = null;
+		teamManager.GetTeamData(Enums.UnitTeam.Player).TryGetBaseAtIndex(
+			targetCellIndex,
+			out teamBaseCellDefinition
+		);
 
-    if (craft.visual == null)
-        craft.SetVisual(shipNode);
+		MeshInstance3D shipNode = craft.visual
+		                          ?? teamManager.shipScene.Instantiate<MeshInstance3D>();
 
-    if (teamManager.shipContainer != null
-        && shipNode.GetParent() != teamManager.shipContainer)
-        teamManager.shipContainer.AddChild(shipNode);
-    else
-    {
-        if (shipNode.GetParent() != null)
-            shipNode.Reparent(teamManager.shipContainer);
-        else
-            teamManager.AddChild(shipNode);
-    }
+		if (craft.visual == null)
+			craft.SetVisual(shipNode);
 
-    var startCell = manager.GetCellFromIndex(path[0]);
-    if (startCell.HasValue)
-        shipNode.GlobalPosition = startCell.Value.Center;
+		if (teamManager.shipContainer != null
+		    && shipNode.GetParent() != teamManager.shipContainer)
+			teamManager.shipContainer.AddChild(shipNode);
+		else
+		{
+			if (shipNode.GetParent() != null)
+				shipNode.Reparent(teamManager.shipContainer);
+			else
+				teamManager.AddChild(shipNode);
+		}
 
-    craft.TargetCellIndex = targetCellIndex;
-    Tween shipTween = teamManager.GetTree().CreateTween();
+		var startCell = manager.GetCellFromIndex(path[0]);
+		if (startCell.HasValue)
+			shipNode.GlobalPosition = startCell.Value.Center;
 
-    if (missionCellDefinition != null)
-        missionCellDefinition.SetOnRouteCraft(craft);
+		craft.TargetCellIndex = targetCellIndex;
+		Tween shipTween = teamManager.GetTree().CreateTween();
 
-    for (int i = 1; i < path.Count; i++)
-    {
-        HexCellData? cell = manager.GetCellFromIndex(path[i]);
-        if (!cell.HasValue)
-            continue;
+		if (missionCellDefinition != null)
+			missionCellDefinition.SetOnRouteCraft(craft);
 
-        Vector3 targetPos = cell.Value.Center;
+		for (int i = 1; i < path.Count; i++)
+		{
+			HexCellData? cell = manager.GetCellFromIndex(path[i]);
+			if (!cell.HasValue)
+				continue;
 
-        shipTween.TweenCallback(
-            Callable.From(() =>
-            {
-                Vector3 upDir = shipNode.GlobalPosition.Normalized();
-                shipNode.LookAt(targetPos, upDir);
-            })
-        );
+			Vector3 targetPos = cell.Value.Center;
 
-        shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
-    }
+			shipTween.TweenCallback(
+				Callable.From(() =>
+				{
+					Vector3 upDir = shipNode.GlobalPosition.Normalized();
+					shipNode.LookAt(targetPos, upDir);
+				})
+			);
 
-    await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
+			shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
+		}
 
-    craft.CurrentCellIndex = targetCellIndex;
+		await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
 
-    if (missionCellDefinition != null)
-    {
-        // Arrived at a mission – go idle and launch the battle
-        TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
-        
-        missionManager.LoadMissionScene(missionCellDefinition);
-    }
-    else if (teamBaseCellDefinition != null)
-    {
-        if (teamBaseCellDefinition.cellIndex == craft.HomeBaseIndex)
-        {
-            // Arrived home
-            TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
-            craft.TargetCellIndex = -1;
+		craft.CurrentCellIndex = targetCellIndex;
 
-            // Hide the visual now that the craft is docked
-            shipNode.QueueFree();
-            craft.SetVisual(null);
-        }
-        else
-        {
-            // Arrived at a different base – transfer ownership
-            TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
-            TryTransferCraft(
-                craft.GetBaseCellDefinition(),
-                teamBaseCellDefinition,
-                new List<Craft>() { craft },
-                teamManager
-            );
-        }
-    }
-    else
-    {
-        // Arrived at a plain cell
-        TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
-    }
-}
+		if (missionCellDefinition != null)
+		{
+			// Arrived at a mission – go idle and launch the battle
+			TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+
+			missionManager.LoadMissionScene(missionCellDefinition);
+		}
+		else if (teamBaseCellDefinition != null)
+		{
+			if (teamBaseCellDefinition.cellIndex == craft.HomeBaseIndex)
+			{
+				// Arrived home
+				TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
+				craft.TargetCellIndex = -1;
+
+				// Hide the visual now that the craft is docked
+				shipNode.QueueFree();
+				craft.SetVisual(null);
+			}
+			else
+			{
+				// Arrived at a different base – transfer ownership
+				TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+				TryTransferCraft(
+					craft.GetBaseCellDefinition(),
+					teamBaseCellDefinition,
+					new List<Craft>() { craft },
+					teamManager
+				);
+			}
+		}
+		else
+		{
+			// Arrived at a plain cell
+			TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+		}
+	}
 
 
 	public static bool TryTransferCraft(TeamBaseCellDefinition fromBase, TeamBaseCellDefinition toBase,
@@ -463,8 +470,8 @@ public async Task LoadAsync(
 			GD.PrintErr("To base cannot take more than total craft!");
 			return false;
 		}
-		
-		
+
+
 		bool success = true;
 		foreach (Craft craft in craftList)
 		{
@@ -487,7 +494,7 @@ public async Task LoadAsync(
 		GD.Print($"Craft transfer success: {success}");
 		return success;
 	}
-	
+
 	#endregion
 
 	#region Get/Set Funtions
@@ -510,21 +517,21 @@ public async Task LoadAsync(
 
 	public bool TryAddItem(int itemID, int count)
 	{
-		if(InventoryManager.Instance.GetItemData(itemID) == null)
+		if (InventoryManager.Instance.GetItemData(itemID) == null)
 			return false;
-		
-		if(count == 0) return false;
-		
+
+		if (count == 0) return false;
+
 		AddItem(itemID, count);
 		return true;
 	}
-	
-	
+
+
 	private void RemoveItem(int itemID, int count)
 	{
-		if (itemCounts.ContainsKey(itemID) )
+		if (itemCounts.ContainsKey(itemID))
 		{
-			if(itemCounts[itemID] >= count)
+			if (itemCounts[itemID] >= count)
 			{
 				itemCounts[itemID] -= count;
 			}
@@ -538,13 +545,14 @@ public async Task LoadAsync(
 
 	public bool TryRemoveItem(int itemID, int count)
 	{
-		if(InventoryManager.Instance.GetItemData(itemID) == null)
+		if (InventoryManager.Instance.GetItemData(itemID) == null)
 			return false;
-		
-		if(count == 0) return false;
-		
+
+		if (count == 0) return false;
+
 		RemoveItem(itemID, count);
 		return true;
 	}
+
 	#endregion
 }

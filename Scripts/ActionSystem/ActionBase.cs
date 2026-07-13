@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
@@ -27,6 +28,56 @@ public abstract partial class ActionBase
       composite.SubActions ??= new List<ActionBase>();
       composite.SubActions.Add(child);
     }
+  }
+
+  // Validation charges the parent action for a required turn. This queues the
+  // matching child action with zero additional cost so execution always turns
+  // before an attack, throw, or interaction is performed.
+  protected bool AddRotateSubActionIfNeeded(
+    GridCell facingFromCell,
+    GridCell facingToCell,
+    Enums.Direction assumedCurrentDirection = Enums.Direction.None,
+    bool force = false
+  )
+  {
+    if (
+      this is not ICompositeAction
+      || parentGridObject == null
+      || facingFromCell == null
+      || facingToCell == null
+      || !parentGridObject.TryGetGridObjectNode<GridObjectActions>(
+        out var gridObjectActions
+      )
+    )
+      return false;
+
+    var targetDirection = RotationHelperFunctions.GetDirectionBetweenCells(
+      facingFromCell,
+      facingToCell
+    );
+    if (targetDirection == Enums.Direction.None)
+      return false;
+
+    var currentDirection = assumedCurrentDirection == Enums.Direction.None
+      ? parentGridObject.GridPositionData.Direction
+      : assumedCurrentDirection;
+    if (!force && currentDirection == targetDirection)
+      return false;
+
+    var rotateActionDefinition = gridObjectActions.ActionDefinitions?
+      .FirstOrDefault(action => action is RotateActionDefinition)
+      as RotateActionDefinition;
+    if (rotateActionDefinition == null)
+      return false;
+
+    var rotateAction = rotateActionDefinition.InstantiateAction(
+      parentGridObject,
+      facingFromCell,
+      facingToCell,
+      new Godot.Collections.Dictionary<Enums.Stat, int>()
+    );
+    AddSubAction(rotateAction);
+    return true;
   }
 
   public ActionBase() { }

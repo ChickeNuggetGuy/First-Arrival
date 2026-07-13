@@ -22,6 +22,9 @@ public partial class GridCellStateOverride : GridObject
 
 	public override void _EnterTree()
 	{
+		// State overrides describe cells; they are not physical occupants. Their
+		// explicit cell-state override still controls whether a cell is blocked.
+		gridObjectSettings |= Enums.GridObjectSettings.CanWalkThrough;
 		base._EnterTree();
 		AddToGroup("GridObjects");
 		AddToGroup("GridCellOverride");

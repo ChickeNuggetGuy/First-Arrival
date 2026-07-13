@@ -43,10 +43,8 @@ public partial class MoveStepActionDefinition : ActionDefinition
       return false;
     }
 
-    // Determine rotation cost based on actual transform-facing
-    var currentFacing = RotationHelperFunctions.GetDirectionFromRotation3D(
-	    gridObject.Rotation.Y
-    );
+    // GridPositionData is the canonical gameplay-facing state.
+    var currentFacing = gridObject.GridPositionData.Direction;
     
     var targetFacing = RotationHelperFunctions.GetDirectionBetweenCells(
       startingGridCell,

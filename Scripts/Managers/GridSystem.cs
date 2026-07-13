@@ -991,7 +991,7 @@ public partial class GridSystem : Manager<GridSystem>
 						&& !candidate.state.HasFlag(stateFilter)
 					) continue;
 
-					if (onlyNonOccupied && candidate.HasGridObject()) continue;
+						if (onlyNonOccupied && candidate.HasSpawnBlockingGridObject()) continue;
 
 					if (teamFilter != Enums.UnitTeam.None)
 					{
