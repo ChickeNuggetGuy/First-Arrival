@@ -237,6 +237,7 @@ public class Enums
 		Visited = 1,
 		Successful = 2,
 		Failed = 4,
-		OnRoute = 8,
+		Timeout = 8,
+		OnRoute = 16,
 	}
 }

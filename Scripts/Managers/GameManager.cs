@@ -57,6 +57,7 @@ public partial class GameManager : Manager<GameManager>
 
 	[Signal]
 	public delegate void CoreManagersLoadedEventHandler();
+	[Signal] public delegate void SceneChangedEventHandler(GameScene scene);
 
 	public override string GetManagerName() => "GameManager";
 
@@ -177,6 +178,7 @@ public partial class GameManager : Manager<GameManager>
 		// assignment above. The scene we were actually asked to switch to is always the
 		// source of truth here, so re-assert it.
 		currentScene = scene;
+		EmitSignal(SignalName.SceneChanged, (int)currentScene);
 	}
 
 	public void RegisterGlobalManager(ManagerBase manager)

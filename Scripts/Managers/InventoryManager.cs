@@ -9,26 +9,27 @@ using Godot.Collections;
 
 namespace FirstArrival.Scripts.Managers;
 
-[GlobalClass]
 public partial class InventoryManager : Manager<InventoryManager>
 {
 	
-	[Export] public ItemDatabase Database;
-	[Export] Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new Dictionary<Enums.InventoryType, InventoryGrid>();
+	public ItemDatabase Database;
+	[Export] Dictionary<Enums.InventoryType, InventoryGrid> inventoryGrids = new();
 	
 	
-	Dictionary<Enums.InventoryType, InventoryGridUI> runtimeInventoryGridUIs = new Dictionary<Enums.InventoryType, InventoryGridUI>();
-	[Export]public MouseHeldInventoryUI  mouseHeldInventoryUI {get; protected set;}
-	
-	[Export]public PackedScene InventorySlotPrefab{ get; protected set;}
-	[Export]public PackedScene BlankSlotPrefab{ get; protected set;}
-	[Export]public StartingEuipmentUI StartingEuipmentUi { get; protected set;}
+	Dictionary<Enums.InventoryType, InventoryGridUI> runtimeInventoryGridUIs = new();
 
-	[Export] public Dictionary<ItemData, int> startingItems = new();
+	
+	public PackedScene InventorySlotPrefab{ get; protected set;}
+	public PackedScene BlankSlotPrefab{ get; protected set;}
+
+	public Dictionary<ItemData, int> startingItems = new();
 	public override string GetManagerName() => "InventoryManager";
 
 	protected override async Task _Setup(bool loadingData)
 	{
+		Database = ResourceLoader.Load<ItemDatabase>("res://Data/InventorySystem/ItemsDatabase.tres");
+		InventorySlotPrefab = ResourceLoader.Load<PackedScene>("res://Scenes/UI/item_slot_ui.tscn");
+		BlankSlotPrefab = ResourceLoader.Load<PackedScene>("res://Scenes/UI/blank_slot_ui.tscn");
 		InventoryGrid[] grids = NodeExtensions.LoadFilesOfTypeFromDirectory("res://Data/InventoryGrids/", "InventoryGrid")
 			.Cast<InventoryGrid>().ToArray();
 
@@ -38,19 +39,21 @@ public partial class InventoryManager : Manager<InventoryManager>
 			if(inventoryGrid != null)
 				inventoryGrids.Add(inventoryGrid.InventoryType, inventoryGrid);
 		}
-    
+
+
+		if (startingItems.Count == 0)
+		{
+			foreach (ItemData itemData in Database.GetAllItems())
+			{
+				startingItems.Add(itemData, 4);
+			}
+		}
 		await Task.CompletedTask;
 	}
 
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		if(GameManager.Instance.currentScene == GameManager.GameScene.BattleScene)
-		{
-			StartingEuipmentUi.ShowCall();
-			await ToSignal(StartingEuipmentUi.acceptButton, BaseButton.SignalName.Pressed);
-			StartingEuipmentUi.HideCall();
-		}
 		await Task.CompletedTask;
 	}
 

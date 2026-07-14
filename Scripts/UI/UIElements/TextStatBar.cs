@@ -10,7 +10,7 @@ public partial class TextStatBar : UIElement
 {
 	private Enums.Stat _targetStat;
 	[Export]
-	private Enums.Stat targetStat
+	public Enums.Stat targetStat
 	{
 		get
 		{
@@ -51,10 +51,24 @@ public partial class TextStatBar : UIElement
 
 	public void UpdateStat(GridObjectStatHolder targetGridObjectStatHolder)
 	{
-		if (targetGridObjectStatHolder == null) return;
-		if (!targetGridObjectStatHolder.TryGetStat(targetStat, out var stat)) return;
-		if(statProgressBar == null) return;
+		if (targetGridObjectStatHolder == null)
+		{
+			GD.PrintErr("StatBar UpdateStat: targetGridObjectStatHolder is null");
+			return;
+		}
+		if (!targetGridObjectStatHolder.TryGetStat(targetStat, out var stat))
+		{
+			GD.PrintErr($"StatBar UpdateStat: stat: { targetStat} is null");
+			return;
+		}
+		if(statProgressBar == null)
+		{
+			GD.PrintErr("StatBar UpdateStat: statProgressBar is null");
+			return;
+		}
 		
+		
+		GD.Print($"Updating Stat {targetStat}");
 		statProgressBar.MinValue = stat.MinMaxValue.min;
 		statProgressBar.MaxValue = stat.MinMaxValue.max;
 		statProgressBar.SetValue(stat.CurrentValue);

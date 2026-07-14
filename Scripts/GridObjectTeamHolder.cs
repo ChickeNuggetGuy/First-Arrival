@@ -90,7 +90,11 @@ public partial class GridObjectTeamHolder : Node
 
 		    if (!gridObject.TryGetGridObjectNode<GridObjectSight>(out var sight) || sight == null) continue;
 
-		    sight.EnsureUpToDate();
+		    // Build the team texture from a fresh sight result for every active
+		    // viewer. A different unit may have moved or turned since its last
+		    // explicit refresh, and stale per-unit caches would otherwise let the
+		    // unit that just changed overwrite the team's combined visibility.
+		    sight.CalculateSightArea();
 
 		    foreach (var cell in sight.VisibleCells)
 		    {

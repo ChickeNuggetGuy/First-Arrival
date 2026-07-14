@@ -9,6 +9,9 @@ using FirstArrival.Scripts.Utility;
 public partial class TeamBaseCellDefinition : HexCellDefinition
 {
 	public Enums.UnitTeam teamAffiliation = Enums.UnitTeam.None;
+	public int DetectionRadius { get; set; } = 10;
+	public float DetectionChance { get; set; } = 0.35f;
+	public bool ShowDetectionRadius { get; set; } = true;
 
 	private Godot.Collections.Array<GridObject> stationedGridObjects = new Godot.Collections.Array<GridObject>();
 
@@ -53,9 +56,10 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	}
 
 	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(
-		cellIndex, name)
+		cellIndex, name, true)
 	{
 		this.teamAffiliation = team;
+		RevealForTeam(team);
 		if (craftList != null)
 		{
 			craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
@@ -118,6 +122,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		);
 		data["teamAffiliation"] = (int)teamAffiliation;
 		data["itemCounts"] = itemCounts;
+		data["detectionRadius"] = DetectionRadius;
+		data["detectionChance"] = DetectionChance;
+		data["showDetectionRadius"] = ShowDetectionRadius;
 
 		return data;
 	}
@@ -134,6 +141,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			teamAffiliation =
 				(Enums.UnitTeam)data["teamAffiliation"].AsInt32();
 		}
+
+		if (data.ContainsKey("detectionRadius"))
+			DetectionRadius = data["detectionRadius"].AsInt32();
+		if (data.ContainsKey("detectionChance"))
+			DetectionChance = data["detectionChance"].AsSingle();
+		if (data.ContainsKey("showDetectionRadius"))
+			ShowDetectionRadius = data["showDetectionRadius"].AsBool();
 
 		craft.Clear();
 		craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
@@ -333,6 +347,14 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			return;
 		}
 
+		// Only the destination must be land. The pathfinder remains unrestricted,
+		// allowing aircraft to cross water cells en route.
+		if (!manager.GetCellFromIndex(targetCellIndex, excludeWater: true).HasValue)
+		{
+			GD.PrintErr($"Cannot send craft to water cell {targetCellIndex}.");
+			return;
+		}
+
 		List<int> path = pathfinder.GetPath(startCellIndex, targetCellIndex);
 
 		if (path == null || path.Count == 0)
@@ -380,7 +402,16 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 		var startCell = manager.GetCellFromIndex(path[0]);
 		if (startCell.HasValue)
+		{
 			shipNode.GlobalPosition = startCell.Value.Center;
+			DetectionRadiusVisualizer.AttachOrUpdate(
+				shipNode,
+				startCell.Value.Index,
+				craft.DetectionRadius,
+				new Color(0.2f, 0.75f, 1.0f, 0.22f),
+				craft.ShowDetectionRadius
+			);
+		}
 
 		craft.TargetCellIndex = targetCellIndex;
 		Tween shipTween = teamManager.GetTree().CreateTween();
@@ -395,6 +426,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 				continue;
 
 			Vector3 targetPos = cell.Value.Center;
+			int reachedCellIndex = cell.Value.Index;
 
 			shipTween.TweenCallback(
 				Callable.From(() =>
@@ -405,6 +437,25 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			);
 
 			shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
+			shipTween.TweenCallback(
+				Callable.From(() =>
+				{
+					craft.CurrentCellIndex = reachedCellIndex;
+					DetectionRadiusVisualizer.AttachOrUpdate(
+						shipNode,
+						reachedCellIndex,
+						craft.DetectionRadius,
+						new Color(0.2f, 0.75f, 1.0f, 0.22f),
+						craft.ShowDetectionRadius
+					);
+					teamManager.ScanForDefinitions(
+						teamAffiliation,
+						reachedCellIndex,
+						craft.DetectionRadius,
+						craft.DetectionChance
+					);
+				})
+			);
 		}
 
 		await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);

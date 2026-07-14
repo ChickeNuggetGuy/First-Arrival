@@ -58,13 +58,13 @@ public partial class GlobeTeamHolder : Node
 	}
 	
 	
-	public bool TryBuildBase( HexCellData cell, int baseIndex,  int cost)
+	public bool TryBuildBase( HexCellData cell,  int cost)
 	{
 		if (!CanAffordCost(cost)) return false;
 
 		TryRemoveFunds(cost);
 		TeamBaseCellDefinition baseCellDefinition =
-			new TeamBaseCellDefinition(cell.Index, "Base " + baseIndex.ToString(), Team, null);
+			new TeamBaseCellDefinition(cell.Index, "Base " + Bases.Count + 1, Team, null);
 		Bases.Add(baseCellDefinition);
 		EmitSignal(SignalName.BaseAdded, cell.Index, this);
 		return true;

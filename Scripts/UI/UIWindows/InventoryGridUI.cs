@@ -200,7 +200,7 @@ public partial class InventoryGridUI : UIWindow
 
 	public void ItemSlot_Pressed(ItemSlotUI slotPressed)
 	{
-		MouseHeldInventoryUI mouseHeldInventory = InventoryManager.Instance.mouseHeldInventoryUI;
+		MouseHeldInventoryUI mouseHeldInventory = UIManager.Instance.mouseHeldInventoryUI;
 
 		// Check what's in the clicked slot
 		bool slotHasItem =

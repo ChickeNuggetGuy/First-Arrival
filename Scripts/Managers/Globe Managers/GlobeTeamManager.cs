@@ -18,6 +18,12 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	public bool buildBaseMode = false;
 	public bool buyCraftMode = false;
 	private bool _sendCraftMode = false;
+	private readonly HashSet<HexCellDefinition> _registeredDefinitions = new();
+	private readonly System.Collections.Generic.Dictionary<TeamBaseCellDefinition, TeambasedVisual> _baseVisuals = new();
+
+	[Export] public Enums.UnitTeam ViewingTeam { get; set; } = Enums.UnitTeam.Player;
+	[Export] private bool scanForDefinitionsDaily = true;
+	private bool _timeSignalsConnected;
 	
 
 	[Export] public bool overridePreviousInstance = false; 
@@ -72,6 +78,9 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		{
 			foreach (var teamHolder in GetAllTeamData().Values)
 			{
+				foreach (var baseDef in teamHolder.Bases)
+					RegisterCellDefinition(baseDef);
+
 				RestoreCraftVisuals(teamHolder);
 				
 				foreach (var baseDef in teamHolder.Bases)
@@ -104,9 +113,29 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 					var cell = GlobeHexGridManager.Instance
 						.GetCellFromIndex(baseDef.cellIndex);
 					if (cell.HasValue)
-						SpawnBase(cell.Value, baseDef.definitionName);
+						SpawnBase(baseDef);
 				}
 			}
+		}
+		else
+		{
+			GlobeTeamHolder teamHolder = teamData[Enums.UnitTeam.Enemy];
+
+			if (teamHolder != null)
+			{
+				HexCellData? randomCell = GlobeHexGridManager.Instance.GetRandomCell(true);
+
+				if (randomCell.HasValue)
+				{
+					teamHolder.TryBuildBase(randomCell.Value, 0);
+				}
+			}
+		}
+
+		if (scanForDefinitionsDaily && GlobeTimeManager.Instance != null && !_timeSignalsConnected)
+		{
+			GlobeTimeManager.Instance.DayChanged += OnDayChanged;
+			_timeSignalsConnected = true;
 		}
 		await Task.CompletedTask;
 	}
@@ -169,6 +198,13 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		if (cellData.HasValue)
 		{
 			shipNode.GlobalPosition = cellData.Value.Center;
+			DetectionRadiusVisualizer.AttachOrUpdate(
+				shipNode,
+				craft.CurrentCellIndex,
+				craft.DetectionRadius,
+				new Color(0.2f, 0.75f, 1.0f, 0.22f),
+				craft.ShowDetectionRadius
+			);
 
 			// Orient towards target if one exists
 			if (craft.TargetCellIndex != -1 && craft.TargetCellIndex != craft.CurrentCellIndex)
@@ -317,6 +353,11 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			{
 				HexCellData? cell = GlobeInputManager.Instance.CurrentCell;
 				if (cell == null) return;
+				if (cell.Value.cellType == Enums.HexGridType.Water)
+				{
+					GD.Print("Craft destinations must be on land.");
+					return;
+				}
 				
 				GlobeTeamHolder playerTeamHolder = GetTeamData(Enums.UnitTeam.Player);
 				
@@ -356,6 +397,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	public bool TryBuildBase(Enums.UnitTeam team, HexCellData cell, int baseIndex , int cost)
 	{
 		if (team ==  Enums.UnitTeam.None) return false;
+		if (cell.cellType == Enums.HexGridType.Water) return false;
 
 		if (!teamData.ContainsKey(team))
 		{
@@ -364,29 +406,171 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		
 		if(!teamData[team].CanAffordCost(cost)) return false;
 
-		if (teamData[team].TryBuildBase(cell, baseIndex, cost))
+		if (teamData[team].TryBuildBase(cell, cost))
 		{
-			SpawnBase(cell, "Base " + baseIndex.ToString());
+			if (!teamData[team].TryGetBaseAtIndex(cell.Index, out var definition))
+				return false;
+
+			RegisterCellDefinition(definition);
+			SpawnBase(definition);
+			ScanForDefinitions(
+				team,
+				cell.Index,
+				definition.DetectionRadius,
+				definition.DetectionChance
+			);
 			buildBaseMode = false;
+			return true;
 		}
-		return true;
+		return false;
 	}
 	
-	private void SpawnBase(HexCellData cell, string name)
+	private void SpawnBase(TeamBaseCellDefinition definition)
 	{
-		if (baseScene == null) return;
-		var instance = baseScene.Instantiate<Node3D>();
+		if (baseScene == null || definition == null) return;
+		if (!definition.IsVisibleTo(ViewingTeam)) return;
+		if (_baseVisuals.TryGetValue(definition, out var existing)
+		    && GodotObject.IsInstanceValid(existing)) return;
+
+		HexCellData? cell = GlobeHexGridManager.Instance.GetCellFromIndex(definition.cellIndex);
+		if (!cell.HasValue) return;
+
+		var instance = baseScene.Instantiate<TeambasedVisual>();
 		if (baseContainer != null) baseContainer.AddChild(instance);
 		else AddChild(instance);
 
-		instance.GlobalPosition = cell.Center;
-		Vector3 normal = cell.Center.Normalized();
+		instance.GlobalPosition = cell.Value.Center;
+		Vector3 normal = cell.Value.Center.Normalized();
 		Vector3 up = Mathf.Abs(normal.Y) > 0.9f ? Vector3.Forward : Vector3.Up;
-		instance.LookAt(cell.Center + normal, up);
-		instance.Name = name;
+		instance.LookAt(cell.Value.Center + normal, up);
+		instance.Name = definition.definitionName;
+		definition.BindVisual(instance, ViewingTeam);
+		_baseVisuals[definition] = instance;
 		
 		var label = instance.GetNodeOrNull<Label3D>("Label3D");
-		if(label != null) label.Text = name;
+		if(label != null) label.Text = definition.definitionName;
+
+		DetectionRadiusVisualizer.AttachOrUpdate(
+			instance,
+			definition.cellIndex,
+			definition.DetectionRadius,
+			GetTeamDetectionColor(definition.teamAffiliation),
+			definition.ShowDetectionRadius
+		);
+	}
+
+	public void RegisterCellDefinition(HexCellDefinition definition)
+	{
+		if (definition == null || !_registeredDefinitions.Add(definition)) return;
+		definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
+		definition.VisibilityChanged += OnDefinitionVisibilityChanged;
+	}
+
+	public void UnregisterCellDefinition(HexCellDefinition definition)
+	{
+		if (definition == null || !_registeredDefinitions.Remove(definition)) return;
+		definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
+	}
+
+	/// <summary>
+	/// Rolls once for each hidden hostile definition in the detector's hex-step range.
+	/// Returns the definitions revealed by this scan.
+	/// </summary>
+	public List<HexCellDefinition> ScanForDefinitions(
+		Enums.UnitTeam detectingTeam,
+		int originCellIndex,
+		int detectionRadius,
+		float detectionChance)
+	{
+		var revealed = new List<HexCellDefinition>();
+		if (detectingTeam == Enums.UnitTeam.None || detectionRadius < 0) return revealed;
+
+		HexCellData? origin = GlobeHexGridManager.Instance?.GetCellFromIndex(originCellIndex);
+		if (!origin.HasValue) return revealed;
+
+		var cellsInRange = GlobeHexGridManager.Instance.GetCellsInStepRange(
+			origin.Value,
+			detectionRadius
+		);
+		var indicesInRange = new HashSet<int>();
+		foreach (HexCellData cell in cellsInRange) indicesInRange.Add(cell.Index);
+
+		float chance = Mathf.Clamp(detectionChance, 0.0f, 1.0f);
+		foreach (HexCellDefinition definition in _registeredDefinitions)
+		{
+			if (definition == null || definition.IsVisibleTo(detectingTeam)) continue;
+			if (!indicesInRange.Contains(definition.cellIndex)) continue;
+			if (definition is TeamBaseCellDefinition teamBase
+			    && teamBase.teamAffiliation == detectingTeam) continue;
+			if (GD.Randf() > chance) continue;
+
+			if (definition.RevealForTeam(detectingTeam))
+				revealed.Add(definition);
+		}
+
+		return revealed;
+	}
+
+	public List<HexCellDefinition> ScanAllDetectors(Enums.UnitTeam detectingTeam)
+	{
+		var revealed = new List<HexCellDefinition>();
+		GlobeTeamHolder holder = GetTeamData(detectingTeam);
+		if (holder?.Bases == null) return revealed;
+
+		foreach (TeamBaseCellDefinition baseDefinition in holder.Bases)
+		{
+			revealed.AddRange(ScanForDefinitions(
+				detectingTeam,
+				baseDefinition.cellIndex,
+				baseDefinition.DetectionRadius,
+				baseDefinition.DetectionChance
+			));
+
+			foreach (Craft craft in baseDefinition.CraftList)
+			{
+				if (craft == null || craft.Status == Enums.CraftStatus.Home) continue;
+				revealed.AddRange(ScanForDefinitions(
+					detectingTeam,
+					craft.CurrentCellIndex,
+					craft.DetectionRadius,
+					craft.DetectionChance
+				));
+			}
+		}
+
+		return revealed;
+	}
+
+	private void OnDayChanged(int dayOfYear, int dayOfMonth, Enums.Day day)
+	{
+		foreach (Enums.UnitTeam team in teamData.Keys)
+			ScanAllDetectors(team);
+	}
+
+	private void OnDefinitionVisibilityChanged(HexCellDefinition definition)
+	{
+		if (definition is not TeamBaseCellDefinition baseDefinition) return;
+
+		if (definition.IsVisibleTo(ViewingTeam))
+		{
+			SpawnBase(baseDefinition);
+			return;
+		}
+
+		if (_baseVisuals.Remove(baseDefinition, out var visual)
+		    && GodotObject.IsInstanceValid(visual))
+			visual.QueueFree();
+		definition.ClearVisual();
+	}
+
+	private static Color GetTeamDetectionColor(Enums.UnitTeam team)
+	{
+		return team switch
+		{
+			Enums.UnitTeam.Player => new Color(0.2f, 0.75f, 1.0f, 0.20f),
+			Enums.UnitTeam.Enemy => new Color(1.0f, 0.25f, 0.2f, 0.20f),
+			_ => new Color(1.0f, 0.85f, 0.25f, 0.20f)
+		};
 	}
 
 	public Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder> GetAllTeamData() => teamData;
@@ -404,9 +588,9 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	
 	public override void Deinitialize()
 	{
-		// Cleanup visuals if necessary when switching scenes
-		// But usually GameManager handles scene unloading
-		return;
+		if (_timeSignalsConnected && GlobeTimeManager.Instance != null)
+			GlobeTimeManager.Instance.DayChanged -= OnDayChanged;
+		_timeSignalsConnected = false;
 	}
 	
 	#endregion

@@ -19,7 +19,8 @@ public partial class GlobeUI : UIWindow
 	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
 
 	[ExportGroup("Bases"), Export] private Control baseButtonHolder;
-	private Dictionary<int, Button> baseButtons = new Dictionary<int, Button>();
+	[ExportGroup("Bases"), Export] private Texture2D focusButtonTexture;
+	private Dictionary<int, HBoxContainer> baseButtons = new Dictionary<int, HBoxContainer>();
 	protected override Task _Setup()
 	{
 		
@@ -103,22 +104,34 @@ public partial class GlobeUI : UIWindow
 			TeamBaseCellDefinition baseCellDefinition = teamHolder.Bases[i];
 			if (baseCellDefinition.cellIndex == cellIndex)
 			{
+				HBoxContainer container = new HBoxContainer();
+				baseButtonHolder.AddChild(container);
+				
 				Button baseButton = new Button();
 				baseButton.Text = baseCellDefinition.definitionName;
-            
+				
+				
 				// Mark as async to await the scene change
 				baseButton.Pressed += async () => 
 				{
-					OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
 					GameManager.Instance.currentBase = baseCellDefinition;
                 
 					SavesManager.Instance.StashSceneState("GlobeState");
 
 					await GameManager.Instance.ChangeSceneAsync(GameManager.GameScene.BaseScene, false);
 				};
-            
-				baseButtonHolder.AddChild(baseButton);
-				baseButtons.Add(cellIndex, baseButton);
+				
+				Button panButton = new Button();
+				panButton.Icon = focusButtonTexture;
+				panButton.Pressed += () =>
+				{
+					OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
+				};
+				
+				container.AddChild(baseButton);
+				baseButton.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+				container.AddChild(panButton);
+				baseButtons.Add(cellIndex, container);
 			}
 		}
 	}

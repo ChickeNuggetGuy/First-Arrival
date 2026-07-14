@@ -53,16 +53,23 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     {
         if (loadingData)
         {
-            foreach (var missionDef in _activeMissions.Values)
+            foreach (var missionDef in _activeMissions.Values.ToArray())
             {
                 if (missionDef.missionStatus.HasFlag(Enums.MissionStatus.Visited))
                 {
-                    ResolveVisitedMission(missionDef);
+                    ResolveMission(missionDef);
                     continue;
                 }
 
+				if (missionDef.timeLeft <= 0)
+				{
+					ResolveMission(missionDef);
+					continue;
+				}
+
                 var cell = GlobeHexGridManager.Instance.GetCellFromIndex(
-                    missionDef.cellIndex
+                    missionDef.cellIndex,
+                    excludeWater: true
                 );
                 if (cell.HasValue)
                 {
@@ -124,15 +131,13 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
             List<HexCellData> cellsInRange = gridManager.GetCellsInStepRange(
                 baseCell.Value,
-                missionSpawnRangeSteps
+                missionSpawnRangeSteps,
+                excludeWater: true
             );
 
             foreach (var cell in cellsInRange)
             {
-                if (
-                    cell.cellType == Enums.HexGridType.Land
-                    && !occupiedIndices.Contains(cell.Index)
-                )
+                if (!occupiedIndices.Contains(cell.Index))
                 {
                     candidateCellIndices.Add(cell.Index);
                 }
@@ -144,7 +149,10 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             int[] candidates = candidateCellIndices.ToArray();
             int randomIndex = candidates[GD.RandRange(0, candidates.Length - 1)];
 
-            HexCellData? targetCell = gridManager.GetCellFromIndex(randomIndex);
+            HexCellData? targetCell = gridManager.GetCellFromIndex(
+                randomIndex,
+                excludeWater: true
+            );
 
             if (targetCell.HasValue)
             {
@@ -155,6 +163,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     public bool TrySpawnNewMissionCell(HexCellData cell, Enums.MissionType missionType)
     {
+        if (cell.cellType == Enums.HexGridType.Water)
+            return false;
+
         if (_activeMissions.ContainsKey(cell.Index))
             return false;
 
@@ -232,6 +243,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     private Node3D SpawnMissionVisual(HexCellData cell, string name)
     {
+        if (cell.cellType == Enums.HexGridType.Water)
+            return null;
+
         if (missionScene == null)
             return null;
 
@@ -253,13 +267,17 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     }
 
 
-    public void RemoveMissionDefinition(int cellIndex)
+    public void RemoveMissionDefinition(MissionCellDefinition mission)
     {
-	    if (!_activeMissions.ContainsKey(cellIndex)) return;
-	    
-	    MissionCellDefinition missionDefinition = _activeMissions[cellIndex];
-	    DestroyMissionVisual(cellIndex);
-	    _activeMissions.Remove(cellIndex);
+	    if (mission == null
+	        || !_activeMissions.TryGetValue(mission.cellIndex, out var activeMission)
+	        || activeMission != mission)
+	        return;
+
+	    mission.StopTimeoutTracking();
+	    DestroyMissionVisual(mission);
+	    _activeMissions.Remove(mission.cellIndex);
+	    EmitSignal(SignalName.MissionCompleted);
     }
 
     /// <summary>
@@ -267,42 +285,59 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     /// globe is rebuilt, apply their result and return the craft that visited
     /// the site instead of restoring a live mission marker.
     /// </summary>
-    private void ResolveVisitedMission(MissionCellDefinition missionDefinition)
+    public void ResolveMission(MissionCellDefinition missionDefinition)
     {
+	    if (missionDefinition == null) return;
+
         GlobeTeamManager teamManager = GlobeTeamManager.Instance;
         GlobeTeamHolder playerTeam = teamManager?.GetTeamData(Enums.UnitTeam.Player);
-        if (playerTeam == null)
-            return;
 
-        Enums.MissionStatus outcome = GetMissionOutcome(missionDefinition.missionStatus);
-        if (outcome != Enums.MissionStatus.None &&
+        Enums.MissionStatus outcome = GetMissionOutcome(missionDefinition);
+		if (playerTeam != null && outcome != Enums.MissionStatus.None &&
             missionDefinition.scoreChange.TryGetValue(outcome, out int scoreChange))
         {
             playerTeam.AddMonthlyScore(scoreChange);
         }
 
-        Craft craft = FindMissionCraft(playerTeam, missionDefinition.onRouteCraft);
-        if (craft == null || craft.CurrentCellIndex == craft.HomeBaseIndex)
-            return;
+		Craft craft = playerTeam == null
+			? null
+			: FindMissionCraft(playerTeam, missionDefinition.onRouteCraft);
+        
+        if (craft != null)
+        {
+	        if (craft.CurrentCellIndex != craft.HomeBaseIndex)
+	        {
+		        TeamBaseCellDefinition homeBase = craft.GetBaseCellDefinition();
+		        if (homeBase == null)
+			        return;
 
-        TeamBaseCellDefinition homeBase = craft.GetBaseCellDefinition();
-        if (homeBase == null)
-            return;
-
-        _ = homeBase.SendCraft(
-            craft.CurrentCellIndex,
-            craft.HomeBaseIndex,
-            craft,
-            teamManager
-        );
+		        _ = homeBase.SendCraft(
+			        craft.CurrentCellIndex,
+			        craft.HomeBaseIndex,
+			        craft,
+			        teamManager
+		        );
+	        }
+        }
+        
+        RemoveMissionDefinition(missionDefinition);
     }
 
-    private static Enums.MissionStatus GetMissionOutcome(Enums.MissionStatus status)
+    private static Enums.MissionStatus GetMissionOutcome(MissionCellDefinition mission)
     {
-        if (status.HasFlag(Enums.MissionStatus.Successful))
-            return Enums.MissionStatus.Successful;
-        if (status.HasFlag(Enums.MissionStatus.Failed))
-            return Enums.MissionStatus.Failed;
+	    if (mission == null) return Enums.MissionStatus.None;
+	    
+	    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Visited))
+	    {
+		    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Successful))
+			    return Enums.MissionStatus.Successful;
+		    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Failed))
+			    return Enums.MissionStatus.Failed;
+	    }
+	    else if (mission.timeLeft <= 0)
+	    {
+		    return Enums.MissionStatus.Timeout;
+	    }
         return Enums.MissionStatus.None;
     }
 
@@ -332,23 +367,16 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         return null;
     }
 
-    private void DestroyMissionVisual(int cellIndex)
+    private void DestroyMissionVisual(MissionCellDefinition mission)
     {
-	    MissionCellDefinition missionDefinition = _activeMissions[cellIndex];
-	    
-	    if (missionDefinition == null) return;
-	    
-	    
-	    if (missionContainer != null)
-	    {
-		    missionContainer.RemoveChild(missionDefinition.missionVisual);
+	    if (mission?.missionVisual == null
+	        || !GodotObject.IsInstanceValid(mission.missionVisual))
+		    return;
 
-	    }
-	    else
-	    {
-		    RemoveChild(missionDefinition.missionVisual);
-	    }
-	    missionDefinition.missionVisual.QueueFree();
+	    Node visual = mission.missionVisual;
+	    visual.GetParent()?.RemoveChild(visual);
+	    visual.QueueFree();
+	    mission.missionVisual = null;
     }
     public override Godot.Collections.Dictionary<string, Variant> Save()
     {
@@ -378,6 +406,8 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             foreach (Node child in missionContainer.GetChildren())
                 child.QueueFree();
         }
+		foreach (MissionCellDefinition missionDefinition in _activeMissions.Values)
+			missionDefinition.StopTimeoutTracking();
         _activeMissions.Clear();
 
         GlobalDifficulty = data.ContainsKey("globalDifficulty")
@@ -403,6 +433,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             MissionBase mission = null;
             Enums.MissionType type = (Enums.MissionType)mData["type"].AsInt32();
             Enums.MissionStatus status = (Enums.MissionStatus)mDefData["missionStatus"].AsInt32();
+			int timeoutTime = mDefData.ContainsKey("timeoutTime")
+				? mDefData["timeoutTime"].AsInt32()
+				: 12;
+			int timeLeft = mDefData.ContainsKey("timeLeft")
+				? mDefData["timeLeft"].AsInt32()
+				: timeoutTime;
             Craft onRouteCraft = null;
             if (mDefData.ContainsKey("onRouteCraft"))
             {
@@ -422,9 +458,11 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
             if (mission != null)
             {
-                _activeMissions.Add(cellIdx,
-                    new MissionCellDefinition(cellIdx, "New Mission", mission, null, status, onRouteCraft)
-                );
+				var missionDefinition = new MissionCellDefinition(
+					cellIdx, "New Mission", mission, null, status, onRouteCraft
+				);
+				missionDefinition.RestoreTimeoutState(timeoutTime, timeLeft);
+				_activeMissions.Add(cellIdx, missionDefinition);
             }
         }
         return Task.CompletedTask;
@@ -432,7 +470,8 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     public override void Deinitialize()
     {
-	    return;
+		foreach (MissionCellDefinition missionDefinition in _activeMissions.Values)
+			missionDefinition.StopTimeoutTracking();
     }
 
     #region Get/Set Functions

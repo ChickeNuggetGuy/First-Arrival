@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.UI;
 
 namespace FirstArrival.Scripts.Managers;
 [GlobalClass]
@@ -13,7 +14,7 @@ public partial class UIManager : Manager<UIManager>
 	[Export] private Control uiHolder;
 	[Export] private LoadingScreenUI loadingSCcreenUI;
 	
-	
+	[Export]public MouseHeldInventoryUI  mouseHeldInventoryUI {get; protected set;}
 	#region Functions
 
 	public void ShowLoadingScreen()

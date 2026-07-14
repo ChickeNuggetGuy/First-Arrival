@@ -28,6 +28,24 @@ public abstract partial class Manager<T> : ManagerBase where T : ManagerBase, ne
 			{
 				GameManager.Instance.RegisterGlobalManager(this);
 			}
+			
+			GameManager.Instance.SceneChanged += GameManagerOnSceneChanged;
+		}
+		
+	}
+
+	private void GameManagerOnSceneChanged(GameManager.GameScene scene)
+	{
+		if (Instance != null)
+		{
+			if (Instance != this)
+			{
+				this.QueueFree();
+			}
+		}
+		else
+		{
+			Instance = this as T;
 		}
 	}
 

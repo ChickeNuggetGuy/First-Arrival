@@ -138,7 +138,7 @@ public partial class GridObjectSight : GridObjectNode
 
         if (_useProximityCheck)
         {
-            if (gridSystem.TryGetGridCellsInRange(
+		    if (gridSystem.TryGetGridCellsInRadius(
                     startCell,
                     new Vector2I(_proximityRadius, _proximityRadius),
                     false,

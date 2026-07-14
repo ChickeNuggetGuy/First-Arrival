@@ -84,6 +84,10 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 	);
 
 	[Signal]
+	public delegate void HourChangedEventHandler(
+		int hour
+	);
+	[Signal]
 	public delegate void DayChangedEventHandler(
 		int dayOfYear,
 		int dayOfMonth,
@@ -197,8 +201,14 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		{
 			AdvanceDateByDays(daysToAdvance);
 		}
+		int hour = secondsOfDay / 3600;
 
-		CurrentHour = secondsOfDay / 3600;
+		if (hour != CurrentHour)
+		{
+			EmitSignal(SignalName.HourChanged, hour);
+		}
+
+		CurrentHour = hour;
 		CurrentMinute = (secondsOfDay % 3600) / 60;
 		CurrentSeconds = secondsOfDay % 60;
 	}

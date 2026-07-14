@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 
+[GlobalClass]
 public partial class BuySellUI : UIWindow
 {
 	[Export] protected Tree itemTreeUI;
@@ -36,9 +37,14 @@ public partial class BuySellUI : UIWindow
 	private void DrawTree()
 	{
 		itemTreeUI.Clear();
+		
 		InventoryManager inventoryManager = InventoryManager.Instance;
-		if (inventoryManager == null) return;
-
+		if (inventoryManager == null)
+		{
+			GD.PrintErr("InventoryManager is null");
+			return;
+		}
+		GD.Print("DrawTree");
 
 		TreeItem root = itemTreeUI.CreateItem();
 		foreach (ItemData itemData in inventoryManager.Database.GetAllItems())

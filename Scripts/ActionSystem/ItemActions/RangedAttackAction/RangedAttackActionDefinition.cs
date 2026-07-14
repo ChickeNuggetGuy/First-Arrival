@@ -14,6 +14,9 @@ public partial class RangedAttackActionDefinition
 	[Export] public int attackCount = 1;
 	[Export] public int range;
 	[Export] public int damage;
+	// Added to the shooter's RangedAccuracy when calculating projectile spread.
+	// Positive values make this attack more accurate; negative values make it less accurate.
+	[Export(PropertyHint.Range, "-100,100,1")] public float accuracy = 0f;
 	[Export] public Godot.Collections.Dictionary<Enums.Stat, int> damagingStats = new();
 	
 	public override ActionBase InstantiateAction(

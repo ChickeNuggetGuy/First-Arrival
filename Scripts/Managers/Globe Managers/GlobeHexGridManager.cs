@@ -437,6 +437,22 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			return false;
 		}
 
+		// Convert() cannot cross the compressed/uncompressed boundary. Textures
+		// imported with VRAM compression therefore have to be decompressed first.
+		if (img.IsCompressed())
+		{
+			Error decompressError = img.Decompress();
+			if (decompressError != Error.Ok)
+			{
+				GD.PrintErr(
+					$"Texture '{textureKey}' uses {img.GetFormat()} compression, " +
+					$"which could not be decompressed for grid sampling " +
+					$"({decompressError}). Change its import compression mode to Lossless."
+				);
+				return false;
+			}
+		}
+
 		if (img.GetFormat() != Image.Format.Rgba8)
 			img.Convert(Image.Format.Rgba8);
 
@@ -484,16 +500,21 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return (uint)(r | (g << 8) | (b << 16));
 	}
 
-	public HexCellData? GetCellFromLatLon(Vector2 coordinates)
+	public HexCellData? GetCellFromLatLon(
+		Vector2 coordinates,
+		bool excludeWater = false)
 	{
 		Vector2 snapped = SnapVector2(coordinates);
-		if (Cells.TryGetValue(snapped, out var cell)) return cell;
+		if (Cells.TryGetValue(snapped, out var cell))
+			return IsAllowedCell(cell, excludeWater) ? cell : null;
 
 		// If exact key fails, fallback to position lookup
-		return GetCellFromPosition(LatLonToVector3(coordinates));
+		return GetCellFromPosition(LatLonToVector3(coordinates), excludeWater);
 	}
 
-	public HexCellData? GetCellFromPosition(Vector3 worldPosition)
+	public HexCellData? GetCellFromPosition(
+		Vector3 worldPosition,
+		bool excludeWater = false)
 	{
 		// Project position onto the sphere surface at the defined radius
 		Vector3 surfacePoint = worldPosition.Normalized() * Radius;
@@ -522,15 +543,49 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 					}
 				}
 
-		return bestIdx != -1 ? _cellArray[bestIdx] : null;
+		if (bestIdx == -1) return null;
+		HexCellData cell = _cellArray[bestIdx];
+		return IsAllowedCell(cell, excludeWater) ? cell : null;
 	}
 
 
-	public HexCellData? GetCellFromIndex(int index)
+	public HexCellData? GetCellFromIndex(int index, bool excludeWater = false)
 	{
 		if (index < 0 || index >= _cellArray.Length) return null;
-		return _cellArray[index];
+		HexCellData cell = _cellArray[index];
+		return IsAllowedCell(cell, excludeWater) ? cell : null;
 	}
+
+	/// <summary>
+	/// Returns a uniformly selected cell from the grid. When excludeWater is
+	/// true, only land cells are eligible. Returns null if no cell is available.
+	/// </summary>
+	public HexCellData? GetRandomCell(bool excludeWater = false)
+	{
+		if (_cellArray == null || _cellArray.Length == 0) return null;
+
+		if (!excludeWater)
+			return _cellArray[GD.RandRange(0, _cellArray.Length - 1)];
+
+		HexCellData? selected = null;
+		int eligibleCount = 0;
+
+		foreach (HexCellData cell in _cellArray)
+		{
+			if (!IsAllowedCell(cell, excludeWater)) continue;
+
+			eligibleCount++;
+			// Reservoir sampling keeps every eligible cell equally likely without
+			// allocating a temporary list.
+			if (GD.RandRange(1, eligibleCount) == 1)
+				selected = cell;
+		}
+
+		return selected;
+	}
+
+	private static bool IsAllowedCell(HexCellData cell, bool excludeWater)
+		=> !excludeWater || cell.cellType != Enums.HexGridType.Water;
 
 	#region Helper Methods
 
@@ -654,13 +709,17 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 	#endregion
 
 
-	public List<HexCellData> GetCellsInStepRange(HexCellData startCell, int steps)
+	public List<HexCellData> GetCellsInStepRange(
+		HexCellData startCell,
+		int steps,
+		bool excludeWater = false)
 	{
 		List<HexCellData> results = new();
 
 		if (steps == 0)
 		{
-			results.Add(startCell);
+			if (IsAllowedCell(startCell, excludeWater))
+				results.Add(startCell);
 			return results;
 		}
 
@@ -669,7 +728,8 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		Queue<(int index, int distance)> queue = new();
 
 		queue.Enqueue((startCell.Index, 0));
-		results.Add(startCell); // Include origin? Remove if exclusive.
+		if (IsAllowedCell(startCell, excludeWater))
+			results.Add(startCell); // Include origin when it passes the filter.
 
 		while (queue.Count > 0)
 		{
@@ -686,7 +746,9 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 				if (visited.Add(neighborIndex))
 				{
 					var neighbor = _cellArray[neighborIndex];
-					results.Add(neighbor);
+					if (IsAllowedCell(neighbor, excludeWater))
+						results.Add(neighbor);
+					// Water is still traversed so range/path topology is unchanged.
 					queue.Enqueue((neighborIndex, currentDist + 1));
 				}
 			}
@@ -708,7 +770,10 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return new Vector2(u, v);
 	}
 
-	public List<HexCellData> GetCellsInWorldRadius(Vector3 origin, float worldRadius)
+	public List<HexCellData> GetCellsInWorldRadius(
+		Vector3 origin,
+		float worldRadius,
+		bool excludeWater = false)
 	{
 		List<HexCellData> results = new();
 		float radiusSqr = worldRadius * worldRadius;
@@ -717,7 +782,8 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		// Since _cellArray is a flat array, memory access is sequential and cache-friendly.
 		for (int i = 0; i < _cellArray.Length; i++)
 		{
-			if (_cellArray[i].Center.DistanceSquaredTo(origin) <= radiusSqr)
+			if (_cellArray[i].Center.DistanceSquaredTo(origin) <= radiusSqr
+			    && IsAllowedCell(_cellArray[i], excludeWater))
 			{
 				results.Add(_cellArray[i]);
 			}

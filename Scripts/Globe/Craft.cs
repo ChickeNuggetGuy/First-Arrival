@@ -17,6 +17,15 @@ public partial class Craft : ItemData
 	[Export]
 	public bool IsAvailable { get; set; }
 
+	[Export(PropertyHint.Range, "0,20,1")]
+	public int DetectionRadius { get; set; } = 2;
+
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float DetectionChance { get; set; } = 0.35f;
+
+	[Export]
+	public bool ShowDetectionRadius { get; set; } = true;
+
 	[Export]
 	public Enums.CraftStatus Status { get; set; } =
 		Enums.CraftStatus.Home;
@@ -132,6 +141,9 @@ public new Godot.Collections.Dictionary<string, Variant> Save()
 		{ "maxSpeed", MaxSpeed },
 		{ "acceleration", Acceleration },
 		{ "isAvailable", IsAvailable },
+		{ "detectionRadius", DetectionRadius },
+		{ "detectionChance", DetectionChance },
+		{ "showDetectionRadius", ShowDetectionRadius },
 		{
 			"stationedUnits",
 			GridObjectSerializationUtility.SaveGridObjects(
@@ -174,6 +186,12 @@ private void LoadDataOnly(
 	{
 		IsAvailable = data["isAvailable"].AsBool();
 	}
+	if (data.ContainsKey("detectionRadius"))
+		DetectionRadius = data["detectionRadius"].AsInt32();
+	if (data.ContainsKey("detectionChance"))
+		DetectionChance = data["detectionChance"].AsSingle();
+	if (data.ContainsKey("showDetectionRadius"))
+		ShowDetectionRadius = data["showDetectionRadius"].AsBool();
 }
 
 // Keep your existing Load(data) if other code calls it.

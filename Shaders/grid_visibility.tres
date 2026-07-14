@@ -5,3 +5,9 @@
 [resource]
 render_priority = 0
 shader = ExtResource("1_7fci6")
+shader_parameter/grid_origin_world = Vector3(0, 0, 0)
+shader_parameter/cell_size_world = Vector3(1, 1, 1)
+shader_parameter/visibility_grid_min = Vector3(0, 0, 0)
+shader_parameter/visibility_grid_size = Vector3(1, 1, 1)
+shader_parameter/terrain_color = Color(0.3128726, 0.5242307, 0.3156874, 1)
+shader_parameter/explored_brightness = 0.3499999921768

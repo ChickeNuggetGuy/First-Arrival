@@ -143,12 +143,15 @@ public partial class StartingEuipmentUI : UIWindow
 			}
 		}
 
-		if (_statBars != null && _statBars.Count > 0)
+		if (_statBars is { Count: > 0 })
 		{
-			currentUnit.TryGetGridObjectNode<GridObjectStatHolder>(out var statHolder);
-			foreach (var statBar in _statBars)
+			if(currentUnit.TryGetGridObjectNode<GridObjectStatHolder>(out var statHolder))
 			{
-				statBar.UpdateStat(statHolder);
+				foreach (var statBar in _statBars)
+				{
+
+					statBar.UpdateStat(statHolder);
+				}
 			}
 		}
 	}
@@ -193,6 +196,7 @@ public partial class StartingEuipmentUI : UIWindow
 	{
 		MouseFilter = MouseFilterEnum.Ignore;
 	}
+	
 	private void populateInventoryGrid(Enums.InventoryType inventoryType,
 		Godot.Collections.Dictionary<ItemData, int> items, InventoryManager inventoryManager)
 	{

@@ -6,7 +6,7 @@ public abstract partial class CellDefinitionVisual : Node3D, IContextUser<CellDe
 {
 	public int CellIndex;
 	public HexCellDefinition parentCellDefinition;
-	[Export] CollisionObject3D collisionObject;
+	[Export] private CollisionObject3D collisionObject;
 	public CellDefinitionVisual(HexCellDefinition parentCellDefinition, int cellIndex)
 	{
 		this.parentCellDefinition = parentCellDefinition;
@@ -19,6 +19,26 @@ public abstract partial class CellDefinitionVisual : Node3D, IContextUser<CellDe
 		this.CellIndex = -1;
 	}
 	public abstract Dictionary<string, Callable> GetContextActions();
+
+	public void BindDefinition(HexCellDefinition definition)
+	{
+		parentCellDefinition = definition;
+		CellIndex = definition?.cellIndex ?? -1;
+	}
+
+	public void SetDefinitionVisible(bool visible)
+	{
+		Visible = visible;
+		ProcessMode = visible ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+		if (collisionObject != null)
+			collisionObject.InputRayPickable = visible;
+	}
+
+	public override void _ExitTree()
+	{
+		parentCellDefinition?.ClearVisual(this);
+		base._ExitTree();
+	}
 
 	public CellDefinitionVisual parent { get; set; }
 }

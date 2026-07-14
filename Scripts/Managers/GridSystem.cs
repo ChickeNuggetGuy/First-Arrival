@@ -1315,6 +1315,50 @@ public partial class GridSystem : Manager<GridSystem>
 		return neighbors.Count > 0;
 	}
 
+	/// <summary>
+	/// Gets cells centered on <paramref name="startingGridCell"/>. Radius.X is
+	/// applied equally on the X and Z axes; Radius.Y is the vertical radius.
+	/// This differs from TryGetGridCellsInRange, whose Vector2I represents an
+	/// area size and can be asymmetric around a cell for odd dimensions.
+	/// </summary>
+	public bool TryGetGridCellsInRadius(
+		GridCell startingGridCell,
+		Vector2I radius,
+		bool onlyWalkable,
+		out List<GridCell> cells,
+		Enums.GridCellState stateFilter = Enums.GridCellState.None
+	)
+	{
+		cells = new List<GridCell>();
+		if (startingGridCell == null || radius.X < 0 || radius.Y < 0)
+			return false;
+
+		for (int y = -radius.Y; y <= radius.Y; y++)
+		{
+			for (int x = -radius.X; x <= radius.X; x++)
+			{
+				for (int z = -radius.X; z <= radius.X; z++)
+				{
+					GridCell cell = GetGridCell(
+						startingGridCell.GridCoordinates + new Vector3I(x, y, z)
+					);
+					if (cell == null)
+						continue;
+
+					if (onlyWalkable && !cell.IsWalkable)
+						continue;
+
+					if (stateFilter != Enums.GridCellState.None && !cell.state.HasFlag(stateFilter))
+						continue;
+
+					cells.Add(cell);
+				}
+			}
+		}
+
+		return cells.Count > 0;
+	}
+
 	public bool TryGetGridCellsInArea(
 		Area3D area,
 		out List<GridCell> gridCells

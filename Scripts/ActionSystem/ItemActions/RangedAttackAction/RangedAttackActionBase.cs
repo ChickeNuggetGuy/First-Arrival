@@ -9,6 +9,11 @@ using FirstArrival.Scripts.Utility;
 
 public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IItemAction
 {
+	private const float RegularSpreadScale = 0.5f;
+	private const float MaximumFlyerDeviationDegrees = 28.4f;
+	private const float MinimumFlyerChance = 0.02f;
+	private const float MaximumFlyerChance = 0.12f;
+
 	public Item Item { get; set; }
 	public ActionBase ParentActionBase { get; set; }
 	public List<ActionBase> SubActions { get; set; }
@@ -83,8 +88,12 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 
 			Vector3 direction =
 				((targetGridCell.WorldCenter + Vector3.Up) - origin).Normalized();
-			Vector2 deviationMax = mathUtils.GetMaxDeviation(rangedAccuracy.CurrentValue, 1, true);
-			Vector3 newDirection = CalculateProjectileDirection(direction, deviationMax.X, deviationMax.Y);
+			float effectiveAccuracy = Mathf.Clamp(
+				rangedAccuracy.CurrentValue + rangedAttackActionDefinition.accuracy,
+				0f,
+				100f
+			);
+			Vector3 newDirection = CalculateProjectileDirection(direction, effectiveAccuracy);
 
 			if (RaycastCheck(origin, newDirection, out var results))
 			{
@@ -130,11 +139,44 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 	}
 
 
-	private Vector3 CalculateProjectileDirection(Vector3 direction, float horizontalDeviationMax,
-		float verticalDeviationMax)
+	private Vector3 CalculateProjectileDirection(Vector3 direction, float effectiveAccuracy)
 	{
-		float yaw = Mathf.DegToRad((float)GD.RandRange(-horizontalDeviationMax, horizontalDeviationMax));
-		float pitch = Mathf.DegToRad((float)GD.RandRange(-verticalDeviationMax, verticalDeviationMax));
+		float normalizedAccuracy = Mathf.Clamp(effectiveAccuracy / 100f, 0f, 1f);
+		float flyerChance = Mathf.Lerp(
+			MaximumFlyerChance,
+			MinimumFlyerChance,
+			normalizedAccuracy
+		);
+		bool isFlyer = GD.Randf() < flyerChance;
+
+		Vector2 regularDeviationMax = mathUtils.GetMaxDeviation(effectiveAccuracy, 1, true)
+			* RegularSpreadScale;
+
+		float yawDegrees;
+		float pitchDegrees;
+		if (isFlyer)
+		{
+			// Flyers retain the full possible cone at every accuracy level. Accuracy
+			// makes them less frequent rather than making them impossible.
+			yawDegrees = (float)GD.RandRange(
+				-MaximumFlyerDeviationDegrees,
+				MaximumFlyerDeviationDegrees
+			);
+			pitchDegrees = (float)GD.RandRange(
+				-MaximumFlyerDeviationDegrees,
+				MaximumFlyerDeviationDegrees
+			);
+		}
+		else
+		{
+			// The difference of two uniform samples creates a triangular distribution,
+			// keeping ordinary shots near the aim point while retaining soft tails.
+			yawDegrees = SampleTriangularDeviation(regularDeviationMax.X);
+			pitchDegrees = SampleTriangularDeviation(regularDeviationMax.Y);
+		}
+
+		float yaw = Mathf.DegToRad(yawDegrees);
+		float pitch = Mathf.DegToRad(pitchDegrees);
 
 		Quaternion yawRotation = new Quaternion(Vector3.Up, yaw);
 
@@ -145,6 +187,11 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 		Quaternion finalRotation = yawRotation * pitchRotation;
 
 		return finalRotation * direction.Normalized();
+	}
+
+	private static float SampleTriangularDeviation(float maximumDeviation)
+	{
+		return (GD.Randf() - GD.Randf()) * maximumDeviation;
 	}
 
 	private bool RaycastCheck(Vector3 startPoint, Vector3 direction, out Godot.Collections.Dictionary result)
