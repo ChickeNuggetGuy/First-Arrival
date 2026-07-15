@@ -23,6 +23,11 @@ public partial class ItemData : Resource
 
 	[Export] public bool globeOnly { get; protected set; } = false;
 
+	[ExportGroup("Trading")]
+	[Export] public bool ShowInBuySellWindow { get; protected set; } = true;
+	[Export] public int buyPrice;
+	[Export] public int sellPrice;
+
 	[Export(PropertyHint.ResourceType, "GridShape")]
 	public GridShape ItemShape { get; set; }
 
@@ -40,9 +45,6 @@ public partial class ItemData : Resource
 	public Array<ActionDefinition> ActionDefinitions;
 	
 	[Export] public int MaxStackSize { get; protected set; } = 1;
-	
-	[Export] public int buyPrice;
-	[Export] public int sellPrice;
 	
 	public static Item CreateItem(ItemData itemData)
 	{

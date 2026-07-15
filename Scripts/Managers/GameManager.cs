@@ -47,6 +47,7 @@ public partial class GameManager : Manager<GameManager>
 	public Vector2I unitCounts = new Vector2I(2, 2);
 	public MissionCellDefinition currentMission;
 	public TeamBaseCellDefinition currentBase;
+	public int currentBaseFunds;
 	public PackedScene unitScene;
 
 	public float loadingPercent = 0;
@@ -389,10 +390,62 @@ public partial class GameManager : Manager<GameManager>
 		var globeData = SavesManager.Instance.ConsumeSceneState("GlobeState");
 		if (globeData == null) return;
 
+		MergeCurrentBaseIntoGlobeState(globeData);
+
 		SavesManager.PendingSaveData = globeData;
 		SavesManager.LoadFromAutosave = false;
 
 		await ChangeSceneAsync(GameScene.GlobeScene, true);
+	}
+
+	public bool SyncCurrentBaseToGlobeState()
+	{
+		if (SavesManager.Instance == null ||
+		    !SavesManager.Instance.TryGetSessionData("GlobeState", out Variant stateValue))
+			return false;
+
+		var globeData = stateValue.AsGodotDictionary<string, Variant>();
+		MergeCurrentBaseIntoGlobeState(globeData);
+		SavesManager.Instance.SetSessionData("GlobeState", globeData);
+		return true;
+	}
+
+	private void MergeCurrentBaseIntoGlobeState(
+		Godot.Collections.Dictionary<string, Variant> globeData)
+	{
+		if (currentBase == null) return;
+		if (!globeData.TryGetValue("managers", out Variant managersValue)) return;
+
+		var managers = managersValue.AsGodotDictionary<string, Variant>();
+		if (!managers.TryGetValue("GlobeTeamManager", out Variant teamManagerValue)) return;
+
+		var teamManagerData = teamManagerValue.AsGodotDictionary<string, Variant>();
+		if (!teamManagerData.TryGetValue("teamData", out Variant teamDataValue)) return;
+
+		var teamData = teamDataValue.AsGodotDictionary<string, Variant>();
+		string teamKey = ((int)currentBase.teamAffiliation).ToString();
+		if (!teamData.TryGetValue(teamKey, out Variant holderValue)) return;
+
+		var holderData = holderValue.AsGodotDictionary<string, Variant>();
+		if (!holderData.TryGetValue("bases", out Variant basesValue)) return;
+
+		var bases = basesValue.AsGodotDictionary<string, Variant>();
+		bases[currentBase.cellIndex.ToString()] = currentBase.Save();
+		holderData["bases"] = bases;
+		holderData["funds"] = currentBaseFunds;
+		teamData[teamKey] = holderData;
+		teamManagerData["teamData"] = teamData;
+		managers["GlobeTeamManager"] = teamManagerData;
+
+		if (managers.TryGetValue(GetManagerName(), out Variant gameManagerValue))
+		{
+			var gameManagerData = gameManagerValue.AsGodotDictionary<string, Variant>();
+			gameManagerData["currentBase"] = currentBase.Save();
+			gameManagerData["currentBaseFunds"] = currentBaseFunds;
+			managers[GetManagerName()] = gameManagerData;
+		}
+
+		globeData["managers"] = managers;
 	}
 
 	private static void UpdateMissionStatusInSavedData(
@@ -424,6 +477,7 @@ public partial class GameManager : Manager<GameManager>
 			["unitCounts"] = unitCounts,
 			["currentScene"] = (int)currentScene,
 			["currentBase"] = currentBase?.Save(),
+			["currentBaseFunds"] = currentBaseFunds,
 		};
 	}
 
@@ -433,6 +487,7 @@ public partial class GameManager : Manager<GameManager>
 		if (data.ContainsKey("mapSize")) mapSize = (Vector2I)data["mapSize"];
 		if (data.ContainsKey("unitCounts")) unitCounts = (Vector2I)data["unitCounts"];
 		if (data.ContainsKey("currentScene")) currentScene = (GameScene)(int)data["currentScene"];
+		if (data.ContainsKey("currentBaseFunds")) currentBaseFunds = data["currentBaseFunds"].AsInt32();
 		if (data.ContainsKey("currentBase") && data["currentBase"].VariantType != Variant.Type.Nil)
 		{
 			currentBase = new TeamBaseCellDefinition(-1, "", Enums.UnitTeam.None, null);

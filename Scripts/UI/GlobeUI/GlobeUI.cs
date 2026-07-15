@@ -115,6 +115,7 @@ public partial class GlobeUI : UIWindow
 				baseButton.Pressed += async () => 
 				{
 					GameManager.Instance.currentBase = baseCellDefinition;
+					GameManager.Instance.currentBaseFunds = teamHolder.funds;
                 
 					SavesManager.Instance.StashSceneState("GlobeState");
 

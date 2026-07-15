@@ -63,3 +63,5 @@ RightHandItemPosition = Vector3(0.01, 0.01, 0.01)
 RightHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
 ActionDefinitions = Array[Object]([SubResource("Resource_xokv0"), SubResource("Resource_tj85d"), SubResource("Resource_xaass"), SubResource("Resource_xgeb5"), SubResource("Resource_ipk4j")])
 MaxStackSize = 4
+buyPrice = 850
+sellPrice = 675

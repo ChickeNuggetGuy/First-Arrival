@@ -55,6 +55,8 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 	}
 
+	public int MaxCraft => maxCraft;
+
 	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(
 		cellIndex, name, true)
 	{
@@ -261,6 +263,17 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		return true;
 	}
 
+	public bool TryAddCraftWithoutPurchase(Enums.CraftStatus status, Craft craftToAdd)
+	{
+		if (craftToAdd == null) return false;
+		if (!craft.ContainsKey(status)) return false;
+		if (craft[status].Contains(craftToAdd)) return false;
+		if (CraftCount >= maxCraft) return false;
+
+		AddCraft(status, craftToAdd);
+		return true;
+	}
+
 	private void RemoveCraft(Enums.CraftStatus status, Craft craftToRemove)
 	{
 		craft[status].Remove(craftToRemove);
@@ -279,6 +292,42 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 		RemoveCraft(status, craftToRemove);
 		return true;
+	}
+
+	public int GetCraftCountForItem(int itemId)
+	{
+		int count = 0;
+		foreach (Craft existingCraft in CraftList)
+		{
+			if (existingCraft.ItemID == itemId) count++;
+		}
+		return count;
+	}
+
+	public int GetSellableCraftCountForItem(int itemId)
+	{
+		int count = 0;
+		foreach (Craft existingCraft in CraftList)
+		{
+			if (existingCraft.ItemID == itemId &&
+			    existingCraft.Status != Enums.CraftStatus.EnRoute &&
+			    existingCraft.GetStationedUnits().Count == 0)
+				count++;
+		}
+		return count;
+	}
+
+	public bool TryRemoveCraftByItemId(int itemId)
+	{
+		foreach (Craft existingCraft in CraftList)
+		{
+			if (existingCraft.ItemID == itemId &&
+			    existingCraft.Status != Enums.CraftStatus.EnRoute &&
+			    existingCraft.GetStationedUnits().Count == 0)
+				return TryRemoveCraft(existingCraft.Status, existingCraft);
+		}
+
+		return false;
 	}
 
 
@@ -533,7 +582,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			}
 			else
 			{
-				if (!toBase.TryAddCraft(craft.Status, craft))
+				if (!toBase.TryAddCraftWithoutPurchase(craft.Status, craft))
 				{
 					fromBase.AddCraft(craft.Status, craft);
 					success = false;
@@ -571,7 +620,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (InventoryManager.Instance.GetItemData(itemID) == null)
 			return false;
 
-		if (count == 0) return false;
+		if (count <= 0) return false;
 
 		AddItem(itemID, count);
 		return true;
@@ -599,9 +648,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (InventoryManager.Instance.GetItemData(itemID) == null)
 			return false;
 
-		if (count == 0) return false;
+		if (count <= 0) return false;
+		if (!itemCounts.ContainsKey(itemID) || itemCounts[itemID] < count)
+			return false;
 
 		RemoveItem(itemID, count);
+		if (itemCounts.GetValueOrDefault(itemID, 0) == 0)
+			itemCounts.Remove(itemID);
 		return true;
 	}
 

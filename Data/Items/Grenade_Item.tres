@@ -36,3 +36,5 @@ ItemShape = SubResource("Resource_5mon7")
 weight = 5
 ActionDefinitions = [SubResource("Resource_yew0j"), SubResource("Resource_3n0l4")]
 MaxStackSize = 2
+buyPrice = 500
+sellPrice = 375
