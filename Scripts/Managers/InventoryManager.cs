@@ -42,12 +42,7 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 
 		if (startingItems.Count == 0)
-		{
-			foreach (ItemData itemData in Database.GetAllItems())
-			{
-				startingItems.Add(itemData, 4);
-			}
-		}
+			ResetStartingItemsToDefaults();
 		await Task.CompletedTask;
 	}
 
@@ -82,8 +77,28 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 	public void AddRuntimeInventoryGridUI(Enums.InventoryType type, InventoryGridUI gridUi)
 	{
-		if(runtimeInventoryGridUIs.ContainsKey(type)) return;
+		if (gridUi == null) return;
+
+		if (runtimeInventoryGridUIs.TryGetValue(type, out InventoryGridUI existing))
+		{
+			if (existing == gridUi) return;
+			if (existing != null && GodotObject.IsInstanceValid(existing)) return;
+			runtimeInventoryGridUIs[type] = gridUi;
+			return;
+		}
+
 		runtimeInventoryGridUIs.Add(type, gridUi);
+	}
+
+	public void RemoveRuntimeInventoryGridUI(
+		Enums.InventoryType type,
+		InventoryGridUI gridUi)
+	{
+		if (runtimeInventoryGridUIs.TryGetValue(type, out InventoryGridUI registered) &&
+		    registered == gridUi)
+		{
+			runtimeInventoryGridUIs.Remove(type);
+		}
 	}
 
 
@@ -119,6 +134,31 @@ public partial class InventoryManager : Manager<InventoryManager>
 			return Database.Items[itemID];
 		}
 		return null;
+	}
+
+	public void SetStartingItems(Dictionary<int, int> itemCounts)
+	{
+		startingItems.Clear();
+		if (itemCounts == null || Database == null) return;
+
+		foreach (var pair in itemCounts)
+		{
+			ItemData itemData = GetItemData(pair.Key);
+			if (itemData == null || itemData is Craft || pair.Value <= 0) continue;
+			startingItems[itemData] = pair.Value;
+		}
+	}
+
+	public void ResetStartingItemsToDefaults()
+	{
+		startingItems.Clear();
+		if (Database == null) return;
+
+		foreach (ItemData itemData in Database.GetAllItems())
+		{
+			if (itemData != null && itemData is not Craft)
+				startingItems[itemData] = 4;
+		}
 	}
 	
 	#region manager Data

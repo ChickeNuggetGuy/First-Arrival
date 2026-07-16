@@ -9,6 +9,7 @@ namespace FirstArrival.Scripts.Managers;
 public partial class FogManager : Manager<FogManager>
 {
     [Export] public ShaderMaterial FowMaterial { get; set; }
+	[Export] public Godot.Collections.Array<ShaderMaterial> AdditionalFogMaterials { get; set; } = new();
 	
     private ImageTexture3D _visibilityTexture3DCache;
     private GridObjectTeamHolder _playerHolder;
@@ -97,11 +98,13 @@ public partial class FogManager : Manager<FogManager>
         if (visibilitySize.X <= 0 || visibilitySize.Y <= 0 || visibilitySize.Z <= 0)
             return;
 
-        FowMaterial.SetShaderParameter("visibility_texture", _visibilityTexture3DCache);
-        FowMaterial.SetShaderParameter("grid_origin_world", gridOrigin);
-        FowMaterial.SetShaderParameter("cell_size_world", cellSizeWorld);
-        FowMaterial.SetShaderParameter("visibility_grid_min", visibilityMin);
-        FowMaterial.SetShaderParameter("visibility_grid_size", visibilitySize);
+        SetFogParameters(FowMaterial, gridOrigin, cellSizeWorld, visibilityMin, visibilitySize);
+
+        foreach (var material in AdditionalFogMaterials)
+        {
+            if (material != null && material != FowMaterial)
+                SetFogParameters(material, gridOrigin, cellSizeWorld, visibilityMin, visibilitySize);
+        }
 
         if (DebugMode)
         {
@@ -110,6 +113,21 @@ public partial class FogManager : Manager<FogManager>
                 $"origin {gridOrigin}, cell size {cellSizeWorld}."
             );
         }
+    }
+
+    private void SetFogParameters(
+        ShaderMaterial material,
+        Vector3 gridOrigin,
+        Vector3 cellSizeWorld,
+        Vector3 visibilityMin,
+        Vector3 visibilitySize
+    )
+    {
+        material.SetShaderParameter("visibility_texture", _visibilityTexture3DCache);
+        material.SetShaderParameter("grid_origin_world", gridOrigin);
+        material.SetShaderParameter("cell_size_world", cellSizeWorld);
+        material.SetShaderParameter("visibility_grid_min", visibilityMin);
+        material.SetShaderParameter("visibility_grid_size", visibilitySize);
     }
 
     public override void Deinitialize()

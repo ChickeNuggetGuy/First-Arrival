@@ -119,7 +119,10 @@ public partial class ActiveMissionsUi : UIWindow
 		{
 			child.QueueFree();
 		}
-		
-		
 	}
+	
+	protected override async Task DrawUI()
+	{
+	}
+
 }

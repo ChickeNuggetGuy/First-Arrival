@@ -4,8 +4,7 @@ using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.UI.UIAnimations;
 
-[GlobalClass]
-public partial class UIWindow : UIElement
+public abstract partial class UIWindow : UIElement
 {
 	[Export] protected Control Visual;
 	[Export] Button toggleButton;
@@ -78,6 +77,7 @@ public partial class UIWindow : UIElement
 
 	public async Task ShowCall(bool playAnimation = true)
 	{
+		await DrawUI();
 		_Show();
 		Visual.Show();
 		foreach (var uiElement in uiElements)
@@ -98,6 +98,8 @@ public partial class UIWindow : UIElement
 		{
 			UIManager.Instance.BlockInputs(this);
 		}
+
+		MouseFilter = MouseFilterEnum.Stop;
 
 		IsShown = true;
 	}
@@ -125,7 +127,7 @@ public partial class UIWindow : UIElement
 		}
 		Visual.Hide();
 		IsShown = false;
-		
+		MouseFilter = MouseFilterEnum.Ignore;
 		if (blockInputs)
 		{
 			UIManager.Instance.UnblockInputs(this);
@@ -136,7 +138,9 @@ public partial class UIWindow : UIElement
 	{
 		
 	}
-	
+
+
+	protected abstract Task DrawUI();
 	#region Animation Functions
 
 	protected async Task StartShowAnimation()

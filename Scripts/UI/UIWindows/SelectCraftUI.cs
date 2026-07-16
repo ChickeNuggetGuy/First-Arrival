@@ -32,7 +32,8 @@ public partial class SelectCraftUI : UIWindow
 		base._ExitTree();
 	}
 
-	protected override void _Show()
+	
+	protected override async Task DrawUI()
 	{
 		SetupTree();
 		base._Show();

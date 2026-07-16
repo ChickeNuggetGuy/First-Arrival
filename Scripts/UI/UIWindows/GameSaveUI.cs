@@ -32,10 +32,10 @@ public partial class GameSaveUI : UIWindow
 	}
 
 
-	protected override void _Show()
+	
+	protected override async Task DrawUI()
 	{
 		LoadSaveGameData();
-		base._Show();
 	}
 
 	private void LoadSaveGameData()

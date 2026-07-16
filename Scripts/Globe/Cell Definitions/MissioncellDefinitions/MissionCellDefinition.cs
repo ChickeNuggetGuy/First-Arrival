@@ -26,6 +26,7 @@ public partial class MissionCellDefinition : HexCellDefinition
 	};
 
 	public Craft onRouteCraft; 
+	public int alienOperationId { get; private set; } = -1;
 
 	public MissionCellDefinition(
 		int cellIndex,
@@ -33,12 +34,14 @@ public partial class MissionCellDefinition : HexCellDefinition
 		MissionBase mission,
 		Node3D missionVisual = null,
 		Enums.MissionStatus missionStatus = Enums.MissionStatus.None,
-		Craft craft = null) : base(cellIndex, name)
+		Craft craft = null,
+		int alienOperationId = -1) : base(cellIndex, name)
 	{
 		this.mission = mission;
 		if (missionVisual != null)
 			this.missionVisual = missionVisual;
 		this.missionStatus = missionStatus;
+		this.alienOperationId = alienOperationId;
 		SetOnRouteCraft(craft);
 		timeLeft = timeoutTime;
 		StartTimeoutTracking();
@@ -85,10 +88,17 @@ public partial class MissionCellDefinition : HexCellDefinition
 		
 		onRouteCraft = craft;
 		
-		if (onRouteCraft != null)
-		{
-			missionStatus = Enums.MissionStatus.OnRoute;
-		}
+		if (onRouteCraft == null) return;
+
+		// Loaded missions may still reference their dispatched craft after the
+		// battle has produced a final result. Do not overwrite that result with
+		// OnRoute, or GlobeMissionManager will never resolve the mission/reward.
+		Enums.MissionStatus completedStatuses = Enums.MissionStatus.Visited |
+			Enums.MissionStatus.Successful |
+			Enums.MissionStatus.Failed |
+			Enums.MissionStatus.Timeout;
+		if ((missionStatus & completedStatuses) == Enums.MissionStatus.None)
+			missionStatus |= Enums.MissionStatus.OnRoute;
 	}
 	
 	
@@ -107,6 +117,7 @@ public partial class MissionCellDefinition : HexCellDefinition
 		data.Add("onRouteCraft", craftData);
 		data.Add("timeoutTime", timeoutTime);
 		data.Add("timeLeft", timeLeft);
+		data.Add("alienOperationId", alienOperationId);
 		return data;
 	}
 }

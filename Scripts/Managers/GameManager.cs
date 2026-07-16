@@ -49,6 +49,10 @@ public partial class GameManager : Manager<GameManager>
 	public TeamBaseCellDefinition currentBase;
 	public int currentBaseFunds;
 	public PackedScene unitScene;
+	private Godot.Collections.Array<
+		Godot.Collections.Dictionary<string, Variant>> _pendingBattlePlayerUnits;
+
+	public bool HasPendingBattlePlayerUnits => _pendingBattlePlayerUnits != null;
 
 	public float loadingPercent = 0;
 	public LoadingState loadingState = LoadingState.NONE;
@@ -329,6 +333,31 @@ public partial class GameManager : Manager<GameManager>
 
 	#region Game Logic & Rules
 
+	public void PrepareBattleLoadout(Craft craft)
+	{
+		_pendingBattlePlayerUnits = craft == null
+			? new Godot.Collections.Array<
+				Godot.Collections.Dictionary<string, Variant>>()
+			: GridObjectSerializationUtility.SaveGridObjects(
+				craft.GetStationedGridObjects()
+			);
+
+		unitCounts = new Vector2I(_pendingBattlePlayerUnits.Count, unitCounts.Y);
+		InventoryManager.Instance?.SetStartingItems(craft?.GetItemCounts);
+	}
+
+	public Godot.Collections.Array<
+		Godot.Collections.Dictionary<string, Variant>> GetPendingBattlePlayerUnits()
+	{
+		return _pendingBattlePlayerUnits;
+	}
+
+	public void ClearPendingBattleLoadout()
+	{
+		_pendingBattlePlayerUnits = null;
+		InventoryManager.Instance?.ResetStartingItemsToDefaults();
+	}
+
 	public void CheckGameState(Turn currentTurn)
 	{
 		var teamHolders = GridObjectManager.Instance.GetGridObjectTeamHolders();
@@ -351,6 +380,7 @@ public partial class GameManager : Manager<GameManager>
 					}
 
 					EndGame();
+					return;
 				}
 			}
 		}

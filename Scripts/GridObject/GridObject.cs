@@ -50,7 +50,10 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 		bool allowMissingGridCell = false
 	)
 	{
-		TeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(team);
+		// Stored globe/base units are loaded as inactive data objects in scenes
+		// that intentionally do not contain the battle-only GridObjectManager.
+		// They receive a TeamHolder later when initialized in a battle scene.
+		TeamHolder = GridObjectManager.Instance?.GetGridObjectTeamHolder(team);
 		Team = team;
 
 		GridPositionData ??= GetNodeOrNull<GridPositionData>("GridPositionData") ??

@@ -363,11 +363,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	}
 
 
-	public async Task SendCraft(
+	public async Task<bool> SendCraft(
 		int startCellIndex,
 		int targetCellIndex,
 		Craft craft,
-		GlobeTeamManager teamManager)
+		GlobeTeamManager teamManager,
+		bool interactWithMission = true,
+		Action<Craft> onArrived = null)
 	{
 		// Early out: craft is already at its home base 
 		if (startCellIndex == targetCellIndex && targetCellIndex == craft.HomeBaseIndex)
@@ -383,17 +385,19 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 				craft.SetVisual(null);
 			}
 
-			return;
+			onArrived?.Invoke(craft);
+			return true;
 		}
 
 		GlobePathfinder pathfinder = GlobePathfinder.Instance;
 		GlobeHexGridManager manager = GlobeHexGridManager.Instance;
 		GlobeMissionManager missionManager = GlobeMissionManager.Instance;
 
-		if (pathfinder == null || manager == null || missionManager == null)
+		if (pathfinder == null || manager == null ||
+		    (interactWithMission && missionManager == null))
 		{
 			GD.PrintErr("manager is null");
-			return;
+			return false;
 		}
 
 		// Only the destination must be land. The pathfinder remains unrestricted,
@@ -401,7 +405,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (!manager.GetCellFromIndex(targetCellIndex, excludeWater: true).HasValue)
 		{
 			GD.PrintErr($"Cannot send craft to water cell {targetCellIndex}.");
-			return;
+			return false;
 		}
 
 		List<int> path = pathfinder.GetPath(startCellIndex, targetCellIndex);
@@ -409,17 +413,18 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (path == null || path.Count == 0)
 		{
 			GD.PrintErr("No path found for mission!");
-			return;
+			return false;
 		}
 
 		if (!TryChangeCraftStatus(Enums.CraftStatus.EnRoute, craft))
 		{
 			GD.PrintErr("Failed to change craft status!");
-			return;
+			return false;
 		}
 
 		MissionCellDefinition missionCellDefinition = null;
-		if (missionManager.GetActiveMissions().ContainsKey(targetCellIndex))
+		if (interactWithMission &&
+		    missionManager.GetActiveMissions().ContainsKey(targetCellIndex))
 		{
 			MissionCellDefinition possibleMission = missionManager.GetActiveMissions()[targetCellIndex];
 			if (!possibleMission.missionStatus.HasFlag(Enums.MissionStatus.Visited))
@@ -427,27 +432,34 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 
 		TeamBaseCellDefinition teamBaseCellDefinition = null;
-		teamManager.GetTeamData(Enums.UnitTeam.Player).TryGetBaseAtIndex(
+		teamManager.GetTeamData(teamAffiliation)?.TryGetBaseAtIndex(
 			targetCellIndex,
-			out teamBaseCellDefinition
-		);
+			out teamBaseCellDefinition);
+
+		if (teamManager.shipScene == null)
+		{
+			GD.PrintErr("Cannot send craft: ship scene is not configured.");
+			TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
+			return false;
+		}
 
 		MeshInstance3D shipNode = craft.visual
 		                          ?? teamManager.shipScene.Instantiate<MeshInstance3D>();
 
 		if (craft.visual == null)
 			craft.SetVisual(shipNode);
+		shipNode.Visible = teamAffiliation == teamManager.ViewingTeam ||
+		                   craft.IsVisibleTo(teamManager.ViewingTeam);
 
-		if (teamManager.shipContainer != null
-		    && shipNode.GetParent() != teamManager.shipContainer)
-			teamManager.shipContainer.AddChild(shipNode);
-		else
+		if (teamManager.shipContainer != null)
 		{
-			if (shipNode.GetParent() != null)
+			if (shipNode.GetParent() == null)
+				teamManager.shipContainer.AddChild(shipNode);
+			else if (shipNode.GetParent() != teamManager.shipContainer)
 				shipNode.Reparent(teamManager.shipContainer);
-			else
-				teamManager.AddChild(shipNode);
 		}
+		else if (shipNode.GetParent() == null)
+			teamManager.AddChild(shipNode);
 
 		var startCell = manager.GetCellFromIndex(path[0]);
 		if (startCell.HasValue)
@@ -464,6 +476,29 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 		craft.TargetCellIndex = targetCellIndex;
 		Tween shipTween = teamManager.GetTree().CreateTween();
+		float secondsPerStep = craft.MaxSpeed > 0
+			? Mathf.Clamp(100f / craft.MaxSpeed, 0.05f, 0.4f)
+			: 0.4f;
+		GlobeTimeManager timeManager = GlobeTimeManager.Instance;
+
+		void ApplyGlobeTimeSpeed(int speed)
+		{
+			if (!GodotObject.IsInstanceValid(shipTween)) return;
+			if (speed <= 0)
+			{
+				shipTween.Pause();
+				return;
+			}
+
+			shipTween.SetSpeedScale(speed);
+			shipTween.Play();
+		}
+
+		if (timeManager != null)
+		{
+			timeManager.TimeSpeedChanged += ApplyGlobeTimeSpeed;
+			ApplyGlobeTimeSpeed(timeManager.GetTimeSpeed());
+		}
 
 		if (missionCellDefinition != null)
 			missionCellDefinition.SetOnRouteCraft(craft);
@@ -485,7 +520,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 				})
 			);
 
-			shipTween.TweenProperty(shipNode, "global_position", targetPos, 0.4f);
+			shipTween.TweenProperty(
+				shipNode,
+				"global_position",
+				targetPos,
+				secondsPerStep);
 			shipTween.TweenCallback(
 				Callable.From(() =>
 				{
@@ -503,11 +542,23 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 						craft.DetectionRadius,
 						craft.DetectionChance
 					);
+					teamManager.TryDetectHostileCraft(
+						craft,
+						teamAffiliation,
+						reachedCellIndex);
 				})
 			);
 		}
 
-		await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
+		try
+		{
+			await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
+		}
+		finally
+		{
+			if (timeManager != null && GodotObject.IsInstanceValid(timeManager))
+				timeManager.TimeSpeedChanged -= ApplyGlobeTimeSpeed;
+		}
 
 		craft.CurrentCellIndex = targetCellIndex;
 
@@ -547,6 +598,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			// Arrived at a plain cell
 			TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
 		}
+
+		onArrived?.Invoke(craft);
+		return true;
 	}
 
 

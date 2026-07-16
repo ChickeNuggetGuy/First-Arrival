@@ -75,4 +75,9 @@ public partial class QuickSelectUI : UIWindow
 		
 		return instantiateButton;
 	}
+	
+	protected override async Task DrawUI()
+	{
+	}
+
 }

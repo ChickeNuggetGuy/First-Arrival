@@ -7,6 +7,7 @@
 [ext_resource type="Resource" uid="uid://cl5ux7qc5iogn" path="res://Data/Items/Grenade_Item.tres" id="4_02t12"]
 [ext_resource type="Resource" uid="uid://bfkutk4217uhc" path="res://Data/Items/Rifle_Item.tres" id="5_8xkxm"]
 [ext_resource type="Resource" uid="uid://b307r1871vdqi" path="res://Data/Items/Troop_Transport_Item.tres" id="5_y1orf"]
+[ext_resource type="Resource" uid="uid://cvsru2hn58n2r" path="res://Data/Items/Aien_Craft_Item.tres" id="7_02t12"]
 
 [resource]
 script = ExtResource("2_edjy6")
@@ -15,6 +16,7 @@ Items = Dictionary[int, ExtResource("1_m8kqt")]({
 1: ExtResource("3_8xkxm"),
 2: ExtResource("2_y1orf"),
 3: ExtResource("5_8xkxm"),
-4: ExtResource("5_y1orf")
+4: ExtResource("5_y1orf"),
+5: ExtResource("7_02t12")
 })
 metadata/_custom_type_script = "uid://bg1t1nedltkks"

@@ -90,8 +90,20 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			// Either New Game or loaded a Globe save and entered a new Battle.
 			foreach (KeyValuePair<Enums.UnitTeam, int> kvp in spawnCounts)
 			{
-				for (int i = 0; i < kvp.Value; i++)
-					await TrySpawnGridObject(GetGridObjectTeamHolder(kvp.Key).unitPrefab, kvp.Key);
+				bool useCraftUnits = kvp.Key == Enums.UnitTeam.Player &&
+				                     GameManager.Instance.HasPendingBattlePlayerUnits;
+
+				if (useCraftUnits)
+				{
+					var savedUnits = GameManager.Instance.GetPendingBattlePlayerUnits();
+					foreach (var savedUnit in savedUnits)
+						await TrySpawnSavedGridObject(savedUnit, kvp.Key);
+				}
+				else
+				{
+					for (int i = 0; i < kvp.Value; i++)
+						await TrySpawnGridObject(GetGridObjectTeamHolder(kvp.Key).unitPrefab, kvp.Key);
+				}
 
 				if (gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active].Count > 0)
 				{
@@ -113,21 +125,66 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		await ToSignal(GetTree().CreateTimer(1.0f), "timeout");
 		await startingEuipmentUI.ShowCall();
 		await ToSignal(startingEuipmentUI, StartingEuipmentUI.SignalName.AcceptPressed);
+		GameManager.Instance.ClearPendingBattleLoadout();
+	}
+
+	private async Task TrySpawnSavedGridObject(
+		Godot.Collections.Dictionary<string, Variant> unitData,
+		Enums.UnitTeam team)
+	{
+		if (!TryGetSpawnCell(team, out GridCell cell))
+		{
+			GD.PrintErr($"No valid spawn cell found for saved {team} unit.");
+			return;
+		}
+
+		var battleUnitData = new Godot.Collections.Dictionary<string, Variant>();
+		foreach (var pair in unitData)
+			battleUnitData[pair.Key] = pair.Value;
+
+		// Units stored on a craft are inactive and have no globe-grid position.
+		// Override only that scene-specific state; their stats and inventories remain.
+		battleUnitData["Team"] = (int)team;
+		battleUnitData["IsActive"] = true;
+		battleUnitData["HasPosition"] = false;
+
+		GridObjectTeamHolder teamHolder = GetGridObjectTeamHolder(team);
+		GridObject instance = await GridObjectSerializationUtility.LoadGridObjectAsync(
+			battleUnitData,
+			teamHolder,
+			false
+		);
+		if (instance == null) return;
+
+		instance.GlobalPosition = cell.WorldCenter;
+		instance.SetIsActive(true);
+		instance.Show();
+		instance.GridPositionData.SetGridCell(cell);
+		await teamHolder.AddGridObject(instance);
+	}
+
+	private bool TryGetSpawnCell(Enums.UnitTeam team, out GridCell cell)
+	{
+		if (team.HasFlag(Enums.UnitTeam.Player))
+		{
+			return GridSystem.Instance.TryGetRandomGridCell(
+				true,
+				out cell,
+				teamFilter: Enums.UnitTeam.Player
+			);
+		}
+
+		return GridSystem.Instance.TryGetRandomGridCell(
+			true,
+			out cell,
+			Enums.GridCellState.None,
+			true
+		);
 	}
 
 	private async Task TrySpawnGridObject(PackedScene gridObjectScene, Enums.UnitTeam team)
 	{
-		bool success;
-		GridCell cell;
-
-		if (team.HasFlag(Enums.UnitTeam.Player))
-		{
-			success = GridSystem.Instance.TryGetRandomGridCell(true, out cell, teamFilter: Enums.UnitTeam.Player);
-		}
-		else
-		{
-			success = GridSystem.Instance.TryGetRandomGridCell(true, out cell, Enums.GridCellState.None, true);
-		}
+		bool success = TryGetSpawnCell(team, out GridCell cell);
 
 		if (!success)
 		{

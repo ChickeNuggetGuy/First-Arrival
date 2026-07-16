@@ -58,16 +58,9 @@ public partial class LoadingScreenUI : UIWindow
 			_ =HideCall();
 		}
 	}
-
-	protected override void _Hide()
+	
+	protected override async Task DrawUI()
 	{
-		base._Hide();
-		MouseFilter = MouseFilterEnum.Ignore;
 	}
 
-	protected override void _Show()
-	{
-		base._Show();
-		MouseFilter = MouseFilterEnum.Stop;
-	}
 }

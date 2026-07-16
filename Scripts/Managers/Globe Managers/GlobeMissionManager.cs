@@ -16,8 +16,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     [Export] private PackedScene missionScene;
     [Export] private Node missionContainer;
     [Export] private float missionInterval = 10.0f;
-    [Export] private int missionSpawnRangeSteps = 4;
+    [Export] private int missionSpawnRangeSteps = 6;
     [Export] private int maxActiveMissions = 8;
+	[Export] private bool spawnLegacyRandomMissions = false;
 
     public int GlobalDifficulty { get; set; } = 1;
 
@@ -81,7 +82,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     public override void _Process(double delta)
     {
-        if (Engine.IsEditorHint())
+		// Kept as an opt-in testing tool. Normal campaign missions are initiated
+		// by GlobeAIManager operations rather than real-time random spawning.
+        if (Engine.IsEditorHint() || !spawnLegacyRandomMissions)
             return;
 
         _currentMissionTimer -= (float)delta;
@@ -162,6 +165,41 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     }
 
     public bool TrySpawnNewMissionCell(HexCellData cell, Enums.MissionType missionType)
+		=> TryCreateMission(
+			cell,
+			missionType,
+			difficulty: -1,
+			alienOperationId: -1,
+			missionName: "New Mission");
+
+	/// <summary>
+	/// Creates the player-facing mission produced by an alien strategic
+	/// operation. The operation id is persisted with the mission so battle scene
+	/// transitions can report the eventual outcome back to GlobeAIManager.
+	/// </summary>
+	public bool TryCreateAlienMission(
+		int operationId,
+		int targetCellIndex,
+		Enums.MissionType missionType,
+		int difficulty)
+	{
+		HexCellData? cell = GlobeHexGridManager.Instance?.GetCellFromIndex(
+			targetCellIndex,
+			excludeWater: true);
+		return cell.HasValue && TryCreateMission(
+			cell.Value,
+			missionType,
+			difficulty,
+			operationId,
+			$"Alien Attack: {GlobeCityManager.Instance?.GetCityName(targetCellIndex) ?? "City"}");
+	}
+
+	private bool TryCreateMission(
+		HexCellData cell,
+		Enums.MissionType missionType,
+		int difficulty,
+		int alienOperationId,
+		string missionName)
     {
         if (cell.cellType == Enums.HexGridType.Water)
             return false;
@@ -169,15 +207,21 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         if (_activeMissions.ContainsKey(cell.Index))
             return false;
 
-        MissionBase mission = GenerateRandomMission(cell.Index, missionType);
+        int unresolvedMissionCount = _activeMissions.Values.Count(missionDefinition =>
+	        !missionDefinition.missionStatus.HasFlag(Enums.MissionStatus.Visited));
+		if (unresolvedMissionCount >= maxActiveMissions)
+			return false;
+
+		MissionBase mission = GenerateRandomMission(cell.Index, missionType, difficulty);
         if (mission == null)
             return false;
 
         MissionCellDefinition missionCellDefinition = new MissionCellDefinition(
             cell.Index,
-            "New Mission",
-            mission,
-          null
+			missionName,
+			mission,
+			null,
+			alienOperationId: alienOperationId
         );
         
         _activeMissions.Add(cell.Index, missionCellDefinition);
@@ -223,8 +267,15 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    // Save the complete Globe state NOW, before leaving
 	    SavesManager.Instance.SetSessionData("GlobeState", SavesManager.Instance.GetSceneTransitionState());
 
-	    // Set up battle parameters
-	    GameManager.Instance.unitCounts = new Vector2I(GD.RandRange(2,4), missionDefinition.mission.EnemySpawnCount);
+	    // Snapshot the craft payload before its globe-scene unit nodes are freed.
+	    GameManager.Instance.PrepareBattleLoadout(missionDefinition.onRouteCraft);
+
+	    // Set up the remaining battle parameters. The player count now comes from
+	    // the craft snapshot instead of a random value.
+	    GameManager.Instance.unitCounts = new Vector2I(
+		    GameManager.Instance.unitCounts.X,
+		    missionDefinition.mission.EnemySpawnCount
+	    );
 	    GameManager.Instance.mapSize = new Vector2I(GD.RandRange(3,4), GD.RandRange(3,4));
 	    GameManager.Instance.currentMission = missionDefinition;
 	    missionDefinition.missionStatus |= Enums.MissionStatus.Visited;
@@ -292,7 +343,11 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         GlobeTeamManager teamManager = GlobeTeamManager.Instance;
         GlobeTeamHolder playerTeam = teamManager?.GetTeamData(Enums.UnitTeam.Player);
 
-        Enums.MissionStatus outcome = GetMissionOutcome(missionDefinition);
+		Enums.MissionStatus outcome = GetMissionOutcome(missionDefinition);
+		if (missionDefinition.alienOperationId >= 0 && outcome != Enums.MissionStatus.None)
+			GlobeAIManager.Instance?.ResolveOperation(
+				missionDefinition.alienOperationId,
+				outcome);
 		if (playerTeam != null && outcome != Enums.MissionStatus.None &&
             missionDefinition.scoreChange.TryGetValue(outcome, out int scoreChange))
         {
@@ -426,9 +481,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         {
             int cellIdx = int.Parse(kvp.Key);
 
-            var mDefData = kvp.Value.AsGodotDictionary<string, Variant>();
-            var mData = mDefData["missionData"].AsGodotDictionary<string, Variant>();
-            string className = mDefData["missionClass"].AsString();
+			var mDefData = kvp.Value.AsGodotDictionary<string, Variant>();
+			var mData = mDefData["missionData"].AsGodotDictionary<string, Variant>();
+			string className = mDefData["missionClass"].AsString();
+			string definitionName = mDefData.ContainsKey("definitionName")
+				? mDefData["definitionName"].AsString()
+				: "New Mission";
 
             MissionBase mission = null;
             Enums.MissionType type = (Enums.MissionType)mData["type"].AsInt32();
@@ -439,6 +497,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			int timeLeft = mDefData.ContainsKey("timeLeft")
 				? mDefData["timeLeft"].AsInt32()
 				: timeoutTime;
+			int alienOperationId = mDefData.ContainsKey("alienOperationId")
+				? mDefData["alienOperationId"].AsInt32()
+				: -1;
             Craft onRouteCraft = null;
             if (mDefData.ContainsKey("onRouteCraft"))
             {
@@ -459,7 +520,13 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             if (mission != null)
             {
 				var missionDefinition = new MissionCellDefinition(
-					cellIdx, "New Mission", mission, null, status, onRouteCraft
+					cellIdx,
+					definitionName,
+					mission,
+					null,
+					status,
+					onRouteCraft,
+					alienOperationId
 				);
 				missionDefinition.RestoreTimeoutState(timeoutTime, timeLeft);
 				_activeMissions.Add(cellIdx, missionDefinition);

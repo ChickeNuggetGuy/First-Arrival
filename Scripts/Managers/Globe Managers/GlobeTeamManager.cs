@@ -24,6 +24,12 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	[Export] public Enums.UnitTeam ViewingTeam { get; set; } = Enums.UnitTeam.Player;
 	[Export] private bool scanForDefinitionsDaily = true;
 	private bool _timeSignalsConnected;
+
+	[Signal]
+	public delegate void CraftDetectedEventHandler(
+		Craft craft,
+		int detectingTeam,
+		int cellIndex);
 	
 
 	[Export] public bool overridePreviousInstance = false; 
@@ -96,12 +102,20 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 						if (craft.CurrentCellIndex != craft.HomeBaseIndex
 						    && craft.CurrentCellIndex != -1)
 						{
+							if (teamHolder.Team == Enums.UnitTeam.Enemy &&
+							    GlobeAIManager.Instance?.IsCraftAssigned(craft) == true)
+								continue;
+
 							// Fire-and-forget: craft will tween its way home
 							_ = baseDef.SendCraft(
 								craft.CurrentCellIndex,
 								craft.HomeBaseIndex,
 								craft,
-								this
+								this,
+								interactWithMission: teamHolder.Team == Enums.UnitTeam.Player,
+								onArrived: teamHolder.Team == Enums.UnitTeam.Enemy
+									? craft => GlobeAIManager.Instance?.OnAlienCraftArrived(craft)
+									: null
 							);
 						}
 					}
@@ -126,9 +140,11 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 				HexCellData? randomCell = GlobeHexGridManager.Instance.GetRandomCell(true);
 
 				if (randomCell.HasValue)
-				{
-					teamHolder.TryBuildBase(randomCell.Value, 0);
-				}
+					TryBuildBase(
+						Enums.UnitTeam.Enemy,
+						randomCell.Value,
+						teamHolder.Bases.Count + 1,
+						0);
 			}
 		}
 
@@ -163,14 +179,14 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 
 					if (isEnRoute || isAwayFromHome)
 					{
-						SpawnCraftVisual(craft);
+						SpawnCraftVisual(craft, teamHolder.Team);
 					}
 				}
 			}
 		}
 	}
 	
-	private void SpawnCraftVisual(Craft craft)
+	private void SpawnCraftVisual(Craft craft, Enums.UnitTeam craftTeam)
 	{
 		if (craft == null) return;
     
@@ -187,6 +203,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		{
 			craft.SetVisual(shipNode);
 		}
+		shipNode.Visible = craftTeam == ViewingTeam || craft.IsVisibleTo(ViewingTeam);
 
 		if (shipContainer != null && shipNode.GetParent() != shipContainer)
 			shipContainer.AddChild(shipNode);
@@ -231,7 +248,11 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 				craft.CurrentCellIndex, 
 				craft.TargetCellIndex, 
 				craft, 
-				this
+				this,
+				interactWithMission: craftTeam == Enums.UnitTeam.Player,
+				onArrived: craftTeam == Enums.UnitTeam.Enemy
+					? arrivedCraft => GlobeAIManager.Instance?.OnAlienCraftArrived(arrivedCraft)
+					: null
 			);
 		}
 	}
@@ -398,6 +419,15 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	{
 		if (team ==  Enums.UnitTeam.None) return false;
 		if (cell.cellType == Enums.HexGridType.Water) return false;
+		foreach (GlobeTeamHolder holder in teamData.Values)
+		{
+			if (holder?.Bases == null) continue;
+			foreach (TeamBaseCellDefinition existingBase in holder.Bases)
+			{
+				if (existingBase.cellIndex == cell.Index)
+					return false;
+			}
+		}
 
 		if (!teamData.ContainsKey(team))
 		{
@@ -541,10 +571,102 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		return revealed;
 	}
 
+	/// <summary>
+	/// Gives the viewing team a detection roll whenever a hostile craft enters a
+	/// new cell. Detection persists on the craft and therefore survives saves.
+	/// </summary>
+	public bool TryDetectHostileCraft(
+		Craft craft,
+		Enums.UnitTeam craftTeam,
+		int craftCellIndex)
+	{
+		if (craft == null || craftTeam == ViewingTeam ||
+		    craft.IsVisibleTo(ViewingTeam))
+			return false;
+
+		GlobeTeamHolder detectingTeam = GetTeamData(ViewingTeam);
+		if (detectingTeam?.Bases == null) return false;
+
+		foreach (TeamBaseCellDefinition baseDefinition in detectingTeam.Bases)
+		{
+			if (RollCraftDetection(
+				baseDefinition.cellIndex,
+				baseDefinition.DetectionRadius,
+				baseDefinition.DetectionChance,
+				craftCellIndex))
+				return RevealCraft(craft, craftCellIndex);
+
+			foreach (Craft detectorCraft in baseDefinition.CraftList)
+			{
+				if (detectorCraft == null ||
+				    detectorCraft.Status == Enums.CraftStatus.Home)
+					continue;
+
+				if (RollCraftDetection(
+					detectorCraft.CurrentCellIndex,
+					detectorCraft.DetectionRadius,
+					detectorCraft.DetectionChance,
+					craftCellIndex))
+					return RevealCraft(craft, craftCellIndex);
+			}
+		}
+
+		return false;
+	}
+
+	private bool RollCraftDetection(
+		int detectorCellIndex,
+		int detectionRadius,
+		float detectionChance,
+		int craftCellIndex)
+	{
+		if (detectionRadius < 0 || GD.Randf() > Mathf.Clamp(detectionChance, 0f, 1f))
+			return false;
+
+		HexCellData? detectorCell = GlobeHexGridManager.Instance?.GetCellFromIndex(
+			detectorCellIndex);
+		if (!detectorCell.HasValue) return false;
+
+		foreach (HexCellData cell in GlobeHexGridManager.Instance.GetCellsInStepRange(
+			detectorCell.Value,
+			detectionRadius))
+		{
+			if (cell.Index == craftCellIndex) return true;
+		}
+
+		return false;
+	}
+
+	private bool RevealCraft(Craft craft, int cellIndex)
+	{
+		if (!craft.RevealForTeam(ViewingTeam)) return false;
+		EmitSignal(SignalName.CraftDetected, craft, (int)ViewingTeam, cellIndex);
+		if (DebugMode)
+			GD.Print($"[Detection] {ViewingTeam} detected {craft.ItemName} at cell {cellIndex}.");
+		return true;
+	}
+
 	private void OnDayChanged(int dayOfYear, int dayOfMonth, Enums.Day day)
 	{
 		foreach (Enums.UnitTeam team in teamData.Keys)
 			ScanAllDetectors(team);
+
+		// Re-roll detection for hostile craft that are lingering at a scan point
+		// or active mission rather than only checking them while they move.
+		foreach (var teamEntry in teamData)
+		{
+			if (teamEntry.Key == ViewingTeam || teamEntry.Value?.Bases == null) continue;
+			foreach (TeamBaseCellDefinition baseDefinition in teamEntry.Value.Bases)
+			{
+				foreach (Craft craft in baseDefinition.CraftList)
+				{
+					if (craft == null || craft.Status == Enums.CraftStatus.Home ||
+					    craft.CurrentCellIndex < 0)
+						continue;
+					TryDetectHostileCraft(craft, teamEntry.Key, craft.CurrentCellIndex);
+				}
+			}
+		}
 	}
 
 	private void OnDefinitionVisibilityChanged(HexCellDefinition definition)

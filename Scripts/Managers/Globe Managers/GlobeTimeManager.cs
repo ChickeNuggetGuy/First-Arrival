@@ -8,7 +8,13 @@ using Godot.Collections;
 [GlobalClass]
 public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 {
-	[Export] public int timeSpeed = 1;
+	private int _timeSpeed = 1;
+	[Export]
+	public int timeSpeed
+	{
+		get => _timeSpeed;
+		set => SetTimeSpeed(value);
+	}
 	[Export] private Label currentTimeUI;
 
 	[ExportGroup("Sun / Day-Night")]
@@ -99,6 +105,9 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 	[Signal]
 	public delegate void YearChangedEventHandler(int year);
+
+	[Signal]
+	public delegate void TimeSpeedChangedEventHandler(int timeSpeed);
 	#endregion
 
 	public override string GetManagerName() => "GlobeTimeManager";
@@ -305,7 +314,16 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		sunLight.Rotation = rot;
 	}
 
-	public void SetTimeSpeed(int amount) => timeSpeed = amount;
+	public int GetTimeSpeed() => Math.Max(0, timeSpeed);
+
+	public void SetTimeSpeed(int amount)
+	{
+		int newSpeed = Math.Max(0, amount);
+		if (_timeSpeed == newSpeed) return;
+
+		_timeSpeed = newSpeed;
+		EmitSignal(SignalName.TimeSpeedChanged, _timeSpeed);
+	}
 
 	public bool TryGetDayOfMonth(int dayOfYear, out int dayOfMonth, out Enums.Month month)
 	{

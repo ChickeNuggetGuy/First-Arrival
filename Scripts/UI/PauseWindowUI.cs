@@ -96,7 +96,8 @@ public partial class PauseWindowUI : UIWindow
 	}
 
 
-	protected override void _Show()
+	
+	protected override async Task DrawUI()
 	{
 		base._Show();
 		if (_gameSaveUI != null)

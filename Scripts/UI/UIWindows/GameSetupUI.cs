@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
 
 [GlobalClass]
@@ -40,5 +41,10 @@ public partial class GameSetupUI : UIWindow
 		GameManager.Instance.mapSize = mapSize;
 		GameManager.Instance.unitCounts = unitCounts;
 	}
+	
+	protected override async Task DrawUI()
+	{
+	}
+
 
 }

@@ -156,7 +156,9 @@ public partial class StartingEuipmentUI : UIWindow
 		}
 	}
 
-	protected override async void _Show()
+	
+	
+	protected override async Task DrawUI()
 	{
 		MouseFilter = MouseFilterEnum.Stop;
 		InitializePlayerUnits();

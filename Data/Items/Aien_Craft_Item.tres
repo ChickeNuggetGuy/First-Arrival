@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="Craft" format=3 uid="uid://cvsru2hn58n2r"]
+
+[ext_resource type="Script" uid="uid://duqdmmi83ptnx" path="res://Scripts/Globe/Craft.cs" id="1_0kl5f"]
+[ext_resource type="Texture2D" uid="uid://bb48tor5xora5" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Status/ICON_MilitaryCombat_Status_Poisoned_01_Clean.png" id="1_iw0w2"]
+
+[resource]
+resource_name = "Aien Craft_Item"
+script = ExtResource("1_0kl5f")
+MaxSpeed = 500
+Acceleration = 250
+DetectionRadius = 3
+DetectionChance = 0.4
+ShowDetectionRadius = false
+ItemID = 5
+ItemName = "Aien Craft"
+ItemDescription = "Advanced Aien Craft 
+"
+ItemIcon = ExtResource("1_iw0w2")
+globeOnly = true
+ActionDefinitions = null

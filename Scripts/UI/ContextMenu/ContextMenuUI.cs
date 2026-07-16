@@ -19,7 +19,8 @@ public partial class ContextMenuUI : UIWindow
 		return base._Setup();
 	}
 
-	protected override void _Show()
+	
+	protected override async Task DrawUI()
 	{
 		GD.Print("ContextMenuUI Show");
 		Position = GetViewport().GetMousePosition();

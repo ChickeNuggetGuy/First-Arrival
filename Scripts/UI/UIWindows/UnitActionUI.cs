@@ -38,6 +38,11 @@ public partial class UnitActionUI : UIWindow
 		}
 		GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).SelectedGridObjectChanged += OnSelectedGridObjectChanged;
 	}
+	
+	protected override async Task DrawUI()
+	{
+	}
+
 
 	private void OnSelectedGridObjectChanged(GridObject gridObject)
 	{

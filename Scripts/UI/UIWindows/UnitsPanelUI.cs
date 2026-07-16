@@ -72,7 +72,8 @@ public partial class UnitsPanelUI : UIWindow
 		GD.Print($"Hired {newUnit.Name}. Total units in manager: {CurrentBase.GetStationedGridObjects().Count}");
 	}
 
-	protected override void _Show()
+	
+	protected override async Task DrawUI()
 	{
 		base._Show();
 		ContstructUnitList();

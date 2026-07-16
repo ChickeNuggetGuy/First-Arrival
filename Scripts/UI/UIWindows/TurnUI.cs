@@ -56,4 +56,9 @@ public partial class TurnUI : UIWindow
 			currentTurnLabel.Text = "Current turn: " + currentTurn?.team.ToString() ?? "None";
 		}
 	}
+	
+	protected override async Task DrawUI()
+	{
+	}
+
 }

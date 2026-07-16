@@ -24,12 +24,7 @@ public partial class InventoryGridUI : UIWindow
 		return base._Setup();
 	}
 
-	private void InventoryOnInventoryChanged()
-	{
-		UpdateSlotsUI();
-	}
-
-	protected override void _Show()
+	protected override async Task DrawUI()
 	{
 		if (InventoryGrid == null)
 		{
@@ -48,14 +43,9 @@ public partial class InventoryGridUI : UIWindow
 			{
 				InventoryGrid = InventoryManager.Instance.GetInventoryGrid(Enums.InventoryType.Ground);
 			}
-			else
-			{
-				if (InventoryGrid != null)
+				else
 				{
-					InventoryGrid.InventoryChanged -= InventoryOnInventoryChanged;
-				}
-
-				if (!gridObjectInventory.TryGetInventory(inventoryType, out var inventory))
+					if (!gridObjectInventory.TryGetInventory(inventoryType, out var inventory))
 				{
 					GD.Print("Error: gridObjectInventory is null!");
 					return;
@@ -68,8 +58,10 @@ public partial class InventoryGridUI : UIWindow
 
 		if (inventoryType == Enums.InventoryType.Ground && AutoFetchGround)
 		{
-			InventoryGrid = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject
-				.GridPositionData.AnchorCell.InventoryGrid;
+			SetInventroyGrid(
+				GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject
+					.GridPositionData.AnchorCell.InventoryGrid
+			);
 		}
 
 		SetupInventoryUI(InventoryGrid);
@@ -80,10 +72,7 @@ public partial class InventoryGridUI : UIWindow
 
 	public void SetupInventoryUI(InventoryGrid inventory)
 	{
-		if (InventoryGrid != null)
-		{
-			InventoryGrid.InventoryChanged -= InventoryOnInventoryChanged;
-		}
+		DetachInventoryEvents();
 
 		if (inventory != null)
 			ClearSlots();
@@ -114,7 +103,23 @@ public partial class InventoryGridUI : UIWindow
 
 	public void SetInventroyGrid(InventoryGrid inventory)
 	{
+		if (InventoryGrid != inventory)
+			DetachInventoryEvents();
 		InventoryGrid = inventory;
+	}
+
+	private void DetachInventoryEvents()
+	{
+		if (InventoryGrid != null)
+			InventoryGrid.InventoryChanged -= OnInventoryChanged;
+	}
+
+	public override void _ExitTree()
+	{
+		DetachInventoryEvents();
+		InventoryManager.Instance?.RemoveRuntimeInventoryGridUI(inventoryType, this);
+		slotUIs = null;
+		base._ExitTree();
 	}
 
 	private void ClearSlots()
@@ -173,12 +178,14 @@ public partial class InventoryGridUI : UIWindow
 
 	public void UpdateSlotsUI()
 	{
+		if (!IsInsideTree() || InventoryGrid == null || slotUIs == null) return;
+
 		for (int x = 0; x < slotUIs.GetLength(0); x++)
 		{
 			for (int z = 0; z < slotUIs.GetLength(1); z++)
 			{
 				ItemSlotUI currentSlot = slotUIs[x, z];
-				if (currentSlot == null) continue;
+					if (currentSlot == null || !GodotObject.IsInstanceValid(currentSlot)) continue;
 
 				if (InventoryGrid.TryGetItemAt(x, z, out var itemInfo) && itemInfo.item != null)
 				{

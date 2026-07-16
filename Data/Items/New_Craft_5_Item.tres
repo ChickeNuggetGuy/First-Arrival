@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="Craft" format=3 uid="uid://cdyixxpdgme34"]
+
+[ext_resource type="Script" uid="uid://duqdmmi83ptnx" path="res://Scripts/Globe/Craft.cs" id="1_y2t3e"]
+
+[resource]
+script = ExtResource("1_y2t3e")
+ItemID = 5
+ItemName = "New Craft"
+ActionDefinitions = null

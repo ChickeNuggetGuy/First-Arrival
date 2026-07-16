@@ -66,7 +66,7 @@ public partial class GlobeUI : UIWindow
 		{
 			GD.Print("not found!");
 		}
-		RefreshUI();
+		DrawUI();
 		return base._Setup();
 	}
 
@@ -76,7 +76,7 @@ public partial class GlobeUI : UIWindow
 	}
 
 
-	private void RefreshUI()
+	protected override async Task DrawUI()
 	{
 		RefreshBaseButtons(GlobeTeamManager.Instance.GetTeamData(Enums.UnitTeam.Player));
 	}

@@ -38,6 +38,18 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	[Export] private Enums.ChunkType mapType;
 	[Export] private Material chunkMaterial { get; set; }
 
+	[ExportGroup("Instanced Grass")]
+	[Export] private bool generateGrass = true;
+	[Export(PropertyHint.Range, "0,8,1")]
+	private int grassBladesPerCell = 2;
+	[Export(PropertyHint.Range, "2,8,1")]
+	private int grassCardsPerClump = 5;
+	[Export(PropertyHint.Range, "0.05,2.0,0.01")]
+	private float grassBladeHeight = 0.45f;
+	[Export(PropertyHint.Range, "0.01,1.0,0.01")]
+	private float grassBladeWidth = 0.09f;
+	[Export] private ShaderMaterial grassMaterial { get; set; }
+
 	public Vector3[,] terrainHeights { get; set; }
 
 	[ExportGroup("Chunk Overrides")]
@@ -200,7 +212,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 						cellSize.X,
 						cData
 					);
-					cData.chunk.Generate(chunkMaterial);
+					cData.chunk.Generate(
+						chunkMaterial,
+						generateGrass ? grassMaterial : null,
+						generateGrass ? grassBladesPerCell : 0,
+						grassCardsPerClump,
+						grassBladeHeight,
+						grassBladeWidth
+					);
 				}
 			}
 

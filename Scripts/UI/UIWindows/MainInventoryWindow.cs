@@ -46,4 +46,9 @@ public partial class MainInventoryWindow : UIWindow
 			inventoryUI.SetupInventoryUI(inventoryRef);
 		}
 	}
+	
+	protected override async Task DrawUI()
+	{
+	}
+
 }

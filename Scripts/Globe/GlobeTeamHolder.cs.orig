@@ -78,7 +78,6 @@ public partial class GlobeTeamHolder : Node
 		return new Godot.Collections.Dictionary<string, Variant> {
 			["team"] = (int)Team,
 			["funds"] = funds,
-			["monthlyScore"] = monthlyScore,
 			["bases"] = basesData
 		};
 	}
@@ -90,10 +89,6 @@ public partial class GlobeTeamHolder : Node
 
 		if (data.ContainsKey("funds"))
 			funds = data["funds"].AsInt32();
-
-		monthlyScore = data.ContainsKey("monthlyScore")
-			? data["monthlyScore"].AsInt32()
-			: 0;
 
 		if (data.ContainsKey("bases"))
 		{

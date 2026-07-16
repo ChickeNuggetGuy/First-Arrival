@@ -5,6 +5,7 @@ namespace FirstArrival.Scripts.Managers;
 public abstract partial class Manager<T> : ManagerBase where T : ManagerBase, new()
 {
 	public static T Instance { get; private set; }
+	private GameManager _subscribedGameManager;
 
 	[Export] public bool IsBusy { get; set; }
 	
@@ -21,15 +22,16 @@ public abstract partial class Manager<T> : ManagerBase where T : ManagerBase, ne
 		base._Ready();
 		Instance = this as T;
 		AddToGroup("Manager");
-		if (GameManager.Instance != null)
+		_subscribedGameManager = GameManager.Instance;
+		if (_subscribedGameManager != null)
 		{
 			// Check if this node is a child of root (meaning it's an Autoload/Global)
 			if (GetParent() == GetTree().Root)
 			{
-				GameManager.Instance.RegisterGlobalManager(this);
+				_subscribedGameManager.RegisterGlobalManager(this);
 			}
 			
-			GameManager.Instance.SceneChanged += GameManagerOnSceneChanged;
+			_subscribedGameManager.SceneChanged += GameManagerOnSceneChanged;
 		}
 		
 	}
@@ -58,10 +60,21 @@ public abstract partial class Manager<T> : ManagerBase where T : ManagerBase, ne
 
 	public override void _ExitTree()
 	{
+		// GameManager is persistent, so its C# event would otherwise retain this
+		// scene-local manager after Godot has disposed it.
+		if (_subscribedGameManager != null &&
+		    GodotObject.IsInstanceValid(_subscribedGameManager))
+		{
+			_subscribedGameManager.SceneChanged -= GameManagerOnSceneChanged;
+		}
+		_subscribedGameManager = null;
+
 		// Only clear the instance if this specific node was the active instance
 		if (Instance == this)
 		{
 			Instance = null;
 		}
+
+		base._ExitTree();
 	}
 }

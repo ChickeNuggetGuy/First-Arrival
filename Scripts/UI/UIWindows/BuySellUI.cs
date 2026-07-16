@@ -202,7 +202,8 @@ public partial class BuySellUI : UIWindow
 		return true;
 	}
 
-	protected override void _Show()
+	
+	protected override async Task DrawUI()
 	{
 		DrawTree();
 		base._Show();

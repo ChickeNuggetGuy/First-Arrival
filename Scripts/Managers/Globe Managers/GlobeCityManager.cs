@@ -15,6 +15,7 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
     [Export] private bool _flipLatitude = false;
     
     private Dictionary<int, Dictionary> citiesData = null;
+	private int[] _cityCellIndices = System.Array.Empty<int>();
 
     public override string GetManagerName() => "GlobeCityManager";
 
@@ -24,6 +25,7 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
     {
 	    if (loadingData && HasLoadedData && citiesData != null)
 	    {
+		    RebuildCityCellIndex();
 		    foreach (var kvp in citiesData)
 		    {
 			    int cellIndex = kvp.Key;
@@ -85,7 +87,7 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
         }
 
         GD.Print($"City Data Loaded: {citiesData.Count}");
-        
+		RebuildCityCellIndex();
 
         EmitSignal(SignalName.ExecuteCompleted);
         await Task.CompletedTask;
@@ -125,9 +127,40 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 	    if (data.ContainsKey("cityData"))
 	    {
 		    citiesData = data["cityData"].AsGodotDictionary<int, Dictionary>();
+		    RebuildCityCellIndex();
 	    }
 	    return Task.CompletedTask;
     }
+
+	/// <summary>
+	/// Returns a stable snapshot of city cell indices for strategic systems.
+	/// The cache avoids scanning or allocating from the city dictionary every
+	/// time the AI evaluates potential targets.
+	/// </summary>
+	public int[] GetCityCellIndices() => _cityCellIndices;
+
+	public string GetCityName(int cellIndex)
+	{
+		if (citiesData != null && citiesData.TryGetValue(cellIndex, out Dictionary city) &&
+		    city.ContainsKey("city"))
+			return city["city"].AsString();
+
+		return "City";
+	}
+
+	private void RebuildCityCellIndex()
+	{
+		if (citiesData == null || citiesData.Count == 0)
+		{
+			_cityCellIndices = System.Array.Empty<int>();
+			return;
+		}
+
+		_cityCellIndices = new int[citiesData.Count];
+		int index = 0;
+		foreach (int cellIndex in citiesData.Keys)
+			_cityCellIndices[index++] = cellIndex;
+	}
 
 
     public override void _Input(InputEvent @event)
