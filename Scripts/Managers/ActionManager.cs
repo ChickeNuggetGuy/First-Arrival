@@ -13,6 +13,9 @@ namespace FirstArrival.Scripts.Managers;
 public partial class ActionManager : Manager<ActionManager>
 {
 	public ActionDefinition SelectedAction { get; private set; }
+	public ActionBase CurrentAction { get; private set; }
+	public bool LastActionWasInterruptedByNewEnemy { get; private set; }
+	private GridCellHighlighter _cellHighlighter;
 
 	private GridCell currentGridCell;
 
@@ -20,6 +23,8 @@ public partial class ActionManager : Manager<ActionManager>
 
 	[Signal]
 	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
+	[Signal]
+	public delegate void ActionCanceledEventHandler(ActionDefinition actionCanceled, ActionDefinition currentAction);
 
 
 	public override string GetManagerName() => "ActionManager";
@@ -32,6 +37,9 @@ public partial class ActionManager : Manager<ActionManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
+		_cellHighlighter = new GridCellHighlighter { Name = "ActionCellHighlighter" };
+		AddChild(_cellHighlighter);
+
 		GridObjectTeamHolder playerTeam = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 
 		if (playerTeam != null)
@@ -43,6 +51,13 @@ public partial class ActionManager : Manager<ActionManager>
 
 	private void PlayerTeamOnSelectedGridObjectChanged(GridObject gridObject)
 	{
+		if (gridObject == null)
+		{
+			SelectedAction = null;
+			_cellHighlighter?.Clear();
+			return;
+		}
+
 		gridObject.TryGetGridObjectNode<GridObjectActions>(out GridObjectActions gridObjectActions);
 		if (gridObjectActions != null)
 		{
@@ -52,6 +67,22 @@ public partial class ActionManager : Manager<ActionManager>
 
 	public override void _Input(InputEvent @event)
 	{
+		if (
+			@event is InputEventMouseButton
+			{
+				Pressed: true,
+				ButtonIndex: MouseButton.Right
+			}
+			&& IsBusy
+			&& CurrentAction != null
+			&& TurnManager.Instance.CurrentTurn.team == Enums.UnitTeam.Player
+		)
+		{
+			GetViewport().SetInputAsHandled();
+			_ = CancelCurrentAction();
+			return;
+		}
+
 		if (IsBusy) return;
 		if (TurnManager.Instance.CurrentTurn.team != Enums.UnitTeam.Player) return;
 		if (BattleInputManager.Instance.MouseOverUI) return;
@@ -117,6 +148,8 @@ public partial class ActionManager : Manager<ActionManager>
 		Dictionary<string, Variant> extraData = null
 	)
 	{
+		LastActionWasInterruptedByNewEnemy = false;
+
 		if (action == null)
 		{
 			GD.Print("ActionManager.RunTryTakeActionAsync: action is null");
@@ -142,7 +175,26 @@ public partial class ActionManager : Manager<ActionManager>
 		catch (Exception e)
 		{
 			GD.PushError($"TryTakeAction failed: {e}");
+			CurrentAction = null;
 			SetIsBusy(false);
+		}
+	}
+
+	public async Task<bool> CancelCurrentAction()
+	{
+		ActionBase action = CurrentAction;
+		if (!IsBusy || action == null)
+			return false;
+
+		try
+		{
+			await action.CancelCall();
+			return true;
+		}
+		catch (Exception e)
+		{
+			GD.PushError($"Failed to cancel current action: {e}");
+			return false;
 		}
 	}
 
@@ -152,6 +204,13 @@ public partial class ActionManager : Manager<ActionManager>
 	)
 	{
 		SelectedAction = action;
+
+		if (action == null)
+		{
+			RefreshValidCellHighlights();
+			return;
+		}
+
 		if (action is ItemActionDefinition itemActionDefinition)
 		{
 			if (extraData != null && extraData.ContainsKey("item"))
@@ -161,8 +220,28 @@ public partial class ActionManager : Manager<ActionManager>
 			}
 		}
 
+		RefreshValidCellHighlights();
+
 		if(DebugMode)
 			GD.Print($"set selected action to {SelectedAction.GetActionName()}");
+	}
+
+	private void RefreshValidCellHighlights()
+	{
+		GridObject selectedGridObject = GridObjectManager.Instance?
+			.GetGridObjectTeamHolder(Enums.UnitTeam.Player)?.CurrentGridObject;
+
+		if (SelectedAction == null || selectedGridObject?.GridPositionData?.AnchorCell == null)
+		{
+			_cellHighlighter?.Clear();
+			return;
+		}
+
+		SelectedAction.UpdateValidGridCells(
+			selectedGridObject,
+			selectedGridObject.GridPositionData.AnchorCell
+		);
+		_cellHighlighter?.ShowCells(SelectedAction.ValidGridCells);
 	}
 
 	public async Task<bool> TryTakeAction(
@@ -232,6 +311,7 @@ public partial class ActionManager : Manager<ActionManager>
 		if (result)
 		{
 			GD.Print($"action: {action.GetActionName()} can be taken, starting execution");
+			_cellHighlighter?.Clear();
 			SetIsBusy(true);
 			try
 			{
@@ -241,6 +321,7 @@ public partial class ActionManager : Manager<ActionManager>
 					targetGridCell,
 					costs
 				);
+				CurrentAction = actionInstance;
 
 				if (actionInstance is IDelayedAction delayedAction)
 				{
@@ -251,14 +332,20 @@ public partial class ActionManager : Manager<ActionManager>
 				{
 					await actionInstance.ExecuteCall();
 				}
+
+				// An interrupted composite action may have completed one or more
+				// child actions before a newly revealed hostile stopped it.
+				LastActionWasInterruptedByNewEnemy = actionInstance.WasInterruptedByNewEnemy;
+				return !LastActionWasInterruptedByNewEnemy;
 			}
 			catch (Exception e)
 			{
 				GD.PushError($"Exception during action '{action.GetActionName()}': {e}");
+				CurrentAction = null;
 				SetIsBusy(false);
+				return false;
 			}
 
-			return true;
 		}
 		else
 		{
@@ -300,12 +387,21 @@ public partial class ActionManager : Manager<ActionManager>
 
 	public void ActionCompleteCall(ActionDefinition actionDef, global::ActionBase actionBaseInst)
 	{
-		if (actionDef?.parentGridObject != null)
+		GridObject actingObject = actionBaseInst?.ActingGridObject ?? actionDef?.parentGridObject;
+		if (actingObject != null)
 		{
-			var teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(actionDef.parentGridObject.Team);
+			var teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(actingObject.Team);
 			if (teamHolder != null)
 			{
+				var visibleEnemiesBeforeAction = GetVisibleEnemies(teamHolder, actingObject.Team);
 				teamHolder.UpdateGridObjects(actionDef, SelectedAction);
+
+				if (GetVisibleEnemies(teamHolder, actingObject.Team)
+					.Any(enemy => !visibleEnemiesBeforeAction.Contains(enemy)))
+				{
+					GD.Print($"{actingObject.Name} revealed a new enemy; interrupting the current action.");
+					CurrentAction?.RequestVisibilityInterrupt();
+				}
 			}
 		}
 
@@ -331,6 +427,8 @@ public partial class ActionManager : Manager<ActionManager>
 		{
 			GD.Print($"{actionDef.GetActionName()} complete");
 
+			if (actionBaseInst == null || ReferenceEquals(CurrentAction, actionBaseInst))
+				CurrentAction = null;
 			SetIsBusy(false);
 
 			if (TurnManager.Instance.CurrentTurn.team == Enums.UnitTeam.Player)
@@ -344,7 +442,63 @@ public partial class ActionManager : Manager<ActionManager>
 							.First());
 				}
 			}
+
+			RefreshValidCellHighlights();
 		}
+	}
+
+	private static HashSet<GridObject> GetVisibleEnemies(
+		GridObjectTeamHolder viewerTeam,
+		Enums.UnitTeam viewerTeamId
+	)
+	{
+		var visibleEnemies = new HashSet<GridObject>();
+		var manager = GridObjectManager.Instance;
+		if (viewerTeam == null || manager == null)
+			return visibleEnemies;
+
+		foreach (var teamHolder in manager.GetGridObjectTeamHolders().Values)
+		{
+			if (teamHolder == null || teamHolder.Team == viewerTeamId)
+				continue;
+
+			foreach (var gridObject in teamHolder.GridObjects[Enums.GridObjectState.Active])
+			{
+				GridCell anchorCell = gridObject?.GridPositionData?.AnchorCell;
+				if (gridObject != null && gridObject.IsActive && !gridObject.scenery &&
+					anchorCell != null && viewerTeam.TeamVisibleCells.Contains(anchorCell))
+					visibleEnemies.Add(gridObject);
+			}
+		}
+
+		return visibleEnemies;
+	}
+
+	public void ActionCanceledCall(ActionDefinition actionDef, global::ActionBase actionBaseInst)
+	{
+		if (actionBaseInst?.Parent != null)
+			return;
+
+		if (CurrentAction != null && !ReferenceEquals(CurrentAction, actionBaseInst))
+			return;
+
+		CurrentAction = null;
+
+		switch (actionDef)
+		{
+			case ItemActionDefinition itemActionDefinition:
+				if (!actionDef.GetRemainSelected())
+					itemActionDefinition.Item = null;
+				break;
+			case MoveActionDefinition moveActionDefinition:
+				moveActionDefinition.path = null;
+				break;
+		}
+
+		GD.Print($"{actionDef?.GetActionName() ?? "Action"} canceled");
+		SetIsBusy(false);
+		RefreshValidCellHighlights();
+		EmitSignal(SignalName.ActionCanceled, actionDef, SelectedAction);
 	}
 
 	#region manager Data

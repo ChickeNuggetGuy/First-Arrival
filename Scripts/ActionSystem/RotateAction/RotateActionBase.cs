@@ -6,6 +6,9 @@ using Godot;
 public partial class RotateActionBase : ActionBase
 {
   private Enums.Direction _targetDirection;
+  private Tween _rotationTween;
+  private float _startingYaw;
+  private bool _rotationStarted;
 
   private const float TurnSpeedDegPerSec = 540f;
   private const bool UseTween = true;
@@ -40,6 +43,8 @@ public partial class RotateActionBase : ActionBase
   public void AppendToTween(Tween tween, ref float currentYaw)
   {
     if (_targetDirection == Enums.Direction.None) return;
+
+    ApplyAnimationSpeed(tween);
 
     float targetYawRad = RotationHelperFunctions.GetRotationRadians(_targetDirection);
 
@@ -79,11 +84,13 @@ public partial class RotateActionBase : ActionBase
 	  float targetYawRad = RotationHelperFunctions.GetRotationRadians(_targetDirection);
 
 	  float currentYaw = parentGridObject.visualMesh.Rotation.Y;
+	  _startingYaw = currentYaw;
+	  _rotationStarted = true;
 	  float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
 	  float finalYaw = currentYaw + delta;
 
 	  float duration = Mathf.Abs(delta) / Mathf.DegToRad(TurnSpeedDegPerSec);
-	  if (duration < 0.0001f)
+	  if (!ShouldAnimate() || duration < 0.0001f)
 	  {
 		  var r = parentGridObject.visualMesh.Rotation;
 		  r.Y = finalYaw;
@@ -91,12 +98,13 @@ public partial class RotateActionBase : ActionBase
 		  return;
 	  }
 
-	  Tween tween = parentGridObject.visualMesh.CreateTween();
-	  tween.SetTrans(Tween.TransitionType.Sine);
-	  tween.SetEase(Tween.EaseType.InOut);
+	  _rotationTween = ApplyAnimationSpeed(parentGridObject.visualMesh.CreateTween());
+	  _rotationTween.SetTrans(Tween.TransitionType.Sine);
+	  _rotationTween.SetEase(Tween.EaseType.InOut);
 
-	  tween.TweenProperty(parentGridObject.visualMesh, "rotation:y", finalYaw, duration);
-	  await parentGridObject.visualMesh.ToSignal(tween, Tween.SignalName.Finished);
+	  _rotationTween.TweenProperty(parentGridObject.visualMesh, "rotation:y", finalYaw, duration);
+	  await WaitForTween(_rotationTween);
+	  _rotationTween = null;
   }
 
   protected override Task ActionComplete()
@@ -104,6 +112,26 @@ public partial class RotateActionBase : ActionBase
 	  // The action's target is the source of truth. Deriving this from a
 	  // transform reintroduces rounding/model-forward-offset errors.
 	  parentGridObject.GridPositionData.SetDirection(_targetDirection);
+	  return Task.CompletedTask;
+  }
+
+  protected override Task ActionCanceled()
+  {
+	  if (_rotationTween != null && GodotObject.IsInstanceValid(_rotationTween))
+		  _rotationTween.Kill();
+	  _rotationTween = null;
+
+	  if (
+		  _rotationStarted
+		  && parentGridObject?.visualMesh != null
+		  && GodotObject.IsInstanceValid(parentGridObject.visualMesh)
+	  )
+	  {
+		  Vector3 rotation = parentGridObject.visualMesh.Rotation;
+		  rotation.Y = _startingYaw;
+		  parentGridObject.visualMesh.Rotation = rotation;
+	  }
+
 	  return Task.CompletedTask;
   }
 }

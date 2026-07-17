@@ -13,6 +13,6 @@ public partial class BTCheckBlackboard : BTCondition
         
 		var val = Blackboard.Get(Key);
 		
-		return val.Obj == ExpectedValue.Obj; 
+		return val.Equals(ExpectedValue);
 	}
 }

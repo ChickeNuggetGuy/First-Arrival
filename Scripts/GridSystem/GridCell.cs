@@ -73,6 +73,26 @@ public partial class GridCell
         return false;
     }
 
+    // Mobile objects do not modify the static connection graph, so movement
+    // checks handle their temporary occupancy separately.
+    public bool HasMovementBlockingGridObject()
+    {
+        if (gridObjects == null) return false;
+
+        foreach (var gridObject in gridObjects)
+        {
+            if (gridObject != null &&
+                gridObject.IsActive &&
+                !gridObject.scenery &&
+                gridObject is not GridCellStateOverride)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void SetFogState(Enums.FogState state)
     {
         this.fogState = state;
@@ -91,7 +111,7 @@ public partial class GridCell
 
             if (fogState == Enums.FogState.Visible)
                 gridObject.Show();
-            else
+            else if(!gridObject.scenery)
                 gridObject.Hide();
         }
     }

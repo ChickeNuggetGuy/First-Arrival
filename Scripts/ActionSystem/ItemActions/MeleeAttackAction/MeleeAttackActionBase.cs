@@ -29,7 +29,10 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 		ParentActionBase = this;
 
 
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, true, false, out var neighbors))
+		// Adjacency is geometric, not a walkability test. The attacker's current
+		// cell is occupied and therefore not walkable, but it must still count as
+		// adjacent on subsequent attacks.
+		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, false, false, out var neighbors))
 		{
 			GD.PrintErr("MeleeAttackAction.Setup: Could not find neighbors for target gridcell");
 			return;

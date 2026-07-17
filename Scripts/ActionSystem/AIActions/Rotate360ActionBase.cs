@@ -10,6 +10,7 @@ public class Rotate360ActionBase : ActionBase, ICompositeAction
 {
 	public ActionBase ParentActionBase { get; set; }
 	public List<ActionBase> SubActions { get; set; }
+	private bool _foundVisibleEnemy;
 	
 	public Rotate360ActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell, 
 		ActionDefinition parent,  Godot.Collections.Dictionary<Enums.Stat, int> costs) 
@@ -20,6 +21,7 @@ public class Rotate360ActionBase : ActionBase, ICompositeAction
 	protected override async Task Setup()
 	{
 		ParentActionBase = this;
+		_foundVisibleEnemy = false;
 		
 		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActionsNode))return;
 		
@@ -36,26 +38,29 @@ public class Rotate360ActionBase : ActionBase, ICompositeAction
 			var nextDirectionValue = (currentDirectionValue - 1 + i) % 8 + 1;
 			var nextDirection = (Enums.Direction)nextDirectionValue;
 			
-			var nextCell = Managers.GridSystem.Instance.GetCellInDirection(startingGridCell, nextDirection);
-			if (nextCell == null)
-			{
-				// If there's no cell in that direction (e.g., edge of the map), we can't create a standard RotateAction.
-				// For now, we'll skip this step, though it means not a full 360 turn will be performed.
-				// A better implementation might involve a RotateAction that can take a direction directly.
-				continue;
-			}
-			
-			var rotateAction = rotateActionDefinition.InstantiateAction(
+			// A rotation should not depend on a neighboring cell existing. Passing
+			// the direction directly also allows a complete scan at map edges.
+			var rotateAction = new RotateActionBase(
 				parentGridObject,
 				startingGridCell,
-				nextCell,
-				new  Godot.Collections.Dictionary<Enums.Stat, int>()
+				startingGridCell,
+				rotateActionDefinition,
+				new Godot.Collections.Dictionary<Enums.Stat, int>(),
+				nextDirection
 			);
 			
 			AddSubAction(rotateAction);
 		}
 
 		await Task.CompletedTask;
+	}
+
+	protected override bool ShouldContinueAfterSubAction(ActionBase completedSubAction)
+	{
+		// RotateActionBase commits GridPositionData.Direction before this check.
+		// Recalculate explicitly so the scan responds to each completed step.
+		_foundVisibleEnemy = HasVisibleEnemy();
+		return !_foundVisibleEnemy;
 	}
 
 	protected override Task Execute()
@@ -66,13 +71,22 @@ public class Rotate360ActionBase : ActionBase, ICompositeAction
 
 	protected override Task ActionComplete()
 	{
-		var seenGridObects = parentGridObject.TeamHolder.GetVisibleGridCells().All(cell =>
-		{
-			if(!cell.HasGridObject()) return false;
-			if(!cell.gridObjects.Any(gridObject => gridObject.Team != parentGridObject.Team))return false;
-			return true;
-		});
-		GD.Print($"Did unit see any GridObjects: {seenGridObects}!");
+		GD.Print($"Rotate 360 found visible enemy: {_foundVisibleEnemy}");
 		return Task.CompletedTask;
+	}
+
+	private bool HasVisibleEnemy()
+	{
+		if (!parentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sight))
+			return false;
+
+		sight.CalculateSightArea();
+
+		return sight.SeenGridObjects.Any(gridObject =>
+			gridObject != null
+			&& gridObject.IsActive
+			&& !gridObject.scenery
+			&& gridObject.Team != parentGridObject.Team
+		);
 	}
 }

@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 using Godot.Collections;
 
@@ -15,6 +16,7 @@ public partial class GridObjectAnimation : GridObjectNode
 	
 	protected override void Setup()
 	{
+		ApplyAnimationSpeed();
 		isMoving = false;
 		isIdle = true;
 		WeaponState = Enums.WeaponState.None;
@@ -43,6 +45,15 @@ public partial class GridObjectAnimation : GridObjectNode
 	}
 
 	#region Animation Functions
+
+	private void ApplyAnimationSpeed()
+	{
+		if (animationPlayer != null)
+		{
+			animationPlayer.SpeedScale =
+				SettingsManager.Instance?.AnimationSpeedMultiplier ?? 1.0f;
+		}
+	}
 
 	public bool TrySetParameter(string parameterName, Variant value)
 	{
@@ -86,6 +97,7 @@ public partial class GridObjectAnimation : GridObjectNode
 	#region Get/Set Functions
 
 	public void SetLocomotionType(Enums.LocomotionType locomotionType) {
+		ApplyAnimationSpeed();
 
 		switch (locomotionType)
 		{

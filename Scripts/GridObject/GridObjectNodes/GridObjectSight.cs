@@ -22,7 +22,7 @@ public partial class GridObjectSight : GridObjectNode
     [ExportCategory("Line Of Sight")]
     [Export] private bool _useLosForGridObjects = true;
 	
-    [Export] private bool _useLosForCells = false;
+    [Export] private bool _useLosForCells = true;
 
 
     [Export(PropertyHint.Layers3DPhysics)]
@@ -42,6 +42,7 @@ public partial class GridObjectSight : GridObjectNode
     public IReadOnlyList<GridCell> VisibleCells => _visibleCells.AsReadOnly();
 
     private readonly HashSet<GridCell> _tempCellSet = new();
+    private readonly HashSet<GridCell> _proximityCellSet = new();
     private GridPositionData _positionData;
 
     
@@ -103,6 +104,7 @@ public partial class GridObjectSight : GridObjectNode
             return;
 
         _tempCellSet.Clear();
+        _proximityCellSet.Clear();
         _tempCellSet.Add(startCell);
 
         var newlySeenObjects = new List<GridObject>();
@@ -146,7 +148,10 @@ public partial class GridObjectSight : GridObjectNode
             {
                 foreach (var cell in immediateCells)
                     if (cell != null && cell != GridCell.Null)
+                    {
                         _tempCellSet.Add(cell);
+                        _proximityCellSet.Add(cell);
+                    }
             }
         }
 
@@ -160,7 +165,10 @@ public partial class GridObjectSight : GridObjectNode
             if (cell == null || cell == GridCell.Null)
                 continue;
 
-            if (_useLosForCells && cell != startCell)
+            // Proximity vision is deliberately not occluded. These cells are
+            // included as an immediate-awareness radius, rather than as a
+            // ray-based field of view.
+            if (_useLosForCells && cell != startCell && !_proximityCellSet.Contains(cell))
             {
                 Vector3 cellPoint = cell.WorldCenter + Vector3.Up * _targetHeight;
                 if (IsLineBlocked(eye, cellPoint))
@@ -263,13 +271,17 @@ public partial class GridObjectSight : GridObjectNode
             CollideWithAreas = false
         };
         
-        if (parentGridObject.collisionShape != null)
+        // The GridObject itself is a StaticBody3D. Exclude it even when no
+        // separate collisionShape reference is assigned, otherwise rays to
+        // neighbouring cells can immediately hit the viewer's own collider.
+        rayParams.Exclude = new Godot.Collections.Array<Rid>
         {
-            rayParams.Exclude = new Godot.Collections.Array<Rid>
-            {
-                parentGridObject.collisionShape.GetRid()
-            };
-        }
+            parentGridObject.GetRid()
+        };
+
+        if (parentGridObject.collisionShape != null &&
+            parentGridObject.collisionShape != parentGridObject)
+            rayParams.Exclude.Add(parentGridObject.collisionShape.GetRid());
 
         var hit = space.IntersectRay(rayParams);
         return hit.Count > 0;

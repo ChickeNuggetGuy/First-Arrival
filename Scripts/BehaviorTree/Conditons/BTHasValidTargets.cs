@@ -17,15 +17,20 @@ public partial class BTHasValidTargets : BTCondition
 
     protected override bool Check()
     {
-        if (ActionDef == null) return false;
+        ActionDefinition actionDef = Blackboard.Has("selectedAction")
+            ? Blackboard.Get<ActionDefinition>("selectedAction")
+            : ActionDef;
+
+        if (actionDef == null) return false;
 
         var gridObject = Blackboard.Get<GridObject>("grid_object");
         if (gridObject == null) return false;
 
-        GridCell startCell = null;
+        // Prefer the live anchor cell. A previous action can have moved the
+        // unit before this behavior tree is evaluated again.
+        GridCell startCell = gridObject.GridPositionData?.AnchorCell;
 
-        // Resolve Coords
-        if (Blackboard.Has("start_cell_coords"))
+        if (startCell == null && Blackboard.Has("start_cell_coords"))
         {
             Vector3I coords = Blackboard.Get<Vector3I>("start_cell_coords");
             startCell = GridSystem.Instance.GetGridCell(coords);
@@ -33,23 +38,23 @@ public partial class BTHasValidTargets : BTCondition
 
         if (startCell == null) return false;
 
-        ActionDef.parentGridObject = gridObject;
+        actionDef.parentGridObject = gridObject;
 
-        if (ActionDef is ItemActionDefinition itemDef && itemDef.Item == null)
+        if (actionDef is ItemActionDefinition itemDef && itemDef.Item == null)
         {
             if (!TryBindItem(gridObject, itemDef)) return false;
         }
 
-        ActionDef.UpdateValidGridCells(gridObject, startCell);
+        actionDef.UpdateValidGridCells(gridObject, startCell);
 
-        if (ActionDef.ValidGridCells == null || ActionDef.ValidGridCells.Count == 0)
+        if (actionDef.ValidGridCells == null || actionDef.ValidGridCells.Count == 0)
             return false;
 
         if (MinScore > int.MinValue)
         {
-            return ActionDef.ValidGridCells.Any(cell =>
+            return actionDef.ValidGridCells.Any(cell =>
             {
-                var (_, score) = ActionDef.GetAIActionScore(cell);
+                var (_, score) = actionDef.GetAIActionScore(cell);
                 return score >= MinScore;
             });
         }
@@ -65,7 +70,7 @@ public partial class BTHasValidTargets : BTCondition
         if (inventory.TryGetInventory(Enums.InventoryType.RightHand, out var rh)) inventories.Add(rh);
         if (inventory.TryGetInventory(Enums.InventoryType.LeftHand, out var lh)) inventories.Add(lh);
 
-        var defType = ActionDef.GetType();
+        var defType = itemDef.GetType();
 
         foreach (var inv in inventories)
         {

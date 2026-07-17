@@ -96,55 +96,17 @@ public partial class GridCellStateOverride : GridObject
 		
 		List<GridCell> gridCells = new List<GridCell>();
 		Vector3I rootCoords = rootCell.GridCoordinates;
-		Enums.Direction direction = this.GridPositionData.Direction;
 
 		if (shape != null)
 		{
-			for (int y = 0; y < shape.SizeY; y++)
+			// GridPositionData and the editor preview both use this method. Reuse
+			// the same coordinates so spawn metadata cannot be rotated or pivoted
+			// differently from the authored footprint.
+			foreach (Vector3I targetCoords in shape.GetWorldCoordinates(rootCoords))
 			{
-				for (int x = 0; x < shape.SizeX; x++)
-				{
-					for (int z = 0; z < shape.SizeZ; z++)
-					{
-						if (!shape.IsOccupied(x, y, z))
-							continue;
-
-						int relX = x - shape.PivotCell.X;
-						int relZ = z - shape.PivotCell.Y;
-						int offsetY = y;
-
-						int rotatedX = relX;
-						int rotatedZ = relZ;
-
-						switch (direction)
-						{
-							case Enums.Direction.North:
-								rotatedX = relX;
-								rotatedZ = relZ;
-								break;
-							case Enums.Direction.East:
-								rotatedX = -relZ;
-								rotatedZ = relX;
-								break;
-							case Enums.Direction.South:
-								rotatedX = -relX;
-								rotatedZ = -relZ;
-								break;
-							case Enums.Direction.West:
-								rotatedX = relZ;
-								rotatedZ = -relX;
-								break;
-						}
-
-						Vector3I targetCoords = rootCoords + new Vector3I(rotatedX, offsetY, rotatedZ);
-						GridCell cell = GridSystem.Instance.GetGridCell(targetCoords);
-
-						if (cell != null)
-						{
-							gridCells.Add(cell);
-						}
-					}
-				}
+				GridCell cell = GridSystem.Instance.GetGridCell(targetCoords);
+				if (cell != null)
+					gridCells.Add(cell);
 			}
 		}
 		else

@@ -11,7 +11,7 @@ namespace FirstArrival.Scripts.AI;
 [GlobalClass]
 public partial class BTActionSegment : TurnSegment
 {
-    [Export] private int _maxTicksPerUnit = 50;
+    [Export] private uint _maxRunTimeMs = 15000;
     
     [Export] private int _delayBetweenUnitsMs = 500; 
 
@@ -64,33 +64,73 @@ public partial class BTActionSegment : TurnSegment
 
         SetupBlackboard(bt.Blackboard, unit);
 
-        int ticks = 0;
-        BTStatus status;
+        ulong startedAt = Time.GetTicksMsec();
+        BTStatus status = BTStatus.Failure;
+        bool timedOut = false;
+        bool retryAfterSearch = false;
 
-        // Keep ticking this specific unit until it succeeds or fails
         do
         {
-            status = bt.TickTree();
-            ticks++;
-
-            if (status == BTStatus.Running)
+            do
             {
-                // Wait for the next visual frame.
-                await unit.ToSignal(unit.GetTree(), SceneTree.SignalName.ProcessFrame);
+                status = bt.TickTree();
+
+                if (status == BTStatus.Running)
+                {
+                    if (Time.GetTicksMsec() - startedAt >= _maxRunTimeMs)
+                    {
+                        timedOut = true;
+                        bt.Abort();
+                        GD.PushWarning(
+                            $"AI Turn: {unit.Name} timed out after {_maxRunTimeMs} ms."
+                        );
+                        break;
+                    }
+
+                    await unit.ToSignal(unit.GetTree(), SceneTree.SignalName.ProcessFrame);
+                }
+            } while (status == BTStatus.Running);
+
+            if (timedOut) break;
+
+            // A scan or movement search can reveal an enemy after Combat was
+            // evaluated. Restart once so the newly visible target is handled
+            // by Combat rather than ending this unit's turn.
+            retryAfterSearch = bt.Blackboard.Get<bool>("enemy_revealed_during_action")
+                && CanSeeActiveEnemy(unit);
+
+            if (retryAfterSearch)
+            {
+                bt.Blackboard.Set("has_searched", Variant.From(false));
+                bt.Blackboard.Set("enemy_revealed_during_action", Variant.From(false));
+                if (unit.GridPositionData?.AnchorCell != null)
+                {
+                    bt.Blackboard.Set(
+                        "start_cell_coords",
+                        Variant.From(unit.GridPositionData.AnchorCell.GridCoordinates)
+                    );
+                }
+                GD.Print($"AI Turn: {unit.Name} found an enemy while searching; reevaluating combat.");
             }
-
-        } while (status == BTStatus.Running && ticks < _maxTicksPerUnit);
-
-        // Safety cleanup
-        if (ticks >= _maxTicksPerUnit) 
-        {
-            GD.PushWarning($"AI Turn: {unit.Name} timed out after {_maxTicksPerUnit} ticks.");
-            // Force one last tick to allow cleanup/abort
-            bt.TickTree(); 
-        }
+        } while (retryAfterSearch);
 
         GD.Print($"<--- AI Turn: {unit.Name} Finished ({status})");
     }
+
+	private static bool CanSeeActiveEnemy(GridObject unit)
+	{
+		if (!unit.TryGetGridObjectNode<GridObjectSight>(out var sight))
+			return false;
+
+		sight.EnsureUpToDate();
+
+		return sight.SeenGridObjects.Any(gridObject =>
+			gridObject != null
+			&& gridObject.IsActive
+			&& !gridObject.scenery
+			&& gridObject.Team != unit.Team
+		);
+	}
 
     private void SetupBlackboard(Blackboard blackboard, GridObject unit)
     {
@@ -108,7 +148,8 @@ public partial class BTActionSegment : TurnSegment
 
         blackboard.Remove("override_target_coords");
         blackboard.Remove("chosen_target_coords");
-        
-        blackboard.Set("has_scanned", Variant.From(false)); 
+        blackboard.Remove("selectedAction");
+        blackboard.Set("has_searched", Variant.From(false));
+        blackboard.Set("enemy_revealed_during_action", Variant.From(false));
     }
 }

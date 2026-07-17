@@ -11,7 +11,7 @@
 [sub_resource type="Resource" id="Resource_xokv0"]
 script = ExtResource("2_w5xnn")
 range = 10
-damage = 25
+damage = 27
 accuracy = 20.0
 confirmClick = true
 
@@ -19,7 +19,7 @@ confirmClick = true
 script = ExtResource("2_w5xnn")
 Type = 1
 range = 20
-damage = 25
+damage = 27
 accuracy = 65.0
 
 [sub_resource type="Resource" id="Resource_xaass"]
@@ -27,7 +27,7 @@ script = ExtResource("2_w5xnn")
 Type = 2
 attackCount = 3
 range = 18
-damage = 25
+damage = 27
 accuracy = -15.0
 confirmClick = true
 

@@ -7,6 +7,9 @@ using Godot;
 
 public class MoveStepActionBase : ActionBase, ICompositeAction
 {
+  private bool _playedMovementVisuals;
+  private Tween _movementTween;
+
   public ActionBase ParentActionBase { get; set; }
   public List<ActionBase> SubActions { get; set; }
   public Enums.Direction targetDirection { get; set; }
@@ -120,11 +123,23 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
 
   protected override async Task Execute()
   {
+	  _playedMovementVisuals = ShouldAnimate();
+	  if (!_playedMovementVisuals)
+	  {
+		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
+		  parentGridObject.animationNode.TrySetParameter(
+			  "WalkBlendSpace/blend_position",
+			  Vector2.Zero
+		  );
+		  parentGridObject.Position = targetGridCell.WorldCenter;
+		  return;
+	  }
+
 	  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
 	  parentGridObject.animationNode.TrySetParameter("WalkBlendSpace/blend_position", blendSpaceValue);
 
-	  var tween = parentGridObject.CreateTween();
-	  var moveTw = tween.TweenProperty(
+	  _movementTween = ApplyAnimationSpeed(parentGridObject.CreateTween());
+	  var moveTw = _movementTween.TweenProperty(
 		  parentGridObject,
 		  "position",
 		  targetGridCell.WorldCenter,
@@ -132,12 +147,15 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
 	  );
 	  moveTw.SetTrans(Tween.TransitionType.Linear);
 
-	  await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+	  await WaitForTween(_movementTween);
+	  _movementTween = null;
   }
 
   protected override Task ActionComplete()
   {
 	  parentGridObject.GridPositionData.SetGridCell(targetGridCell);
+	  if (!_playedMovementVisuals)
+		  return Task.CompletedTask;
 
 	  if (NextActionBase is MoveStepActionBase nextStep)
 	  {
@@ -155,6 +173,32 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
 			  Vector2.Zero
 		  );
 	  }
+
+	  return Task.CompletedTask;
+  }
+
+  protected override Task ActionCanceled()
+  {
+	  if (_movementTween != null && GodotObject.IsInstanceValid(_movementTween))
+		  _movementTween.Kill();
+	  _movementTween = null;
+
+	  if (parentGridObject == null || !GodotObject.IsInstanceValid(parentGridObject))
+		  return Task.CompletedTask;
+
+	  // A partial step is not committed. Return the unit to the cell from which
+	  // the step began so world position and grid occupancy remain consistent.
+	  if (startingGridCell != null)
+	  {
+		  parentGridObject.Position = startingGridCell.WorldCenter;
+		  parentGridObject.GridPositionData.SetGridCell(startingGridCell);
+	  }
+
+	  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
+	  parentGridObject.animationNode.TrySetParameter(
+		  "WalkBlendSpace/blend_position",
+		  Vector2.Zero
+	  );
 
 	  return Task.CompletedTask;
   }

@@ -42,7 +42,9 @@ public partial class InteractActionBase : ActionBase, ICompositeAction
 		}
 		
 		// Not adjacent. We need to move.
-		var walkableNeighbors = neighbors.Where(n => n.IsWalkable).ToList();
+		var walkableNeighbors = neighbors
+			.Where(n => n.IsWalkable && !n.HasMovementBlockingGridObject())
+			.ToList();
 		if (!walkableNeighbors.Any())
 		{
 			GD.PrintErr("InteractAction.Setup: No walkable cell near target to move to.");

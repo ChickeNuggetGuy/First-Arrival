@@ -1,12 +1,16 @@
 using Godot;
 using System.Collections.Generic;
-using System.Linq;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
 [GlobalClass]
 public partial class MoveActionDefinition : ActionDefinition
 {
+  private const int OrthogonalTimeUnitCost = 4;
+  private const int DiagonalTimeUnitCost = 6;
+  private const int MovementStaminaCost = 2;
+  private const int RotationCostPerStep = 1;
+
   public List<GridCell> path = new List<GridCell>();
 
   public override ActionBase InstantiateAction(
@@ -44,9 +48,9 @@ public partial class MoveActionDefinition : ActionDefinition
     return false;
   }
 
-  if (!goal.IsWalkable)
+  if (!goal.IsWalkable || goal.HasMovementBlockingGridObject())
   {
-    reason = "Target grid cell is not walkable";
+    reason = "Target grid cell is not walkable or is occupied";
     return false;
   }
   
@@ -77,8 +81,8 @@ public partial class MoveActionDefinition : ActionDefinition
         facing,
         stepDir
       );
-      AddCost(costs, Enums.Stat.TimeUnits, Mathf.Abs(steps) * 1);
-      AddCost(costs, Enums.Stat.Stamina, Mathf.Abs(steps) * 1);
+      AddCost(costs, Enums.Stat.TimeUnits, Mathf.Abs(steps) * RotationCostPerStep);
+      AddCost(costs, Enums.Stat.Stamina, Mathf.Abs(steps) * RotationCostPerStep);
       facing = stepDir;
     }
 
@@ -88,13 +92,13 @@ public partial class MoveActionDefinition : ActionDefinition
 
     if (diagonal)
     {
-      AddCost(costs, Enums.Stat.TimeUnits, 6);
-      AddCost(costs, Enums.Stat.Stamina, 2);
+      AddCost(costs, Enums.Stat.TimeUnits, DiagonalTimeUnitCost);
+      AddCost(costs, Enums.Stat.Stamina, MovementStaminaCost);
     }
     else
     {
-      AddCost(costs, Enums.Stat.TimeUnits, 4);
-      AddCost(costs, Enums.Stat.Stamina, 2);
+      AddCost(costs, Enums.Stat.TimeUnits, OrthogonalTimeUnitCost);
+      AddCost(costs, Enums.Stat.Stamina, MovementStaminaCost);
     }
   }
 
@@ -108,8 +112,83 @@ public partial class MoveActionDefinition : ActionDefinition
     GridCell startingGridCell
   )
   {
-    GridSystem.Instance.TryGetGridCellsInRange(startingGridCell,new Vector2I(20,3),true, out List<GridCell> cellsInRange);
-    return cellsInRange.Where( cell => Pathfinder.Instance.IsPathPossible(startingGridCell, cell)).ToList();
+    var validCells = new List<GridCell>();
+    if (
+      gridObject == null
+      || startingGridCell == null
+      || GridSystem.Instance == null
+      || Pathfinder.Instance == null
+      || !gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out var statHolder)
+      || !statHolder.TryGetStat(Enums.Stat.TimeUnits, out var timeUnits)
+      || !statHolder.TryGetStat(Enums.Stat.Stamina, out var stamina)
+    )
+      return validCells;
+
+    // Every move consumes at least these base costs. This gives us a safe
+    // step limit for collecting candidates before calculating their exact
+    // path costs (including diagonals and rotations).
+    int maxSteps = Mathf.FloorToInt(Mathf.Min(
+      timeUnits.CurrentValue / OrthogonalTimeUnitCost,
+      stamina.CurrentValue / MovementStaminaCost
+    ));
+    if (maxSteps <= 0)
+      return validCells;
+
+    var candidates = GetCellsWithinStepLimit(startingGridCell, maxSteps);
+    foreach (GridCell candidate in candidates)
+    {
+      // CanTakeAction uses the same path-cost simulation as execution and
+      // performs the final affordability check against both current stats.
+      if (CanTakeAction(
+        gridObject,
+        startingGridCell,
+        candidate,
+        out _,
+        out _
+      ))
+        validCells.Add(candidate);
+    }
+
+    return validCells;
+  }
+
+  private static List<GridCell> GetCellsWithinStepLimit(
+    GridCell startingGridCell,
+    int maxSteps
+  )
+  {
+    var result = new List<GridCell>();
+    var visited = new HashSet<GridCell> { startingGridCell };
+    var frontier = new Queue<(GridCell Cell, int Steps)>();
+    frontier.Enqueue((startingGridCell, 0));
+
+    while (frontier.Count > 0)
+    {
+      var (cell, steps) = frontier.Dequeue();
+      if (steps >= maxSteps)
+        continue;
+
+      if (!GridSystem.Instance.TryGetGridCellNeighbors(
+        cell,
+        true,
+        false,
+        out var neighbors
+      ))
+        continue;
+
+      foreach (GridCell neighbor in neighbors)
+      {
+        if (neighbor == null ||
+            neighbor.HasMovementBlockingGridObject() ||
+            !visited.Add(neighbor))
+          continue;
+
+        result.Add(neighbor);
+        frontier.Enqueue((neighbor, steps + 1));
+      }
+    }
+
+    return result;
   }
 
   public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
@@ -136,19 +215,42 @@ public partial class MoveActionDefinition : ActionDefinition
 	  
 	  if (sightArea == null) return (targetGridCell, 0);
 	  
-	  if(sightArea.SeenGridObjects.Count > 0)
-	  { 
-		  return (targetGridCell, 100 / sightArea.SeenGridObjects.Count);
+	  float nearestEnemyDistance = float.MaxValue;
+	  foreach (GridObject seenObject in sightArea.SeenGridObjects)
+	  {
+		  if (
+			  seenObject == null
+			  || seenObject == parentGridObject
+			  || !seenObject.IsActive
+			  || seenObject.scenery
+			  || seenObject.Team == parentGridObject.Team
+			  || seenObject.GridPositionData?.AnchorCell == null
+		  )
+			  continue;
+
+		  float enemyDistance = targetGridCell.WorldCenter.DistanceTo(
+			  seenObject.GridPositionData.AnchorCell.WorldCenter
+		  );
+		  nearestEnemyDistance = Mathf.Min(nearestEnemyDistance, enemyDistance);
+	  }
+
+	  if (nearestEnemyDistance < float.MaxValue)
+	  {
+		  // DetermineBestAIAction chooses the highest score, so cells closer to
+		  // a visible enemy are preferred over arbitrary reachable cells.
+		  return (targetGridCell, 1000 - Mathf.RoundToInt(nearestEnemyDistance * 10.0f));
 	  }
 
 	  
 	  float distance = startingCell.WorldCenter.DistanceTo(targetGridCell.WorldCenter);
 	  
 	  float maxDistance = 40.0f;
-	  float normalizedScore = (distance / maxDistance) * 70.0f;
-    
-	  int score = (int)Mathf.Clamp(normalizedScore, 0, 70);
-	  score += GD.RandRange(0, 5);
+	  float normalizedScore = (distance / maxDistance) * 45.0f;
+
+	  // Search movement should vary its destination, but longer moves retain
+	  // a meaningful advantage over nearby cells.
+	  int score = (int)Mathf.Clamp(normalizedScore, 0, 45);
+	  score += GD.RandRange(0, 40);
 	  return (targetGridCell, score);
   }
 

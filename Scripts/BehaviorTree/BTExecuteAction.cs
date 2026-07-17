@@ -38,15 +38,15 @@ public partial class BTExecuteAction : BTAsyncBridge
         _gridObject = Blackboard.Get<GridObject>("grid_object");
         if (_gridObject == null) return false;
 
-        // 2. Resolve Start Cell
-        if (Blackboard.Has("start_cell_coords"))
+        // 2. Always act from the unit's current cell. A visibility interrupt
+        // can stop a move partway through its path before this tree retries.
+        _startCell = _gridObject.GridPositionData?.AnchorCell;
+
+        if (_startCell == null && Blackboard.Has("start_cell_coords"))
         {
             Vector3I startCoords = Blackboard.Get<Vector3I>("start_cell_coords");
             _startCell = GridSystem.Instance.GetGridCell(startCoords);
         }
-        
-        if (_startCell == null) 
-            _startCell = _gridObject.GridPositionData.AnchorCell;
 
         if (_startCell == null) return false;
 
@@ -95,36 +95,20 @@ public partial class BTExecuteAction : BTAsyncBridge
             Blackboard.Set(TargetCoordsBlackboardKey, Variant.From(targetCell.GridCoordinates));
         }
 
-        // 5. Execute and Wait for SPECIFIC Completion
-        bool accepted = await ActionManager.Instance.TryTakeAction(
+        // TryTakeAction already awaits the complete action execution. Waiting
+        // for ActionCompleted after it returns would subscribe too late and
+        // leave this node Running forever.
+        bool actionCompleted = await ActionManager.Instance.TryTakeAction(
             actionDef, 
             _gridObject, 
             _startCell, 
             targetCell
         );
 
-        if (accepted)
-        {
-            while (true)
-            {
-                var signalArgs = await ActionManager.Instance.ToSignal(
-                    ActionManager.Instance, 
-                    ActionManager.SignalName.ActionCompleted
-                );
+        if (ActionManager.Instance.LastActionWasInterruptedByNewEnemy)
+            Blackboard.Set("enemy_revealed_during_action", Variant.From(true));
 
-                var completedActionDef = signalArgs[0].As<ActionDefinition>();
-
-                if (completedActionDef == actionDef)
-                {
-                    // The root action we started finished.
-                    break;
-                }
-                
-                // If we are here, a sub-action finished. We keep waiting.
-            }
-        }
-
-        return accepted;
+        return actionCompleted;
     }
 
     private (GridCell cell,  Godot.Collections.Dictionary<Enums.Stat, int> costs)? FindBestTarget(ActionDefinition actionDef)

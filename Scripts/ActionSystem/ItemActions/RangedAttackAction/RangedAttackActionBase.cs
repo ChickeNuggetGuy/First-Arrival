@@ -73,17 +73,7 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 
 		for (int i = 0; i < rangedAttackActionDefinition.attackCount; i++)
 		{
-			var visual = new CsgSphere3D { Radius = 0.125f };
-			parentGridObject.GetTree().Root.AddChild(visual);
-			visual.GlobalPosition = origin;
-
-			Tween tween = parentGridObject.CreateTween();
-			tween.SetTrans(Tween.TransitionType.Linear);
-			tween.SetEase(Tween.EaseType.InOut);
-
-
 			Vector3 tweenPos = origin;
-			float tweenDuration = 0.5f;
 			GridObject targetGridObject = null;
 
 			Vector3 direction =
@@ -109,10 +99,20 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 				tweenPos = origin + newDirection * 25;
 			}
 
-			tweenDuration = origin.DistanceTo(tweenPos) / 100f;
-			tween.TweenProperty(visual, "global_position", tweenPos, tweenDuration);
-			await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
-			visual.QueueFree();
+			if (ShouldAnimate())
+			{
+				var visual = new CsgSphere3D { Radius = 0.125f };
+				parentGridObject.GetTree().Root.AddChild(visual);
+				visual.GlobalPosition = origin;
+
+				Tween tween = ApplyAnimationSpeed(parentGridObject.CreateTween());
+				tween.SetTrans(Tween.TransitionType.Linear);
+				tween.SetEase(Tween.EaseType.InOut);
+				float tweenDuration = origin.DistanceTo(tweenPos) / 100f;
+				tween.TweenProperty(visual, "global_position", tweenPos, tweenDuration);
+				await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+				visual.QueueFree();
+			}
 
 			if (targetGridObject == null)
 			{

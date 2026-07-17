@@ -10,6 +10,7 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
 {
     [Export] private Node3D pivot;
     [Export] private GridPositionData doorData;
+    [Export] private CollisionShape3D closedDoorCollider;
     [Export] public Godot.Collections.Dictionary<Enums.Stat, int> costs { get; set; }
 
     public bool isOpen { get; protected set; } = false;
@@ -22,6 +23,11 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
 	    GridCell gridCell,
 	    bool allowMissingGridCell = false)
     {
+        // Door cells themselves control navigation. Keep the visual/LOS body
+        // off the obstacle layer so its physical width cannot remove unrelated
+        // connections from cells beside the doorway.
+        CollisionLayer = (CollisionLayer & ~(uint)PhysicsLayer.OBSTACLE) | 1u;
+
         await base.Initialize(team, gridCell);
 
         if (_initialized) return;
@@ -109,19 +115,26 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
                 }
             }
         }
+
+        RefreshVisibility();
     }
 
     private void UpdateVisuals()
     {
         if (pivot != null)
-        {
             pivot.Visible = !isOpen;
-            var collider = pivot.GetNodeOrNull<CollisionObject3D>("StaticBody3D");
-            if (collider != null)
-            {
-                collider.ProcessMode = isOpen ? ProcessModeEnum.Disabled : ProcessModeEnum.Inherit;
-            }
-        }
+
+        if (closedDoorCollider != null)
+            closedDoorCollider.Disabled = isOpen;
+    }
+
+    private static void RefreshVisibility()
+    {
+        var manager = GridObjectManager.Instance;
+        if (manager == null) return;
+
+        foreach (var teamHolder in manager.GetGridObjectTeamHolders().Values)
+            teamHolder?.UpdateVisibility();
     }
 
     public override void _Process(double delta)

@@ -21,6 +21,7 @@ PhantomCameraManager="*uid://duq6jhf6unyis"
 GameManager="*uid://dr5vsk7v685hc"
 SavesManager="*uid://c8ng3y8sls6ck"
 InventoryManager="*uid://h1v27m0p54g"
+SettingsManager="*uid://wqhy20mdwvwe"
 
 [debug_draw_3d]
 

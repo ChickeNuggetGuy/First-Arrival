@@ -233,14 +233,18 @@ public partial class GridSystem : Manager<GridSystem>
 		{
 			if (gridObject == null || gridObject.IsInitialized) continue;
 
-			if (TryGetGridCellFromWorldPosition(gridObject.GlobalPosition, out GridCell gridCell, true))
-			{
-				await gridObject.Initialize(gridObject.Team, gridCell);
-			}
-			else
+			// Passing null lets GridObject.Initialize resolve the anchor from its
+			// GridPositionData.GlobalPosition. Preplaced objects often author an
+			// intentional local anchor offset there, so using the parent object's
+			// GlobalPosition would silently discard that offset.
+			await gridObject.Initialize(gridObject.Team, null);
+
+			if (gridObject.GridPositionData?.AnchorCell == null)
 			{
 				GD.PrintErr(
-					$"Could not find grid cell for GridObject {gridObject.Name} at {gridObject.GlobalPosition}");
+					$"Could not find grid cell for GridObject {gridObject.Name} at "
+					+ $"{gridObject.GridPositionData?.GlobalPosition ?? gridObject.GlobalPosition}"
+				);
 			}
 		}
 	}

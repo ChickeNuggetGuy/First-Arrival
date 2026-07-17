@@ -85,6 +85,17 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 		}
 
 		InitializeGridObjectNodes();
+
+		// Connections describe the static grid. A mobile object must not mark its
+		// own anchor cell obstructed, otherwise any nearby connection rebuild (for
+		// example, toggling a door) isolates the object on the cell it occupies.
+		if (!scenery &&
+		    TryGetGridObjectNode<GridObjectActions>(out var actions) &&
+		    actions.ActionDefinitions.Any(definition => definition is MoveActionDefinition))
+		{
+			gridObjectSettings |= Enums.GridObjectSettings.CanWalkThrough;
+		}
+
 		GridPositionData.SetupCall(this);
 
 		if (GridPositionData.AutoCalculateShape)

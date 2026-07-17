@@ -132,4 +132,18 @@ public partial class MoveActionBase : ActionBase, ICompositeAction
 		parentGridObject.GridPositionData.SetGridCell(targetGridCell);
 		await Task.CompletedTask;
 	}
+
+	protected override Task ActionCanceled()
+	{
+		if (parentGridObject != null && GodotObject.IsInstanceValid(parentGridObject))
+		{
+			parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
+			parentGridObject.animationNode.TrySetParameter(
+				"WalkBlendSpace/blend_position",
+				Vector2.Zero
+			);
+		}
+
+		return Task.CompletedTask;
+	}
 }

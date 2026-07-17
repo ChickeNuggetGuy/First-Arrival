@@ -86,7 +86,9 @@ public partial class interactActionDefinition : ActionDefinition
 		{
 			// Need to move to an adjacent tile first
 			var walkableNeighbors = neighbors.Where(n =>
-				n.IsWalkable && Pathfinder.Instance.IsPathPossible(startingGridCell.GridCoordinates, n.GridCoordinates)
+				n.IsWalkable &&
+				!n.HasMovementBlockingGridObject() &&
+				Pathfinder.Instance.IsPathPossible(startingGridCell.GridCoordinates, n.GridCoordinates)
 			).ToList();
 
 			if (walkableNeighbors.Count == 0)

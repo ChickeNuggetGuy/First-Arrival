@@ -83,17 +83,21 @@ public class ThrowActionBase : ActionBase, ICompositeAction, IItemAction
   {
     GD.Print("ThrowAction");
 
-    var visual = new CsgSphere3D { Radius = 0.5f };
-    parentGridObject.GetTree().Root.AddChild(visual);
-    visual.GlobalPosition = vectorPath[0];
-
-    foreach (Vector3 position in vectorPath)
+    CsgSphere3D visual = null;
+    if (ShouldAnimate())
     {
-      Tween tween = parentGridObject.CreateTween();
-      tween.SetTrans(Tween.TransitionType.Linear);
-      tween.SetEase(Tween.EaseType.InOut);
-      tween.TweenProperty(visual, "position", position, 0.05);
-      await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+      visual = new CsgSphere3D { Radius = 0.5f };
+      parentGridObject.GetTree().Root.AddChild(visual);
+      visual.GlobalPosition = vectorPath[0];
+
+      foreach (Vector3 position in vectorPath)
+      {
+        Tween tween = ApplyAnimationSpeed(parentGridObject.CreateTween());
+        tween.SetTrans(Tween.TransitionType.Linear);
+        tween.SetEase(Tween.EaseType.InOut);
+        tween.TweenProperty(visual, "position", position, 0.05);
+        await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+      }
     }
 
     if (Item == null)
@@ -126,7 +130,7 @@ public class ThrowActionBase : ActionBase, ICompositeAction, IItemAction
       );
     }
 
-    visual.QueueFree();
+    visual?.QueueFree();
   }
 
   protected override Task ActionComplete()

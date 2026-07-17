@@ -63,12 +63,15 @@ public partial class MeleeAttackActionDefinition
 
 		if (targetGridObject == null)
 		{
-			GD.Print("Target grid object is null, failed all conditions");
+			reason = "Target grid object is null, failed all conditions";
+			return false;
 		}
 		
 
-		
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, true, false, out var neighbors))
+		// Use every geometric neighbor for the adjacency check. An occupied cell
+		// is not walkable, so asking only for walkable neighbors makes an attacker
+		// that is already beside the target appear non-adjacent on its next hit.
+		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, false, false, out var neighbors))
 		{
 			reason = "Could not find neighbors for target gridcell";
 			return false;

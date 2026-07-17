@@ -479,7 +479,9 @@ public partial class Pathfinder : Manager<Pathfinder>
 		if (!GridSystem.Instance.TryGetGridCellNeighbors(cell, true, false, out var neighbors))
 			return new List<GridCell>();
 
-		return neighbors;
+		return neighbors
+			.Where(neighbor => !neighbor.HasMovementBlockingGridObject())
+			.ToList();
 	}
 
 	/// <summary>

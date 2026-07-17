@@ -133,8 +133,11 @@ public abstract partial class ActionDefinition : Resource
 
   public void UpdateValidGridCells(GridObject gridObject, GridCell startingGridCell)
   {
+    parentGridObject = gridObject;
     ValidGridCells.Clear();
-    ValidGridCells.AddRange(GetValidGridCells(gridObject, startingGridCell));
+    List<GridCell> validCells = GetValidGridCells(gridObject, startingGridCell);
+    if (validCells != null)
+      ValidGridCells.AddRange(validCells);
   }
 
   protected abstract List<GridCell> GetValidGridCells(

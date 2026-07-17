@@ -58,7 +58,7 @@ public partial class BTHasActionDefinition : BTCondition
 		{
 			GD.Print("Action Definition found: " );
 			if(setSelectedAction)
-				Blackboard.Set("selectedAction", ActionDef);
+				Blackboard.Set("selectedAction", returnDefinition);
 			return true;
 		}
 		else

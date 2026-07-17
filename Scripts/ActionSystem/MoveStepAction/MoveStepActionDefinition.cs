@@ -88,7 +88,9 @@ public partial class MoveStepActionDefinition : ActionDefinition
   )
   {
     GridSystem.Instance.TryGetGridCellNeighbors(startingGridCell,true, false, out var neighbors);
-    return neighbors;
+    return neighbors?
+      .Where(cell => !cell.HasMovementBlockingGridObject())
+      .ToList() ?? new List<GridCell>();
   }
 
   public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
