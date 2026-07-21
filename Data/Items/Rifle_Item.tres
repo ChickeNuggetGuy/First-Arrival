@@ -10,9 +10,10 @@
 
 [sub_resource type="Resource" id="Resource_xokv0"]
 script = ExtResource("2_w5xnn")
+attackCount = 2
 range = 10
 damage = 27
-accuracy = 20.0
+accuracy = 5.0
 confirmClick = true
 
 [sub_resource type="Resource" id="Resource_tj85d"]
@@ -20,7 +21,7 @@ script = ExtResource("2_w5xnn")
 Type = 1
 range = 20
 damage = 27
-accuracy = 65.0
+accuracy = 35.0
 
 [sub_resource type="Resource" id="Resource_xaass"]
 script = ExtResource("2_w5xnn")
@@ -54,10 +55,8 @@ ItemID = 3
 ItemName = "Rifle"
 ItemDescription = "Standard Issue Assult Rifle"
 ItemIcon = ExtResource("4_xokv0")
-buyPrice = 850
-sellPrice = 675
 ItemShape = SubResource("Resource_w5xnn")
-weight = 1
+weight = 14
 ItemMesh = ExtResource("2_atvu6")
 LeftHandItemPosition = Vector3(0.24844818, -0.05375739, -0.06803122)
 LeftHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
@@ -65,3 +64,5 @@ RightHandItemPosition = Vector3(0.01, 0.01, 0.01)
 RightHandItemRotation = Vector3(-0.77465475, -1.2517765, -1.6646669)
 ActionDefinitions = Array[Object]([SubResource("Resource_xokv0"), SubResource("Resource_tj85d"), SubResource("Resource_xaass"), SubResource("Resource_xgeb5"), SubResource("Resource_ipk4j")])
 MaxStackSize = 4
+buyPrice = 850
+sellPrice = 675

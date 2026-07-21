@@ -15,14 +15,8 @@ public partial class MainBaseUI : UIWindow
 	[Export] private EquipCraftUI _equipCraftUi;
 	
 
-	private TeamBaseCellDefinition CurrentBase
-	{
-		get
-		{
-			return GameManager.Instance.currentBase;
-		}
-	}
-	
+	private TeamBaseCellDefinition CurrentBase => GameManager.Instance.currentBase;
+
 	protected override async Task _Setup()
 	{
 		await base._Setup();
@@ -54,6 +48,16 @@ public partial class MainBaseUI : UIWindow
 
 	private async void CraftUiButtonOnPressed()
 	{
+		if (_unitsPanelUi is { IsShown: true })
+		{
+			await _unitsPanelUi.HideCall();
+		}
+		
+		if (_buySellUi is { IsShown: true })
+		{
+			await _buySellUi.HideCall();
+		}
+		
 		try
 		{
 			await _equipCraftUi.Toggle();
@@ -66,6 +70,17 @@ public partial class MainBaseUI : UIWindow
 
 	private async void UnitDetailsButtonOnPressed()
 	{
+		
+		if (_equipCraftUi is { IsShown: true })
+		{
+			await _equipCraftUi.HideCall();
+		}
+		
+		if (_buySellUi is { IsShown: true })
+		{
+			await _buySellUi.HideCall();
+		}
+		
 		try
 		{
 			await _unitsPanelUi.Toggle();
@@ -84,6 +99,17 @@ public partial class MainBaseUI : UIWindow
 	
 	private async void BuySellButtonOnPressed()
 	{
+		
+		if (_equipCraftUi is { IsShown: true })
+		{
+			await _equipCraftUi.HideCall();
+		}
+		
+		if (_unitsPanelUi is { IsShown: true })
+		{
+			await _unitsPanelUi.HideCall();
+		}
+		
 		try
 		{
 			await _buySellUi.Toggle();

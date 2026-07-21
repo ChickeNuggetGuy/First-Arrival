@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.Globe.Countries;
 using FirstArrival.Scripts.Utility;
 
 [GlobalClass]
@@ -15,6 +16,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 
 
 	[Export] public Vector2 latLonOffset = Vector2.Zero;
+	[Export] private CountryDatabase countryDatabase;
 
 	[Export] private Godot.Collections.Dictionary<string, Vector2> textureOffsets =
 		new Godot.Collections.Dictionary<string, Vector2>();
@@ -32,6 +34,8 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 
 	private uint[] _countryKeyByIndex = Array.Empty<uint>();
 	private Dictionary<uint, int[]> _countryToCellIndices = new();
+	private readonly Dictionary<uint, CountryRuntimeState> _countryStates = new();
+	private readonly Dictionary<uint, (double Gdp, float Opinion)> _loadedCountryStates = new();
 	private long[]? _loadedCountryKeysFromSave;
 	public int[] DebugHighlightedCellIndices { get; private set; } = Array.Empty<int>();
 
@@ -88,26 +92,66 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			keys[i] = _countryKeyByIndex[i];
 
 		data["country_keys"] = keys;
+
+		var states = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
+		foreach (CountryRuntimeState state in _countryStates.Values)
+		{
+			states.Add(new Godot.Collections.Dictionary<string, Variant>
+			{
+				["country_key"] = (long)state.CountryKey,
+				["gdp"] = state.GrossDomesticProduct,
+				["player_opinion"] = state.PlayerOpinion
+			});
+		}
+		data["country_states"] = states;
 		return data;
 	}
 
 	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		_loadedCountryKeysFromSave = null;
+		_loadedCountryStates.Clear();
 
 		if (data == null || data.Count == 0)
 			return Task.CompletedTask;
 
+		if (data.TryGetValue("country_states", out Variant statesVariant)
+		    && statesVariant.VariantType == Variant.Type.Array)
+		{
+			foreach (Variant stateVariant in statesVariant.AsGodotArray())
+			{
+				var saved = stateVariant.AsGodotDictionary<string, Variant>();
+				if (!saved.TryGetValue("country_key", out Variant keyVariant))
+					continue;
+
+				uint key = (uint)keyVariant.AsInt64();
+				double gdp = saved.TryGetValue("gdp", out Variant gdpVariant)
+					? gdpVariant.AsDouble()
+					: 0.0;
+				float opinion = saved.TryGetValue("player_opinion", out Variant opinionVariant)
+					? opinionVariant.AsSingle()
+					: 0.0f;
+				_loadedCountryStates[key] = (gdp, opinion);
+			}
+		}
+
 		if (!data.TryGetValue("country_keys", out var v))
+		{
+			InitializeCountryStates();
 			return Task.CompletedTask;
+		}
 
 		if (v.VariantType == Variant.Type.Nil)
+		{
+			InitializeCountryStates();
 			return Task.CompletedTask;
+		}
 
 		if (v.VariantType == Variant.Type.PackedInt64Array)
 		{
 			var arr = v.AsInt64Array();
 			_loadedCountryKeysFromSave = arr ?? Array.Empty<long>();
+			InitializeCountryStates();
 			return Task.CompletedTask;
 		}
 
@@ -117,6 +161,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			if (ints == null)
 			{
 				_loadedCountryKeysFromSave = Array.Empty<long>();
+				InitializeCountryStates();
 				return Task.CompletedTask;
 			}
 
@@ -124,6 +169,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			for (int i = 0; i < ints.Length; i++)
 				_loadedCountryKeysFromSave[i] = ints[i];
 
+			InitializeCountryStates();
 			return Task.CompletedTask;
 		}
 
@@ -131,7 +177,10 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		{
 			var bytes = v.AsByteArray();
 			if (bytes == null || bytes.Length == 0 || (bytes.Length % 8) != 0)
+			{
+				InitializeCountryStates();
 				return Task.CompletedTask;
+			}
 
 			int n = bytes.Length / 8;
 			_loadedCountryKeysFromSave = new long[n];
@@ -139,6 +188,8 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			for (int i = 0; i < n; i++)
 				_loadedCountryKeysFromSave[i] = BitConverter.ToInt64(bytes, i * 8);
 		}
+
+		InitializeCountryStates();
 		return Task.CompletedTask;
 	}
 
@@ -179,6 +230,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		bool hasLoadedKeys =
 			_loadedCountryKeysFromSave != null
 			&& _loadedCountryKeysFromSave.Length == verts.Count;
+		HashSet<uint> canonicalCountryKeys = countryDatabase?.GetCountryKeysSnapshot();
 
 		Parallel.For(0, verts.Count, i =>
 		{
@@ -212,8 +264,14 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			if (hasLoadedKeys)
 			{
 				countryKey = (uint)_loadedCountryKeysFromSave![i];
+				if (canonicalCountryKeys is { Count: > 0 }
+				    && !canonicalCountryKeys.Contains(countryKey))
+				{
+					countryKey = 0;
+				}
 			}
-			else if (countryBytes != null)
+
+			if (countryKey == 0 && countryBytes != null)
 			{
 				var uv = LatLonToUv(latLon, countryOffset);
 				int px = Mathf.Clamp(
@@ -223,8 +281,13 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 					(int)(uv.Y * countrySize.Y), 0, countrySize.Y - 1
 				);
 
-				countryKey = GetCountryKeyFromRgba8(
-					countryBytes, countrySize.X, px, py
+				countryKey = ResolveCountryKeyFromRgba8(
+					countryBytes,
+					countrySize.X,
+					countrySize.Y,
+					px,
+					py,
+					canonicalCountryKeys
 				);
 			}
 
@@ -260,6 +323,7 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			Cells[SnapVector2(cell.LatLon)] = cell;
 
 		RebuildCountryIndex();
+		InitializeCountryStates();
 
 		_loadedCountryKeysFromSave = null;
 		DebugHighlightedCellIndices = Array.Empty<int>();
@@ -383,6 +447,50 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		DebugHighlightedCellIndices = GetCountryCellIndicesForIndex(index);
 	}
 
+	public CountryDefinition GetCountryDefinitionForIndex(int index)
+	{
+		uint key = GetCountryKeyForIndex(index);
+		return key == 0 ? null : countryDatabase?.GetCountry(key);
+	}
+
+	public CountryRuntimeState GetCountryStateForIndex(int index)
+	{
+		return GetCountryState(GetCountryKeyForIndex(index));
+	}
+
+	public CountryRuntimeState GetCountryState(uint countryKey)
+	{
+		if (countryKey == 0)
+			return null;
+
+		return _countryStates.GetValueOrDefault(countryKey);
+	}
+
+	public bool TryGetCountryState(uint countryKey, out CountryRuntimeState state)
+	{
+		return _countryStates.TryGetValue(countryKey, out state);
+	}
+
+	private void InitializeCountryStates()
+	{
+		_countryStates.Clear();
+		countryDatabase?.RebuildLookup();
+
+		foreach (uint key in _countryToCellIndices.Keys)
+		{
+			CountryDefinition definition = countryDatabase?.GetCountry(key);
+			var state = new CountryRuntimeState(key, definition);
+
+			if (_loadedCountryStates.TryGetValue(key, out var saved))
+			{
+				state.GrossDomesticProduct = saved.Gdp;
+				state.PlayerOpinion = Mathf.Clamp(saved.Opinion, -100.0f, 100.0f);
+			}
+
+			_countryStates[key] = state;
+		}
+	}
+
 
 	private bool TryGetTextureRgba8Bytes(
 		string textureKey,
@@ -482,7 +590,50 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return rgba[idx + 3];
 	}
 
-	private static uint GetCountryKeyFromRgba8(byte[] rgba, int width, int x, int y)
+	private static uint ResolveCountryKeyFromRgba8(
+		byte[] rgba,
+		int width,
+		int height,
+		int x,
+		int y,
+		HashSet<uint> canonicalKeys)
+	{
+		uint sampledKey = GetRawCountryKeyFromRgba8(rgba, width, x, y);
+		if (sampledKey == 0 || canonicalKeys == null || canonicalKeys.Count == 0)
+			return sampledKey;
+
+		if (canonicalKeys.Contains(sampledKey))
+			return sampledKey;
+
+		// Antialias pixels are blends, not new countries. Find the closest
+		// canonical fill pixel around the sample and use that country's key.
+		const int searchRadius = 8;
+		for (int radius = 1; radius <= searchRadius; radius++)
+		{
+			for (int offsetY = -radius; offsetY <= radius; offsetY++)
+			{
+				for (int offsetX = -radius; offsetX <= radius; offsetX++)
+				{
+					if (Math.Abs(offsetX) != radius && Math.Abs(offsetY) != radius)
+						continue;
+
+					int nearbyX = x + offsetX;
+					int nearbyY = y + offsetY;
+					if (nearbyX < 0 || nearbyY < 0 || nearbyX >= width || nearbyY >= height)
+						continue;
+
+					uint nearbyKey = GetRawCountryKeyFromRgba8(rgba, width, nearbyX, nearbyY);
+					if (canonicalKeys.Contains(nearbyKey))
+						return nearbyKey;
+				}
+			}
+		}
+
+		// Never allow a blended RGB value to become a standalone country.
+		return 0;
+	}
+
+	private static uint GetRawCountryKeyFromRgba8(byte[] rgba, int width, int x, int y)
 	{
 		int idx = ((y * width) + x) * 4;
 

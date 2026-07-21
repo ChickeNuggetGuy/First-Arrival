@@ -63,6 +63,7 @@ public partial class UnitsPanelUI : UIWindow
 		if (CurrentBase == null) return;
 
 		GridObject newUnit = unitScene.Instantiate<GridObject>();
+		newUnit.Name = UnitNameGenerator.Generate();
 		
 		CurrentBase.TryAddStationedGridObject(newUnit);
     

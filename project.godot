@@ -38,7 +38,7 @@ project/assembly_name="First Arrival"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/Todo_Manager/plugin.cfg", "res://addons/fancy_folder_icons/plugin.cfg", "res://addons/gridshapeplugin/plugin.cfg", "res://addons/icosphere/plugin.cfg", "res://addons/inventory_database_editor/plugin.cfg", "res://addons/mixamo_animation_retargeter/plugin.cfg", "res://addons/mixamo_root_motion_remover/plugin.cfg", "res://addons/phantom_camera/plugin.cfg")
+enabled=PackedStringArray("res://addons/Todo_Manager/plugin.cfg", "res://addons/country_database_editor/plugin.cfg", "res://addons/fancy_folder_icons/plugin.cfg", "res://addons/gridshapeplugin/plugin.cfg", "res://addons/icosphere/plugin.cfg", "res://addons/inventory_database_editor/plugin.cfg", "res://addons/mixamo_animation_retargeter/plugin.cfg", "res://addons/mixamo_root_motion_remover/plugin.cfg", "res://addons/phantom_camera/plugin.cfg")
 
 [file_customization]
 
@@ -108,10 +108,6 @@ cameraScrollDown={
 
 [shader_globals]
 
-visibility_grid_texture={
-"type": "sampler3D",
-"value": "::aor72"
-}
 cell_size_world={
 "type": "ivec2",
 "value": Vector2i(1, 1)

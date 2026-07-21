@@ -1,0 +1,26 @@
+{
+  "firstNames": [
+	"Aiden", "Alex", "Amara", "Amelia", "Andre", "Aria", "Avery", "Beatrice", "Benjamin", "Bianca",
+	"Caleb", "Cameron", "Carina", "Carter", "Celeste", "Clara", "Cole", "Dahlia", "Daniel", "Daria",
+	"Devin", "Diego", "Elena", "Elias", "Elise", "Elliot", "Emery", "Esme", "Ethan", "Eva",
+	"Felix", "Fiona", "Gabriel", "Gemma", "Grant", "Hana", "Harper", "Hector", "Imani", "Isaac",
+	"Isla", "Jade", "Jamal", "Jasper", "Jonah", "Jordan", "Julian", "Kaia", "Kai", "Karim",
+	"Lena", "Levi", "Liam", "Lina", "Logan", "Lucia", "Malik", "Marcus", "Maya", "Micah", "Mina",
+	"Naomi", "Natalia", "Nico", "Nina", "Noah", "Nora", "Omar", "Owen", "Paige", "Parker",
+	"Priya", "Quinn", "Rafael", "Reese", "Riley", "Roman", "Rosa", "Rowan", "Sabrina", "Samira",
+	"Sasha", "Sebastian", "Serena", "Silas", "Sofia", "Talia", "Theo", "Tobias", "Valerie", "Victor",
+	"Wesley", "Willow", "Xavier", "Yara", "Yasmin", "Zane", "Zara", "Adrian", "Aisha", "Marlon"
+  ],
+  "lastNames": [
+	"Adler", "Alvarez", "Baker", "Bennett", "Blackwood", "Bose", "Brooks", "Calloway", "Carter", "Chen",
+	"Coleman", "Costa", "Cruz", "Dalton", "Dawson", "Delgado", "Ellison", "Emerson", "Fischer", "Foster",
+	"Garcia", "Gardner", "Grant", "Gupta", "Hale", "Hansen", "Hart", "Hawkins", "Hayes", "Ibrahim", "Jackson",
+	"Jensen", "Kaur", "Keller", "Kim", "Knight", "Kowalski", "Larsen", "Lawson", "Lee", "Lennox",
+	"Malik", "Marin", "Martinez", "Meyer", "Mitchell", "Morales", "Morgan", "Nakamura", "Navarro", "Nguyen",
+	"Nolan", "Okafor", "Ortega", "Park", "Patel", "Pereira", "Quinn", "Ramirez", "Reed", "Rivera",
+	"Roberts", "Romero", "Ross", "Roy", "Santos", "Sawyer", "Shah", "Silva", "Singh", "Sloan",
+	"Soto", "Stewart", "Sullivan", "Tan", "Taylor", "Thompson", "Torres", "Tran", "Turner", "Valdez",
+	"Vasquez", "Vega", "Walker", "Wallace", "Watanabe", "Watson", "West", "Williams", "Wilson", "Wong",
+	"Wright", "Xu", "Young", "Yusuf", "Zhang", "Zimmerman", "Bishop", "Caldwell", "Donovan", "Everett"
+  ]
+}

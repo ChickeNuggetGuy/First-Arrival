@@ -476,9 +476,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 		craft.TargetCellIndex = targetCellIndex;
 		Tween shipTween = teamManager.GetTree().CreateTween();
-		float secondsPerStep = craft.MaxSpeed > 0
-			? Mathf.Clamp(100f / craft.MaxSpeed, 0.05f, 0.4f)
-			: 0.4f;
+		List<float> segmentDurations = CalculateFlightSegmentDurations(
+			path,
+			manager,
+			craft
+		);
 		GlobeTimeManager timeManager = GlobeTimeManager.Instance;
 
 		void ApplyGlobeTimeSpeed(int speed)
@@ -524,7 +526,8 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 				shipNode,
 				"global_position",
 				targetPos,
-				secondsPerStep);
+				segmentDurations[i - 1]
+			).SetTrans(Tween.TransitionType.Linear);
 			shipTween.TweenCallback(
 				Callable.From(() =>
 				{
@@ -601,6 +604,127 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 		onArrived?.Invoke(craft);
 		return true;
+	}
+
+	/// <summary>
+	/// Calculates each path segment's duration from a rest-to-rest flight
+	/// profile. A craft accelerates to its maximum speed when there is enough
+	/// distance, cruises if necessary, then decelerates for arrival. This keeps
+	/// both MaxSpeed and Acceleration meaningful for every route length.
+	/// </summary>
+	private static List<float> CalculateFlightSegmentDurations(
+		List<int> path,
+		GlobeHexGridManager gridManager,
+		Craft craft)
+	{
+		const float FallbackSecondsPerStep = 0.4f;
+		const float MinimumDuration = 0.001f;
+		const float DistanceEpsilon = 0.0001f;
+
+		int segmentCount = Math.Max(0, path.Count - 1);
+		List<float> segmentDistances = new(segmentCount);
+		for (int i = 1; i < path.Count; i++)
+		{
+			HexCellData? fromCell = gridManager.GetCellFromIndex(path[i - 1]);
+			HexCellData? toCell = gridManager.GetCellFromIndex(path[i]);
+			segmentDistances.Add(
+				fromCell.HasValue && toCell.HasValue
+					? fromCell.Value.Center.DistanceTo(toCell.Value.Center)
+					: 0f
+			);
+		}
+
+		float maxSpeed = craft.GetGlobeMaxSpeed();
+		if (maxSpeed <= DistanceEpsilon)
+			return CreateFallbackSegmentDurations(segmentCount, FallbackSecondsPerStep);
+
+		float totalDistance = 0f;
+		foreach (float segmentDistance in segmentDistances)
+			totalDistance += segmentDistance;
+
+		if (totalDistance <= DistanceEpsilon)
+			return CreateFallbackSegmentDurations(segmentCount, MinimumDuration);
+
+		float acceleration = craft.GetGlobeAcceleration();
+		if (acceleration <= DistanceEpsilon)
+		{
+			List<float> constantSpeedDurations = new(segmentCount);
+			foreach (float segmentDistance in segmentDistances)
+			{
+				constantSpeedDurations.Add(
+					Mathf.Max(MinimumDuration, segmentDistance / maxSpeed)
+				);
+			}
+			return constantSpeedDurations;
+		}
+
+		float distanceToReachMaxSpeed =
+			(maxSpeed * maxSpeed) / (2f * acceleration);
+		float accelerationDistance = Mathf.Min(
+			distanceToReachMaxSpeed,
+			totalDistance / 2f
+		);
+		float peakSpeed = Mathf.Sqrt(2f * acceleration * accelerationDistance);
+		float cruiseDistance = totalDistance - (2f * accelerationDistance);
+		float accelerationTime = peakSpeed / acceleration;
+		float totalTime = (2f * accelerationTime) +
+			(cruiseDistance / peakSpeed);
+
+		List<float> durations = new(segmentCount);
+		float distanceTravelled = 0f;
+		float previousTime = 0f;
+		foreach (float segmentDistance in segmentDistances)
+		{
+			distanceTravelled += segmentDistance;
+			float currentTime = GetFlightTimeAtDistance(
+				distanceTravelled,
+				totalDistance,
+				accelerationDistance,
+				cruiseDistance,
+				acceleration,
+				peakSpeed,
+				accelerationTime,
+				totalTime
+			);
+			durations.Add(Mathf.Max(MinimumDuration, currentTime - previousTime));
+			previousTime = currentTime;
+		}
+
+		return durations;
+	}
+
+	private static List<float> CreateFallbackSegmentDurations(
+		int segmentCount,
+		float duration)
+	{
+		List<float> durations = new(segmentCount);
+		for (int i = 0; i < segmentCount; i++)
+			durations.Add(duration);
+		return durations;
+	}
+
+	private static float GetFlightTimeAtDistance(
+		float distanceTravelled,
+		float totalDistance,
+		float accelerationDistance,
+		float cruiseDistance,
+		float acceleration,
+		float peakSpeed,
+		float accelerationTime,
+		float totalTime)
+	{
+		if (distanceTravelled <= accelerationDistance)
+			return Mathf.Sqrt((2f * distanceTravelled) / acceleration);
+
+		float cruiseEndDistance = accelerationDistance + cruiseDistance;
+		if (distanceTravelled <= cruiseEndDistance)
+		{
+			return accelerationTime +
+				((distanceTravelled - accelerationDistance) / peakSpeed);
+		}
+
+		float remainingDistance = Mathf.Max(0f, totalDistance - distanceTravelled);
+		return totalTime - Mathf.Sqrt((2f * remainingDistance) / acceleration);
 	}
 
 

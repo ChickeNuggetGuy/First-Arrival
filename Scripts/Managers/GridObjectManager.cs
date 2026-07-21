@@ -203,7 +203,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		gridObjectTeams[team].AddChild(gridObjectInstance);
 		gridObjectInstance.GlobalPosition = cell.WorldCenter;
 
-		gridObjectInstance.Name = $"{Enum.GetName(team)}_{GetGridObjectTeamHolder(team).GridObjects[Enums.GridObjectState.Active].Count}_{Guid.NewGuid().ToString().Substring(0,4)}";
+		gridObjectInstance.Name = UnitNameGenerator.Generate();
 		GD.PrintErr("Initalizing Grid Object");
 		await gridObjectInstance.Initialize(team, cell);
 	}

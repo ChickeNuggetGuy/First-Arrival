@@ -101,7 +101,7 @@ public partial class EquipCraftUI : UIWindow
 		
 		foreach (Craft craft in stationedCraft)
 		{
-			int index = craftList.AddItem(craft.ItemName, craft.ItemIcon);
+			int index = craftList.AddItem($"{craft.ItemName} (Units: {craft.GetStationedUnits().Count}/{craft.maxUnits}) (Equipment: {craft.CurrentEquipmentWight}/{craft.maxweight})", craft.ItemIcon);
 			craftList.SetItemMetadata(index, stationedCraft.IndexOf(craft));
 		}
 	}

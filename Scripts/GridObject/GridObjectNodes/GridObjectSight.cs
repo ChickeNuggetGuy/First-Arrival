@@ -256,10 +256,7 @@ public partial class GridObjectSight : GridObjectNode
         uint mask = _losBlockerMask;
         if (mask == 0)
         {
-            // Fallback: if you have a PhysicsLayer enum, set a sensible default here.
-            // Example (adjust to your project):
-            // mask = (uint)PhysicsLayer.OBSTACLE | (uint)PhysicsLayer.TERRAIN;
-            mask = uint.MaxValue;
+            mask = (uint)PhysicsLayer.OBSTACLE | (uint)PhysicsLayer.TERRAIN;
         }
 
         var rayParams = new PhysicsRayQueryParameters3D
@@ -271,9 +268,7 @@ public partial class GridObjectSight : GridObjectNode
             CollideWithAreas = false
         };
         
-        // The GridObject itself is a StaticBody3D. Exclude it even when no
-        // separate collisionShape reference is assigned, otherwise rays to
-        // neighbouring cells can immediately hit the viewer's own collider.
+
         rayParams.Exclude = new Godot.Collections.Array<Rid>
         {
             parentGridObject.GetRid()

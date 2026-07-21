@@ -55,8 +55,6 @@ func _disable_plugin() -> void:
 
 
 func _enter_tree() -> void:
-	add_autoload_singleton(PHANTOM_CAMERA_MANAGER, "res://addons/phantom_camera/scripts/managers/phantom_camera_manager.gd")
-
 	# Phantom Camera Nodes
 	add_custom_type(PCAM_2D, "Node2D", preload("res://addons/phantom_camera/scripts/phantom_camera/phantom_camera_2d.gd"), preload("res://addons/phantom_camera/icons/phantom_camera_2d.svg"))
 	add_custom_type(PCAM_3D, "Node3D", preload("res://addons/phantom_camera/scripts/phantom_camera/phantom_camera_3d.gd"), preload("res://addons/phantom_camera/icons/phantom_camera_2d.svg"))
@@ -127,12 +125,17 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
-	panel_button.toggled.disconnect(_btn_toggled)
-	scene_changed.disconnect(editor_panel_instance.viewfinder.scene_changed)
-	scene_changed.disconnect(_scene_changed)
-
-	remove_control_from_bottom_panel(editor_panel_instance)
-	editor_panel_instance.queue_free()
+	# The plugin may be unloaded after a failed/partial editor startup, so every
+	# piece of editor UI must be treated as optional here.
+	if is_instance_valid(panel_button) and panel_button.toggled.is_connected(_btn_toggled):
+		panel_button.toggled.disconnect(_btn_toggled)
+	if is_instance_valid(editor_panel_instance):
+		if scene_changed.is_connected(editor_panel_instance.viewfinder.scene_changed):
+			scene_changed.disconnect(editor_panel_instance.viewfinder.scene_changed)
+		remove_control_from_bottom_panel(editor_panel_instance)
+		editor_panel_instance.queue_free()
+	if scene_changed.is_connected(_scene_changed):
+		scene_changed.disconnect(_scene_changed)
 
 	remove_node_3d_gizmo_plugin(pcam_3d_gizmo_plugin)
 	remove_node_3d_gizmo_plugin(pcam_3d_noise_emitter_gizmo_plugin)
@@ -144,9 +147,8 @@ func _exit_tree() -> void:
 	remove_custom_type(PCAM_NOISE_EMITTER_3D)
 	remove_custom_type(PCAM_TWEEN_DIRECTOR)
 
-	remove_autoload_singleton(PHANTOM_CAMERA_MANAGER)
-#	if get_tree().root.get_node_or_null(String(PHANTOM_CAMERA_MANAGER)):
-#		remove_autoload_singleton(PHANTOM_CAMERA_MANAGER)
+	# Do not mutate project autoloads during normal editor shutdown. The
+	# _enable_plugin/_disable_plugin callbacks own that persistent setting.
 
 
 func _btn_toggled(toggled_on: bool):

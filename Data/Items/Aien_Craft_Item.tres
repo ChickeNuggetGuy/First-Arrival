@@ -6,8 +6,8 @@
 [resource]
 resource_name = "Aien Craft_Item"
 script = ExtResource("1_0kl5f")
-MaxSpeed = 500
-Acceleration = 250
+MaxSpeed = 300
+Acceleration = 150
 DetectionRadius = 3
 DetectionChance = 0.4
 ShowDetectionRadius = false
@@ -17,4 +17,5 @@ ItemDescription = "Advanced Aien Craft
 "
 ItemIcon = ExtResource("1_iw0w2")
 globeOnly = true
-ActionDefinitions = null
+weight = 9999
+ActionDefinitions = []

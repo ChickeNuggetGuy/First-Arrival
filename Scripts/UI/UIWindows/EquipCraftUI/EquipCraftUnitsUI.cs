@@ -45,7 +45,9 @@ public partial class EquipCraftUnitsUI : UIWindow
 	{
 		if (atBaseList == null || !atBaseList.IsAnythingSelected()) return;
 		if (currentCraft == null || currentBase == null) return;
-
+		
+		if(currentCraft.maxUnits != -1 && currentCraft.GetStationedUnits().Count >= currentCraft.maxUnits) return;
+		
 		List<GridObject> selectedUnits = GetSelectedUnits(
 			atBaseList,
 			currentBase.GetStationedGridObjects()
@@ -124,6 +126,10 @@ public partial class EquipCraftUnitsUI : UIWindow
 			int listIndex = onCraftList.AddItem(unit.GetName());
 			onCraftList.SetItemMetadata(listIndex, i);
 		}
+		if(onCraftList.ItemCount > 0)
+		{
+			onCraftList.Select(0);
+		}
 
 		// Draw units currently available at the base.
 		atBaseList.Clear();
@@ -135,6 +141,11 @@ public partial class EquipCraftUnitsUI : UIWindow
 			if (unit == null) continue;
 			int listIndex = atBaseList.AddItem(unit.GetName());
 			atBaseList.SetItemMetadata(listIndex, i);
+		}
+
+		if (onCraftList.ItemCount > 0)
+		{
+			atBaseList.Select(0);
 		}
 
 		UpdateButtonStates();
@@ -162,7 +173,8 @@ public partial class EquipCraftUnitsUI : UIWindow
 	{
 		if (changed && !GameManager.Instance.SyncCurrentBaseToGlobeState())
 			GD.PrintErr("Unit transfer completed locally, but the globe transition state could not be updated.");
-
+		
+		
 		DrawItemLists();
 	}
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
 using FirstArrival.Scripts.Inventory_System;
@@ -9,6 +10,8 @@ using Godot.Collections;
 [GlobalClass]
 public partial class Craft : ItemData
 {
+	public const float GlobeTravelStatToWorldScale = 0.0001f;
+
 	[Export]
 	public int MaxSpeed { get; set; }
 
@@ -45,10 +48,37 @@ public partial class Craft : ItemData
 	public MeshInstance3D visual { get; protected set; }
 	private Enums.UnitTeam _revealedToTeams = Enums.UnitTeam.None;
 
+	[Export] public int maxUnits = -1;
+	
 	private Array<GridObject> stationedGridObjects = new();
-	private Dictionary<int, int> itemCounts = new();
+	
+	[Export] public int maxweight = -1;
+	private Godot.Collections.Dictionary<int, int> itemCounts = new();
 
+	public int CurrentEquipmentWight
+	{
+		get
+		{
+			int currentItemsWeight = 0;
+			foreach (KeyValuePair<int, int> itemPair in itemCounts)
+			{
+				ItemData itemData = InventoryManager.Instance.GetItemData(itemPair.Key);
+
+				if (itemData != null)
+				{
+					currentItemsWeight +=  itemData.weight * itemPair.Value;
+				}
+			}
+			return currentItemsWeight;
+		}
+	}
 	public int Index { get; private set; }
+
+	public float GetGlobeMaxSpeed() =>
+		Mathf.Max(0, MaxSpeed) * GlobeTravelStatToWorldScale;
+
+	public float GetGlobeAcceleration() =>
+		Mathf.Max(0, Acceleration) * GlobeTravelStatToWorldScale;
 
 	public bool IsVisibleTo(Enums.UnitTeam team)
 		=> team != Enums.UnitTeam.None && (_revealedToTeams & team) != 0;
@@ -124,7 +154,9 @@ public bool TryAddStationedGridObject(GridObject gridObject)
 {
 	if (gridObject == null) return false;
 	if (stationedGridObjects.Contains(gridObject)) return false;
-
+	
+	if(stationedGridObjects.Count >= maxUnits) return false;
+	
 	gridObject.SetIsActive(false);
 	gridObject.Visible = false;
 	stationedGridObjects.Add(gridObject);
@@ -143,7 +175,7 @@ public bool TryRemoveStationedGridObject(GridObject gridObject)
 public Godot.Collections.Array<GridObject> GetStationedGridObjects() =>
 	stationedGridObjects;
 
-public Dictionary<int, int> GetItemCounts => itemCounts;
+public Godot.Collections.Dictionary<int, int> GetItemCounts => itemCounts;
 
 public bool TryAddItem(int itemId, int count)
 {
@@ -153,6 +185,10 @@ public bool TryAddItem(int itemId, int count)
 	int currentCount = itemCounts.TryGetValue(itemId, out int storedCount)
 		? storedCount
 		: 0;
+	if (CurrentEquipmentWight + (itemData.weight * count) > maxweight)
+	{
+		return false;
+	}
 	itemCounts[itemId] = currentCount + count;
 	return true;
 }

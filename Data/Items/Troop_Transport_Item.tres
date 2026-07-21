@@ -6,13 +6,15 @@
 [resource]
 resource_name = "Troop Transport _Item"
 script = ExtResource("1_myolf")
-MaxSpeed = 200
-Acceleration = 100
+MaxSpeed = 60
+Acceleration = 30
+maxUnits = 9
+maxweight = 350
 ItemID = 4
 ItemName = "Troop Transport "
 ItemIcon = ExtResource("1_46n6x")
 globeOnly = true
-buyPrice = 100000
-sellPrice = 95000
 weight = 9999
 ActionDefinitions = []
+buyPrice = 100000
+sellPrice = 95000

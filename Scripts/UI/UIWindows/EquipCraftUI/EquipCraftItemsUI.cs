@@ -11,6 +11,7 @@ public partial class EquipCraftItemsUI : UIWindow
 	[Export] private ItemList atBaseList;
 	[Export] private Button addButton;
 	[Export] private Button removeButton;
+	[Export] private Label currentWeightLabel;
 
 	public Craft currentCraft;
 
@@ -32,6 +33,9 @@ public partial class EquipCraftItemsUI : UIWindow
 		if (atBaseList == null || !atBaseList.IsAnythingSelected()) return;
 		if (currentCraft == null || CurrentBase == null) return;
 
+		int currentItemsWeight = currentCraft.CurrentEquipmentWight;
+		
+		
 		bool moveEntireStack = Input.IsKeyPressed(Key.Shift);
 		bool changed = false;
 		List<int> selectedItemIds = GetSelectedItemIds(atBaseList);
@@ -164,6 +168,9 @@ public partial class EquipCraftItemsUI : UIWindow
 			GD.PrintErr("Item transfer completed locally, but the globe transition state could not be updated.");
 
 		DrawItemLists(selectedItemId, selectAtBase);
+	
+		currentWeightLabel.Text = "Current Weight: " + currentCraft.CurrentEquipmentWight + " out of " +
+		                          currentCraft.maxweight;
 	}
 
 	private void UpdateButtonStates()
