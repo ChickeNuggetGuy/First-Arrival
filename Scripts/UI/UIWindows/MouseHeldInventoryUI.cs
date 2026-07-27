@@ -11,6 +11,7 @@ namespace FirstArrival.Scripts.UI;
 public partial class MouseHeldInventoryUI : InventoryGridUI
 {
 
+	public InventoryGrid previousInventory;
 	#region Functions
 
 	protected override Task _Setup()
@@ -34,6 +35,24 @@ public partial class MouseHeldInventoryUI : InventoryGridUI
 		Position = mousePosition;
 	}
 
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if(!IsShown || previousInventory == null) return;
+		
+		if (@event is InputEventMouseButton mouseEvent)
+		{
+			if (mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Right)
+			{
+				if(!InventoryGrid.TryGetItemAt(0,0, out (Item item, int count) item)) return;
+				if (InventoryGrid.TryTransferItem(InventoryGrid, previousInventory, item.item, item.count))
+				{
+					previousInventory = null;
+				}
+			}
+		}
+		base._UnhandledInput(@event);
+	}
+
 	protected override void _Hide()
 	{
 		base._Hide();
@@ -42,7 +61,7 @@ public partial class MouseHeldInventoryUI : InventoryGridUI
 
 	#region Event Handlers
 
-	private void InventoryGridOnItemRemoved(InventoryGrid inventoryGrid, Item itemREmoved)
+	private void InventoryGridOnItemRemoved(InventoryGrid inventoryGrid, Item itemRemoved)
 	{
 		HideCall();
 	}

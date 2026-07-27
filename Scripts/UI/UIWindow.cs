@@ -44,7 +44,10 @@ public abstract partial class UIWindow : UIElement
 		}
 		else
 		{
-			IsShown = true;
+			// The scene may be hidden in the editor to make it easier to work on
+			// other full-screen UI. Keep our runtime state in sync with the node
+			// instead of assuming that startHidden == false means it is visible.
+			IsShown = Visible && (Visual == null || Visual.Visible);
 		}
 	}
 
@@ -77,9 +80,16 @@ public abstract partial class UIWindow : UIElement
 
 	public async Task ShowCall(bool playAnimation = true)
 	{
+		// Make the window visible before drawing it. DrawUI can await other work
+		// (or fail because game data is not ready yet), and neither case should
+		// leave an inspector-hidden root Control permanently hidden.
+		Show();
+		Visual?.Show();
+		IsShown = true;
+		MouseFilter = MouseFilterEnum.Stop;
+
 		await DrawUI();
 		_Show();
-		Visual.Show();
 		foreach (var uiElement in uiElements)
 		{
 			if (uiElement is UIWindow uiWindow)
@@ -99,9 +109,6 @@ public abstract partial class UIWindow : UIElement
 			UIManager.Instance.BlockInputs(this);
 		}
 
-		MouseFilter = MouseFilterEnum.Stop;
-
-		IsShown = true;
 	}
 
 	protected virtual void _Show()
@@ -118,6 +125,7 @@ public abstract partial class UIWindow : UIElement
 		}
 
 		_Hide();
+		Hide();
 		foreach (var uiElement in uiElements)
 		{
 			if (uiElement is UIWindow uiWindow)
@@ -125,7 +133,7 @@ public abstract partial class UIWindow : UIElement
 				await uiWindow.HideCall();
 			}
 		}
-		Visual.Hide();
+		Visual?.Hide();
 		IsShown = false;
 		MouseFilter = MouseFilterEnum.Ignore;
 		if (blockInputs)

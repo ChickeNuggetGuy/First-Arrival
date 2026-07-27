@@ -37,7 +37,22 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 
 	public bool IsInitialized { get; protected set; } = false;
 	[Export] public bool IsActive { get; protected set; } = true;
-	
+
+	[ExportGroup("Thumbnail")]
+	[Export] public Texture2D Thumbnail { get; private set; }
+	[Export] public Vector2I ThumbnailSize { get; set; } = new(256, 256);
+	[Export(PropertyHint.Range, "0.1,1,0.01")]
+	public float ThumbnailVisibleHeightRatio { get; set; } = 0.45f;
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float ThumbnailVerticalFocus { get; set; } = 0.78f;
+	[Export] public Vector3 ThumbnailViewDirection { get; set; } =
+		new(0.8f, 0.12f, 1.0f);
+
+	[Signal]
+	public delegate void ThumbnailChangedEventHandler(Texture2D texture);
+
+	private Task<Texture2D> _thumbnailGenerationTask;
+
 	public override void _EnterTree()
 	{
 		AddToGroup("GridObjects");
@@ -183,6 +198,75 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 		{
 			// remove from grid logic
 			GridPositionData.SetGridCell(null);
+		}
+	}
+
+	/// <summary>
+	/// Returns this object's cached UI thumbnail, generating it from the current
+	/// visual subtree only when first requested.
+	/// </summary>
+	public async Task<Texture2D> GetOrCreateThumbnailAsync(bool forceRefresh = false)
+	{
+		if (!forceRefresh && Thumbnail != null)
+			return Thumbnail;
+
+		if (_thumbnailGenerationTask != null)
+			return await _thumbnailGenerationTask;
+
+		_thumbnailGenerationTask = GenerateThumbnailAsync();
+		try
+		{
+			return await _thumbnailGenerationTask;
+		}
+		finally
+		{
+			_thumbnailGenerationTask = null;
+		}
+	}
+
+	public void InvalidateThumbnail()
+	{
+		Thumbnail = null;
+	}
+
+	private async Task<Texture2D> GenerateThumbnailAsync()
+	{
+		if (!IsInsideTree())
+		{
+			GD.PushWarning(
+				$"GridObject {Name}: Cannot generate a thumbnail outside the scene tree.");
+			return Thumbnail;
+		}
+
+		Node3D source = visualMesh ?? this;
+		var generator = new SceneThumbnailGenerator
+		{
+			Name = $"{Name}ThumbnailGenerator",
+			ThumbnailSize = ThumbnailSize,
+			TransparentBackground = true,
+			Orthographic = true,
+			VisibleHeightRatio = ThumbnailVisibleHeightRatio,
+			VerticalFocus = ThumbnailVerticalFocus,
+			ViewDirection = ThumbnailViewDirection,
+		};
+
+		// Keep the temporary generator outside the source subtree so capturing a
+		// GridObject fallback can never duplicate the generator into itself.
+		GetTree().Root.AddChild(generator);
+		try
+		{
+			Texture2D generated = await generator.GenerateThumbnailAsync(source);
+			if (generated == null)
+				return Thumbnail;
+
+			Thumbnail = generated;
+			EmitSignal(SignalName.ThumbnailChanged, Thumbnail);
+			return Thumbnail;
+		}
+		finally
+		{
+			if (GodotObject.IsInstanceValid(generator))
+				generator.QueueFree();
 		}
 	}
 

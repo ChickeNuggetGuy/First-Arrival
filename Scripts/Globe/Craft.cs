@@ -47,6 +47,8 @@ public partial class Craft : ItemData
 
 	public MeshInstance3D visual { get; protected set; }
 	private Enums.UnitTeam _revealedToTeams = Enums.UnitTeam.None;
+	private Tween _activeTravelTween;
+	private TaskCompletionSource<bool> _activeTravelCompletion;
 
 	[Export] public int maxUnits = -1;
 	
@@ -337,5 +339,43 @@ public async Task LoadAsync(
 	public void SetVisual(MeshInstance3D instance)
 	{
 		visual = instance;
+	}
+
+	/// <summary>
+	/// Makes this tween the craft's only active globe route. The returned task
+	/// resolves to false when a newer order supersedes it.
+	/// </summary>
+	public Task<bool> SetActiveTravelTween(Tween tween)
+	{
+		CancelActiveTravel();
+
+		_activeTravelTween = tween;
+		var completion = new TaskCompletionSource<bool>();
+		_activeTravelCompletion = completion;
+
+		tween.Finished += () =>
+		{
+			if (_activeTravelTween != tween) return;
+
+			_activeTravelTween = null;
+			_activeTravelCompletion = null;
+			completion.TrySetResult(true);
+		};
+
+		return completion.Task;
+	}
+
+	public void CancelActiveTravel()
+	{
+		Tween tween = _activeTravelTween;
+		TaskCompletionSource<bool> completion = _activeTravelCompletion;
+
+		_activeTravelTween = null;
+		_activeTravelCompletion = null;
+
+		if (tween != null && GodotObject.IsInstanceValid(tween))
+			tween.Kill();
+
+		completion?.TrySetResult(false);
 	}
 }

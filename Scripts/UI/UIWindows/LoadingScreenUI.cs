@@ -8,11 +8,14 @@ public partial class LoadingScreenUI : UIWindow
 {
 	[Export] private Label loadingPercentLabel;
 	[Export] private ProgressBar loadingBar;
+	private bool wasLoading;
 
 	protected override async Task _Setup()
 	{
 		await base._Setup();
-		// Ensure it's hidden or shown based on current loading state
+		// Setup may apply startHidden after _Process has already run once.
+		// Re-evaluate the current loading state against the final setup state.
+		wasLoading = false;
 		UpdateUI();
 	}
 
@@ -27,14 +30,18 @@ public partial class LoadingScreenUI : UIWindow
 
 		bool isLoading = GameManager.Instance.loadingState != GameManager.LoadingState.NONE;
 
-		// if (isLoading && !IsShown)
-		// {
-		// 	_ = ShowCall();
-		// }
-		if (!isLoading && IsShown)
+		// Each scene owns its own loading-screen instance. The previous scene's
+		// instance is destroyed during ChangeSceneToFile, so the new scene must
+		// show its inspector-hidden instance while loading is still in progress.
+		if (isLoading && !wasLoading)
 		{
-			_ = HideCall();
+			_ = ShowCall(false);
 		}
+		else if (!isLoading && (wasLoading || Visible))
+		{
+			_ = HideCall(false);
+		}
+		wasLoading = isLoading;
 
 		if (!isLoading) return;
 
@@ -53,10 +60,6 @@ public partial class LoadingScreenUI : UIWindow
 			loadingPercentLabel.Text = $"{state}{mgrPart}: {(percent * 100f):F0}%";
 		}
 
-		if (percent >= 1f)
-		{
-			_ =HideCall();
-		}
 	}
 	
 	protected override async Task DrawUI()

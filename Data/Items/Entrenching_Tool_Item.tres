@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bgrx1jjtjjbue"]
+
+[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_melee"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://b5yf8ay33g5ko" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pickaxe_01_BattleRoyale_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://bek1vn1e44jct" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Bat_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Melee"]
+script = ExtResource("1_melee")
+damage = 33
+timeUnitCost = 26
+staminaCost = 18
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 2
+SizeZ = 2
+OccupiedCells = Array[bool]([true, false, true, true])
+
+[resource]
+resource_name = "Entrenching Tool"
+script = ExtResource("3_item")
+ItemID = 110
+ItemName = "Entrenching Tool"
+ItemDescription = "A compact military shovel pressed into close combat. Heavier than a knife, but hits harder."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 1
+HistoricalIntroductionYear = 1938
+ItemShape = SubResource("Shape")
+weight = 4
+ItemMesh = ExtResource("5_mesh")
+ActionDefinitions = Array[Object]([SubResource("Melee")])
+buyPrice = 140
+sellPrice = 95

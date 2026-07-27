@@ -69,6 +69,13 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 			GD.PushWarning("RangedAttack: objectCenter is not assigned; using the GridObject origin instead");
 
 		int damage = rangedAttackActionDefinition.damage;
+		float fatalWoundAccuracyMultiplier = 1f;
+		if (
+			parentStatHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat shooterHealth)
+		)
+		{
+			fatalWoundAccuracyMultiplier = shooterHealth.GetRangedAccuracyMultiplier();
+		}
 		GD.Print($"RangedAttack: firing {rangedAttackActionDefinition.attackCount} shot(s) from {origin}");
 
 		for (int i = 0; i < rangedAttackActionDefinition.attackCount; i++)
@@ -79,7 +86,8 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 			Vector3 direction =
 				((targetGridCell.WorldCenter + Vector3.Up) - origin).Normalized();
 			float effectiveAccuracy = Mathf.Clamp(
-				rangedAccuracy.CurrentValue + rangedAttackActionDefinition.accuracy,
+				rangedAccuracy.CurrentValue * fatalWoundAccuracyMultiplier
+				+ rangedAttackActionDefinition.accuracy,
 				0f,
 				100f
 			);
@@ -129,11 +137,20 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 			{
 				GD.Print("Target Grid Object does not have Health stat");
 			}
-			else if (Item is { ItemData: not null })
+			else
 			{
-				health.RemoveValue(damage);
+				GridObjectStat.DamageResult damageResult =
+					health.ApplyDamage(
+						damage,
+						rangedAttackActionDefinition.canCauseFatalWounds
+					);
 				GD.Print(
-					$"Target unit: {targetGridObject.Name} Damaged for {damage} damage, remaining health is {health.CurrentValue}");
+					$"Target unit: {targetGridObject.Name} damaged for " +
+					$"{damageResult.HealthDamage} damage, remaining health is " +
+					$"{health.CurrentValue}, fatal wounds added: " +
+					$"{damageResult.FatalWoundsAdded} " +
+					$"({damageResult.WoundedBodyPart})"
+				);
 			}
 		}
 	}

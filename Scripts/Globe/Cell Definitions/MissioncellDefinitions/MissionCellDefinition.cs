@@ -69,11 +69,11 @@ public partial class MissionCellDefinition : HexCellDefinition
 		timeLeft = Math.Clamp(savedTimeLeft, 0, timeoutTime);
 	}
 
-	private void GlobeTimeManagerOnHourChanged(int hour)
+	private void GlobeTimeManagerOnHourChanged(int hour, int hoursAdvanced)
 	{
 		if (_hasResolved || missionStatus.HasFlag(Enums.MissionStatus.OnRoute)) return;
 
-		timeLeft = Math.Max(0, timeLeft - 1);
+		timeLeft = Math.Max(0, timeLeft - hoursAdvanced);
 		GD.Print($"Mission Tick time left {timeLeft}");
 		if (timeLeft > 0) return;
 

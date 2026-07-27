@@ -163,6 +163,8 @@ public partial class CameraController : Manager<CameraController>
 		    FocusOn(GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject);   
 	    }
 	    
+	    
+	    if(BattleInputManager.Instance.MouseOverUI) return;
         if (@event is not InputEventMouseButton mb || !mb.Pressed)
             return;
 
@@ -248,7 +250,6 @@ public partial class CameraController : Manager<CameraController>
         CurrentYLevel = yLevel;
     }
     #endregion
-    #endregion
 
     public override string GetManagerName() => "CameraManager";
 
@@ -283,6 +284,7 @@ public partial class CameraController : Manager<CameraController>
         return Task.CompletedTask;
     }
     
-  
+    #endregion
+
     
 }

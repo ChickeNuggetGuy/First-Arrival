@@ -1,4 +1,6 @@
 using Godot;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 
@@ -12,6 +14,8 @@ namespace FirstArrival.Scripts.Managers;
 public partial class GlobeInputManager : Manager<GlobeInputManager>
 {
 	public HexCellData? CurrentCell { get; private set; }
+	public event Action<HexCellData?> CurrentCellChanged;
+	private readonly Dictionary<int, HashSet<int>> _hoverRangeCache = new();
 
 	[Export] public Camera3D camera3D;
 	[Export] private Node3D mouseMarker;
@@ -73,7 +77,7 @@ public partial class GlobeInputManager : Manager<GlobeInputManager>
 
 			if (cell != null)
 			{
-				CurrentCell = cell;
+				SetCurrentCell(cell.Value);
 				GlobeHexGridManager.Instance.SetDebugHighlightedCountryFromIndex(cell.Value.Index);
 
 				if (mouseMarker != null)
@@ -86,13 +90,58 @@ public partial class GlobeInputManager : Manager<GlobeInputManager>
 		ClearCurrentCell();
 	}
 
+	private void SetCurrentCell(HexCellData cell)
+	{
+		if (CurrentCell.HasValue && CurrentCell.Value.Index == cell.Index)
+		{
+			CurrentCell = cell;
+			return;
+		}
+
+		CurrentCell = cell;
+		_hoverRangeCache.Clear();
+		CurrentCellChanged?.Invoke(CurrentCell);
+	}
+
 	private void ClearCurrentCell()
 	{
+		if (!CurrentCell.HasValue) return;
+
 		CurrentCell = null;
+		_hoverRangeCache.Clear();
+		CurrentCellChanged?.Invoke(null);
 		GlobeHexGridManager.Instance?.SetDebugHighlightedCountryFromIndex(-1);
 
 		if (mouseMarker != null)
 			mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
+	}
+
+	/// <summary>
+	/// Returns whether a cell is within a hex-step radius of the hovered cell.
+	/// Results are cached per radius and recalculated only when the hover target
+	/// changes, allowing many cell labels to share the same range lookup.
+	/// </summary>
+	public bool IsCellNearCurrentCell(int cellIndex, int rangeSteps)
+	{
+		if (!CurrentCell.HasValue || cellIndex < 0 || rangeSteps < 0) return false;
+
+		if (!_hoverRangeCache.TryGetValue(rangeSteps, out HashSet<int> nearbyCells))
+		{
+			nearbyCells = new HashSet<int>();
+			GlobeHexGridManager grid = GlobeHexGridManager.Instance;
+			if (grid == null) return false;
+
+			foreach (HexCellData cell in grid.GetCellsInStepRange(
+				CurrentCell.Value,
+				rangeSteps))
+			{
+				nearbyCells.Add(cell.Index);
+			}
+
+			_hoverRangeCache.Add(rangeSteps, nearbyCells);
+		}
+
+		return nearbyCells.Contains(cellIndex);
 	}
 
 	public Vector3? GetMouseGlobePosition()

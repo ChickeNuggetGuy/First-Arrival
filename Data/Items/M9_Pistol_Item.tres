@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://cv6r73k0w7vj5"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://cpf4rys867qj" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_Metal_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://eoddwo6aujbm" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Pistol_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 10
+damage = 20
+accuracy = -20.0
+timeUnitCost = 17
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 14
+damage = 20
+accuracy = 2.0
+timeUnitCost = 27
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 2
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, false])
+
+[resource]
+resource_name = "M9 Service Pistol"
+script = ExtResource("3_item")
+ItemID = 120
+ItemName = "M9 Service Pistol"
+ItemDescription = "Standard 9 mm military sidearm with good capacity, handling, and aimed accuracy."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 2
+HistoricalIntroductionYear = 1985
+ResearchTier = 1
+RequiredResearch = "standard_sidearms"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 5
+ItemMesh = ExtResource("5_mesh")
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+buyPrice = 625
+sellPrice = 435

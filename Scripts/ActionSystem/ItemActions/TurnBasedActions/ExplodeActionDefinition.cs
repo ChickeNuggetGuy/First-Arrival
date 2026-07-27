@@ -12,6 +12,7 @@ public partial class ExplodeActionDefinition : TurnBasedActionDefinition
     [Export] public int turnsUntilExplode = 2;
     [Export] public int explosionRadius = 2;
     [Export] public Godot.Collections.Dictionary<Enums.Stat, int> affectedStats = new();
+    [Export] public bool canCauseFatalWounds = true;
 	
     public override ActionBase InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
         Godot.Collections.Dictionary<Enums.Stat, int> costs)
@@ -23,6 +24,8 @@ public partial class ExplodeActionDefinition : TurnBasedActionDefinition
             this,
             Item,
             costs,
+            affectedStats,
+            canCauseFatalWounds,
             turnsUntilExplode,
             explosionRadius
         );

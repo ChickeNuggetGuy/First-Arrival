@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://btyv2h0fmoxfx"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://hwanepsjgt6n" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_Heavy_01_BattleRoyale_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://eoddwo6aujbm" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Pistol_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 12
+damage = 26
+accuracy = -12.0
+timeUnitCost = 18
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 16
+damage = 26
+accuracy = 12.0
+timeUnitCost = 28
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 2
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true])
+
+[resource]
+resource_name = "Mk 23 Mod 0"
+script = ExtResource("3_item")
+ItemID = 122
+ItemName = "Mk 23 Mod 0"
+ItemDescription = "Special-operations .45 pistol engineered for exceptional accuracy and durability."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 2
+HistoricalIntroductionYear = 1996
+ResearchTier = 3
+RequiredResearch = "special_operations_weapons"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 6
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.011, 0.011, 0.011)
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+buyPrice = 1450
+sellPrice = 1015

@@ -15,6 +15,8 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
     [Export] private bool _flipLatitude = false;
     
     private Dictionary<int, Dictionary> citiesData = null;
+	private readonly System.Collections.Generic.Dictionary<int, CityCellDefinition>
+		_cityDefinitions = new();
 	private int[] _cityCellIndices = System.Array.Empty<int>();
 
     public override string GetManagerName() => "GlobeCityManager";
@@ -25,19 +27,7 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
     {
 	    if (loadingData && HasLoadedData && citiesData != null)
 	    {
-		    RebuildCityCellIndex();
-		    foreach (var kvp in citiesData)
-		    {
-			    int cellIndex = kvp.Key;
-			    var cityData = kvp.Value;
-			    string cityName = cityData.ContainsKey("city") ? cityData["city"].AsString() : "City";
-
-			    var cell = GlobeHexGridManager.Instance.GetCellFromIndex(cellIndex);
-			    if (cell.HasValue)
-			    {
-				    SpawnCity(cell.Value, cityName);
-			    }
-		    }
+		    RebuildCityDefinitions();
 		    EmitSignal(SignalName.ExecuteCompleted);
 		    return;
 	    }
@@ -80,40 +70,60 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
             
             if (cell.HasValue)
             {
-                SpawnCity(cell.Value, cityName);
                 if (!citiesData.ContainsKey(cell.Value.Index))
 					citiesData.Add(cell.Value.Index, cityData);
             }
         }
 
         GD.Print($"City Data Loaded: {citiesData.Count}");
-		RebuildCityCellIndex();
+		RebuildCityDefinitions();
 
         EmitSignal(SignalName.ExecuteCompleted);
         await Task.CompletedTask;
     }
 
-    private void SpawnCity(HexCellData cell, string name)
+    private void RebuildCityDefinitions()
     {
-        if (_cityPrefab == null) return;
+        ClearCityDefinitions();
+		RebuildCityCellIndex();
+		if (citiesData == null || GlobeHexGridManager.Instance == null) return;
 
-        Node3D cityInstance = _cityPrefab.Instantiate<Node3D>();
+		foreach (var (cellIndex, cityData) in citiesData)
+		{
+			HexCellData? cell = GlobeHexGridManager.Instance.GetCellFromIndex(cellIndex);
+			if (!cell.HasValue) continue;
+
+			string cityName = cityData.ContainsKey("city")
+				? cityData["city"].AsString()
+				: "City";
+			var definition = new CityCellDefinition(cellIndex, cityName, cityData);
+			_cityDefinitions.Add(cellIndex, definition);
+			SpawnCity(cell.Value, definition);
+		}
+    }
+
+    private void SpawnCity(HexCellData cell, CityCellDefinition definition)
+    {
+        if (_cityPrefab == null || definition == null) return;
+
+		CellDefinitionVisual cityInstance = _cityPrefab.Instantiate<CellDefinitionVisual>();
         if (_cityContainer != null) _cityContainer.AddChild(cityInstance);
         else AddChild(cityInstance);
 
         cityInstance.GlobalPosition = cell.Center;
+		definition.BindVisual(cityInstance);
 
         // Orient to face outward from sphere center
         Vector3 surfaceNormal = cell.Center.Normalized();
         Vector3 upDir = Mathf.Abs(surfaceNormal.Y) > 0.9f ? Vector3.Forward : Vector3.Up;
         cityInstance.LookAt(cell.Center + surfaceNormal, upDir);
         
-        cityInstance.Name = name;
+        cityInstance.Name = definition.definitionName;
     }
 
-    public override Godot.Collections.Dictionary<string, Variant> Save()
+    public override Dictionary<string, Variant> Save()
     {
-	    Godot.Collections.Dictionary<string,Variant> data = new Godot.Collections.Dictionary<string,Variant>();
+	    Dictionary<string,Variant> data = new Dictionary<string,Variant>();
 	    
 	    data.Add("cityData", citiesData);
 	    
@@ -139,8 +149,15 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 	/// </summary>
 	public int[] GetCityCellIndices() => _cityCellIndices;
 
+	/// <summary>Gets the persistent city definition assigned to a hex.</summary>
+	public bool TryGetCityDefinition(int cellIndex, out CityCellDefinition definition)
+		=> _cityDefinitions.TryGetValue(cellIndex, out definition);
+
 	public string GetCityName(int cellIndex)
 	{
+		if (_cityDefinitions.TryGetValue(cellIndex, out CityCellDefinition definition))
+			return definition.definitionName;
+
 		if (citiesData != null && citiesData.TryGetValue(cellIndex, out Dictionary city) &&
 		    city.ContainsKey("city"))
 			return city["city"].AsString();
@@ -162,6 +179,19 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 			_cityCellIndices[index++] = cellIndex;
 	}
 
+	private void ClearCityDefinitions()
+	{
+		foreach (CityCellDefinition definition in _cityDefinitions.Values)
+		{
+			CellDefinitionVisual visual = definition.Visual;
+			if (visual != null && GodotObject.IsInstanceValid(visual))
+				visual.QueueFree();
+			definition.ClearVisual();
+		}
+
+		_cityDefinitions.Clear();
+	}
+
 
     public override void _Input(InputEvent @event)
     {
@@ -176,15 +206,15 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 		    {
 			    int cellIndex = GlobeInputManager.Instance.CurrentCell.Value.Index;
 			    
-			    if (!citiesData.ContainsKey(cellIndex)) return;
+			    if (!_cityDefinitions.TryGetValue(cellIndex, out CityCellDefinition city)) return;
 
-			    GD.Print(citiesData[cellIndex]["city"].AsString());
+			    GD.Print(city.definitionName);
 		    }
 	    }
     }
     
     public override void Deinitialize()
     {
-	    return;
+	    ClearCityDefinitions();
     }
 }

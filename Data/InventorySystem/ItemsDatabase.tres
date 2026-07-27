@@ -8,6 +8,27 @@
 [ext_resource type="Resource" uid="uid://bfkutk4217uhc" path="res://Data/Items/Rifle_Item.tres" id="5_8xkxm"]
 [ext_resource type="Resource" uid="uid://b307r1871vdqi" path="res://Data/Items/Troop_Transport_Item.tres" id="5_y1orf"]
 [ext_resource type="Resource" uid="uid://cvsru2hn58n2r" path="res://Data/Items/Aien_Craft_Item.tres" id="7_02t12"]
+[ext_resource type="Resource" path="res://Data/Items/Entrenching_Tool_Item.tres" id="8_yc2nx"]
+[ext_resource type="Resource" path="res://Data/Items/Machete_Item.tres" id="9_6mn25"]
+[ext_resource type="Resource" path="res://Data/Items/Breaching_Axe_Item.tres" id="10_ibyl6"]
+[ext_resource type="Resource" path="res://Data/Items/M9_Pistol_Item.tres" id="11_q3ina"]
+[ext_resource type="Resource" path="res://Data/Items/Glock_17_Item.tres" id="12_2j20g"]
+[ext_resource type="Resource" path="res://Data/Items/Mk23_Pistol_Item.tres" id="13_3dltv"]
+[ext_resource type="Resource" path="res://Data/Items/M3A1_SMG_Item.tres" id="14_hfhjj"]
+[ext_resource type="Resource" path="res://Data/Items/MP5A3_Item.tres" id="15_w10ei"]
+[ext_resource type="Resource" path="res://Data/Items/UMP45_Item.tres" id="16_7srqp"]
+[ext_resource type="Resource" path="res://Data/Items/P90_PDW_Item.tres" id="17_oxmrn"]
+[ext_resource type="Resource" path="res://Data/Items/Mossberg_500_Item.tres" id="18_bmk4s"]
+[ext_resource type="Resource" path="res://Data/Items/Benelli_M4_Item.tres" id="19_ln787"]
+[ext_resource type="Resource" path="res://Data/Items/AKM_Item.tres" id="20_xo0hy"]
+[ext_resource type="Resource" path="res://Data/Items/M4A1_Item.tres" id="21_qucex"]
+[ext_resource type="Resource" path="res://Data/Items/G36K_Item.tres" id="22_k2qky"]
+[ext_resource type="Resource" path="res://Data/Items/F2000_Prototype_Item.tres" id="23_sihdm"]
+[ext_resource type="Resource" path="res://Data/Items/M14_DMR_Item.tres" id="24_pl0y5"]
+[ext_resource type="Resource" path="res://Data/Items/M24_SWS_Item.tres" id="25_gk3ou"]
+[ext_resource type="Resource" path="res://Data/Items/PSG1_Item.tres" id="26_f0cly"]
+[ext_resource type="Resource" path="res://Data/Items/M249_SAW_Item.tres" id="27_flxnk"]
+[ext_resource type="Resource" path="res://Data/Items/M240B_Item.tres" id="28_fapq5"]
 
 [resource]
 script = ExtResource("2_edjy6")
@@ -17,6 +38,27 @@ Items = Dictionary[int, ExtResource("1_m8kqt")]({
 2: ExtResource("2_y1orf"),
 3: ExtResource("5_8xkxm"),
 4: ExtResource("5_y1orf"),
-5: ExtResource("7_02t12")
+5: ExtResource("7_02t12"),
+110: ExtResource("8_yc2nx"),
+111: ExtResource("9_6mn25"),
+112: ExtResource("10_ibyl6"),
+120: ExtResource("11_q3ina"),
+121: ExtResource("12_2j20g"),
+122: ExtResource("13_3dltv"),
+130: ExtResource("14_hfhjj"),
+131: ExtResource("15_w10ei"),
+132: ExtResource("16_7srqp"),
+133: ExtResource("17_oxmrn"),
+140: ExtResource("18_bmk4s"),
+141: ExtResource("19_ln787"),
+150: ExtResource("20_xo0hy"),
+151: ExtResource("21_qucex"),
+152: ExtResource("22_k2qky"),
+153: ExtResource("23_sihdm"),
+160: ExtResource("24_pl0y5"),
+161: ExtResource("25_gk3ou"),
+162: ExtResource("26_f0cly"),
+170: ExtResource("27_flxnk"),
+171: ExtResource("28_fapq5")
 })
 metadata/_custom_type_script = "uid://bg1t1nedltkks"

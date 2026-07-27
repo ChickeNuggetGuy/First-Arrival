@@ -112,8 +112,13 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 
 		var damage = meleeAttackActionDefinition.damage;
 
-		health.RemoveValue(damage);
-		GD.Print($"Target unit Damaged for {damage} damage, remaining health is {health.CurrentValue}");
+		GridObjectStat.DamageResult damageResult =
+			health.ApplyDamage(damage, meleeAttackActionDefinition.canCauseFatalWounds);
+		GD.Print(
+			$"Target unit damaged for {damageResult.HealthDamage} damage, " +
+			$"remaining health is {health.CurrentValue}, fatal wounds added: " +
+			$"{damageResult.FatalWoundsAdded} ({damageResult.WoundedBodyPart})"
+		);
 
 		return;
 	}

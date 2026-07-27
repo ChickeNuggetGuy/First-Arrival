@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bo7sv17452h03"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://c8hkm4a74vu3i" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_MachineGun_USA_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="ShortBurst"]
+script = ExtResource("1_ranged")
+Type = 3
+attackCount = 2
+range = 18
+damage = 20
+accuracy = -24.0
+timeUnitCost = 29
+staminaCost = 5
+
+[sub_resource type="Resource" id="Auto"]
+script = ExtResource("1_ranged")
+Type = 2
+attackCount = 4
+range = 22
+damage = 20
+accuracy = -34.0
+timeUnitCost = 49
+staminaCost = 10
+confirmClick = true
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 4
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true, true, true, true, true])
+
+[resource]
+resource_name = "M249 Squad Automatic Weapon"
+script = ExtResource("3_item")
+ItemID = 170
+ItemName = "M249 Squad Automatic Weapon"
+ItemDescription = "Belt-fed 5.56 mm light machine gun built for sustained squad-level fire."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 9
+HistoricalIntroductionYear = 1984
+ResearchTier = 1
+RequiredResearch = "squad_automatic_weapons"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 18
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.013, 0.013, 0.013)
+ActionDefinitions = Array[Object]([SubResource("ShortBurst"), SubResource("Auto")])
+buyPrice = 1800
+sellPrice = 1260

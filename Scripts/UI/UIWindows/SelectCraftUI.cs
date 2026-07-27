@@ -93,7 +93,7 @@ public partial class SelectCraftUI : UIWindow
 			foreach (var craft in teamHolderBase.CraftList)
 			{
 				var treeSubChild = treeUI.CreateItem(treeChild, craft.Index);
-				treeSubChild.SetText(0, craft.ItemName);
+				treeSubChild.SetText(0, $"{craft.ItemName} ({craft.Status})");
 
 				treeSubChild.AddButton(0, buttonTexture,craft.Index);
 				

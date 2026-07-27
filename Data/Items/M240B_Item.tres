@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bsn62ag1pillh"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://dpon6reaav8l4" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_MachineGun_01_BattleRoyale_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="ShortBurst"]
+script = ExtResource("1_ranged")
+Type = 3
+attackCount = 2
+range = 20
+damage = 29
+accuracy = -22.0
+timeUnitCost = 35
+staminaCost = 8
+
+[sub_resource type="Resource" id="Auto"]
+script = ExtResource("1_ranged")
+Type = 2
+attackCount = 4
+range = 25
+damage = 29
+accuracy = -31.0
+timeUnitCost = 57
+staminaCost = 15
+confirmClick = true
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 4
+SizeZ = 3
+OccupiedCells = Array[bool]([true, true, true, true, true, true, true, true, true, true, true, true])
+
+[resource]
+resource_name = "M240B Machine Gun"
+script = ExtResource("3_item")
+ItemID = 171
+ItemName = "M240B Machine Gun"
+ItemDescription = "Heavy 7.62 mm general-purpose machine gun. Powerful and accurate under sustained fire, but burdensome."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 10
+HistoricalIntroductionYear = 1995
+ResearchTier = 2
+RequiredResearch = "general_purpose_machine_guns"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 24
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.014, 0.014, 0.014)
+ActionDefinitions = Array[Object]([SubResource("ShortBurst"), SubResource("Auto")])
+buyPrice = 2600
+sellPrice = 1820

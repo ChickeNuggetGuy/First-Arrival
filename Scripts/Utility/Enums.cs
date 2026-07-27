@@ -75,6 +75,17 @@ public class Enums
 		RangedAccuracy
 	}
 
+	public enum BodyPart
+	{
+		None = 0,
+		Head,
+		Torso,
+		LeftArm,
+		RightArm,
+		LeftLeg,
+		RightLeg
+	}
+
 	public static Dictionary<Stat, Color> statColors = new()
 	{
 		{ Stat.Health, Colors.Red },
@@ -128,6 +139,7 @@ public class Enums
 		SNAP,
 		AIM,
 		AUTO,
+		BURST,
 		
 	}
 	#endregion
@@ -239,5 +251,15 @@ public class Enums
 		Failed = 4,
 		Timeout = 8,
 		OnRoute = 16,
+	}
+
+	public enum MonthlyScoreReason
+	{
+		None,
+		FailedMission,
+		SuccessfulMission,
+		ExpiredMission,
+		UfoLanding,
+		
 	}
 }

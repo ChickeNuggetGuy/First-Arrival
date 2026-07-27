@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://d06ck2qoet1gj"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://dysq5eqf82g4a" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_Small_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://eoddwo6aujbm" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Pistol_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 11
+damage = 20
+accuracy = -13.0
+timeUnitCost = 15
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 15
+damage = 20
+accuracy = 8.0
+timeUnitCost = 24
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 2
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, false])
+
+[resource]
+resource_name = "Glock 17"
+script = ExtResource("3_item")
+ItemID = 121
+ItemName = "Glock 17"
+ItemDescription = "Light polymer-framed 9 mm pistol. Fast to bring on target and accurate under pressure."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 2
+HistoricalIntroductionYear = 1982
+ResearchTier = 2
+RequiredResearch = "polymer_sidearms"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 4
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.009, 0.009, 0.009)
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+buyPrice = 850
+sellPrice = 595

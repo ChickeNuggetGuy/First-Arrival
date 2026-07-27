@@ -3,8 +3,6 @@ using System;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 
-
-//TODO: Current Value Fill not actually working. The entire bar is filled regardless
 [GlobalClass, Tool]
 public partial class TextStatBar : UIElement
 {
@@ -32,6 +30,11 @@ public partial class TextStatBar : UIElement
 	[Export] private VerticalAlignment _verticalAlignment;
 	
 	[ExportGroup("Progress Bar Settings"),Export] private ProgressBar statProgressBar;
+	private GridObjectStatHolder _statHolder;
+	private GridObjectStat _stat;
+	private GridObjectStat _healthStat;
+	private StatProgressBarOverlay _overlay;
+
 	protected override async Task _Setup()
 	{
 		if(_statNameLabel != null)
@@ -45,12 +48,14 @@ public partial class TextStatBar : UIElement
 		if (statProgressBar != null)
 		{
 			SetProgressColor(Enums.statColors[targetStat], statProgressBar);
+			_overlay ??= new StatProgressBarOverlay(statProgressBar);
 		}
 	}
 
 
 	public void UpdateStat(GridObjectStatHolder targetGridObjectStatHolder)
 	{
+		UnbindStat();
 		if (targetGridObjectStatHolder == null)
 		{
 			GD.PrintErr("StatBar UpdateStat: targetGridObjectStatHolder is null");
@@ -67,11 +72,59 @@ public partial class TextStatBar : UIElement
 			return;
 		}
 		
-		
-		GD.Print($"Updating Stat {targetStat}");
-		statProgressBar.MinValue = stat.MinMaxValue.min;
-		statProgressBar.MaxValue = stat.MinMaxValue.max;
-		statProgressBar.SetValue(stat.CurrentValue);
+		_statHolder = targetGridObjectStatHolder;
+		_stat = stat;
+		_statHolder.TryGetStat(Enums.Stat.Health, out _healthStat);
+		_stat.CurrentValueChanged += StatOnCurrentValueChanged;
+		if (_healthStat != null)
+		{
+			_healthStat.FatalWoundsChanged += HealthOnFatalWoundsChanged;
+		}
+		Refresh();
+	}
+
+	private void StatOnCurrentValueChanged(int value, GridObject gridObject)
+	{
+		Refresh();
+	}
+
+	private void HealthOnFatalWoundsChanged(
+		int totalWounds,
+		int bodyPart,
+		int woundsOnBodyPart,
+		GridObject gridObject
+	)
+	{
+		Refresh();
+	}
+
+	private void Refresh()
+	{
+		if (_statHolder == null || _stat == null || statProgressBar == null) return;
+		_overlay ??= new StatProgressBarOverlay(statProgressBar);
+		_overlay.Update(_statHolder, _stat);
+	}
+
+	private void UnbindStat()
+	{
+		if (_stat != null)
+		{
+			_stat.CurrentValueChanged -= StatOnCurrentValueChanged;
+		}
+		if (_healthStat != null)
+		{
+			_healthStat.FatalWoundsChanged -= HealthOnFatalWoundsChanged;
+		}
+		_stat = null;
+		_healthStat = null;
+		_statHolder = null;
+	}
+
+	public override void _ExitTree()
+	{
+		UnbindStat();
+		_overlay?.Dispose();
+		base._ExitTree();
 	}
 	
 	public void SetProgressColor(Color newColor, Control targetControl)

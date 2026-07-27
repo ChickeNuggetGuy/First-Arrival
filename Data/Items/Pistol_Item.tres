@@ -1,44 +1,41 @@
 [gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://d2jrgtmu7gm88"]
 
-[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_71kes"]
-[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_8w8pa"]
-[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="2_e5pci"]
-[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_7w8sb"]
-[ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="3_lougv"]
-[ext_resource type="Texture2D" uid="uid://gvtufe7m6g40" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_01_Military_Side.png" id="4_71kes"]
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://gvtufe7m6g40" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://eoddwo6aujbm" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Pistol_01.obj" id="5_mesh"]
 
-[sub_resource type="Resource" id="Resource_2jyhj"]
-script = ExtResource("1_71kes")
-damage = 15
-metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 9
+damage = 23
+accuracy = -28.0
 
-[sub_resource type="Resource" id="Resource_wvx2b"]
-script = ExtResource("2_e5pci")
-range = 10
-damage = 20
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 12
+damage = 23
+accuracy = -8.0
 
-[sub_resource type="Resource" id="Resource_fv7ql"]
-script = ExtResource("3_lougv")
-metadata/_custom_type_script = "uid://60yksynr5w30"
-
-[sub_resource type="Resource" id="Resource_uou2a"]
-script = ExtResource("2_8w8pa")
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
 SizeX = 2
 SizeZ = 2
 OccupiedCells = Array[bool]([true, true, true, false])
-metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]
-resource_name = "Pistol_Item"
-script = ExtResource("3_7w8sb")
+resource_name = "M1911A1 Service Pistol"
+script = ExtResource("3_item")
 ItemID = 2
-ItemName = "Pistol"
-ItemDescription = "Standard issue pistol"
-ItemIcon = ExtResource("4_71kes")
-ItemShape = SubResource("Resource_uou2a")
-weight = 8
-ActionDefinitions = [SubResource("Resource_2jyhj"), SubResource("Resource_wvx2b"), SubResource("Resource_fv7ql")]
-MaxStackSize = 2
-buyPrice = 675
-sellPrice = 525
+ItemName = "M1911A1 Service Pistol"
+ItemDescription = "Hard-hitting surplus .45 sidearm. Reliable, but less accurate and slower to recover than modern pistols."
+ItemIcon = ExtResource("4_icon")
+ItemShape = SubResource("Shape")
+weight = 6
+ItemMesh = ExtResource("5_mesh")
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+buyPrice = 450
+sellPrice = 315
 metadata/_custom_type_script = "uid://da4j8smky5g6x"

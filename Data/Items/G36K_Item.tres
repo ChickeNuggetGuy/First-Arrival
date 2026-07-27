@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://ca0j80m64iqm4"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://djxsmdngya2lk" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Preset_B_Rifle_02_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 19
+damage = 24
+accuracy = -11.0
+timeUnitCost = 21
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 26
+damage = 24
+accuracy = 14.0
+timeUnitCost = 32
+
+[sub_resource type="Resource" id="Auto"]
+script = ExtResource("1_ranged")
+Type = 2
+attackCount = 3
+range = 20
+damage = 24
+accuracy = -22.0
+timeUnitCost = 40
+staminaCost = 4
+confirmClick = true
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 3
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true, true, true])
+
+[resource]
+resource_name = "G36K Carbine"
+script = ExtResource("3_item")
+ItemID = 152
+ItemName = "G36K Carbine"
+ItemDescription = "Modern 5.56 mm carbine with integrated optics and strong all-range accuracy."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 6
+HistoricalIntroductionYear = 1997
+ResearchTier = 2
+RequiredResearch = "integrated_optics"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 10
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.009, 0.009, 0.009)
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim"), SubResource("Auto")])
+buyPrice = 1850
+sellPrice = 1295

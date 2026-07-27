@@ -646,7 +646,11 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		return true;
 	}
 
-	private void OnDayChanged(int dayOfYear, int dayOfMonth, Enums.Day day)
+	private void OnDayChanged(
+		int dayOfYear,
+		int dayOfMonth,
+		Enums.Day day,
+		int daysAdvanced)
 	{
 		foreach (Enums.UnitTeam team in teamData.Keys)
 			ScanAllDetectors(team);

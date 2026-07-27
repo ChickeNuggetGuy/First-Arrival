@@ -225,6 +225,7 @@ public partial class InventoryGridUI : UIWindow
 				//Pick up 1 item from slot to empty mouse
 				InventoryGrid.TryTransferItem(InventoryGrid, mouseHeldInventory.InventoryGrid, slotItemInfo.item, 1);
 				mouseHeldInventory.ShowCall();
+				mouseHeldInventory.previousInventory = InventoryGrid;
 			}
 			else if (mouseItemInfo.item.ItemData.ItemID == slotItemInfo.item.ItemData.ItemID)
 			{
@@ -234,6 +235,7 @@ public partial class InventoryGridUI : UIWindow
 				if (!mouseHeldInventory.InventoryGrid.HasItemAt(0, 0))
 				{
 					mouseHeldInventory.HideCall();
+					mouseHeldInventory.previousInventory = null;
 				}
 			}
 			else

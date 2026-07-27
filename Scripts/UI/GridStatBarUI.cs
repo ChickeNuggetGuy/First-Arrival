@@ -13,6 +13,9 @@ public partial class GridStatBarUI : UIElement
 	[Export] private Enums.UnitTeam team;
 
 	private GridObjectStat _stat;
+	private GridObjectStat _healthStat;
+	private GridObjectStatHolder _statHolder;
+	private StatProgressBarOverlay _overlay;
 
 	protected override async Task _Setup()
 	{
@@ -22,54 +25,77 @@ public partial class GridStatBarUI : UIElement
 			return;
 		}
 
-		var sb = new StyleBoxFlat();
-
-		switch (stat)
+		var sb = new StyleBoxFlat
 		{
-			case Enums.Stat.None:
-				sb.BgColor = Colors.Black;
-				break;
-			case Enums.Stat.Health:
-				sb.BgColor = Colors.Tomato;
-				break;
-			case Enums.Stat.Stamina:
-				sb.BgColor = Colors.Gold;
-				break;
-			case Enums.Stat.Bravery:
-				sb.BgColor = Colors.Indigo;
-				break;
-			case Enums.Stat.TimeUnits:
-				sb.BgColor = Colors.ForestGreen;
-				break;
-			default:
-				throw new ArgumentOutOfRangeException();
-		}
+			BgColor = Enums.statColors.TryGetValue(stat, out Color color)
+				? color
+				: Colors.Black
+		};
 
 		statBar.AddThemeStyleboxOverride("fill", sb);
+		_overlay ??= new StatProgressBarOverlay(statBar);
 	}
 
 	public void SetupStatBar(GridObject gridObject)
 	{
+		UnbindStat();
 		if(gridObject == null) return;
-		if (_stat != null)
-		{
-			_stat.CurrentValueChanged -= StatOnCurrentValueChanged;
-			_stat = null;
-		}
 		if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
 		GridObjectStat gridObjectStat = statHolder.Stats.FirstOrDefault(s => s.Stat == stat);
 		if (gridObjectStat == null) return;
 
+		_statHolder = statHolder;
 		_stat = gridObjectStat;
-		statBar.MinValue = _stat.MinMaxValue.min;
-		statBar.MaxValue = _stat.MinMaxValue.max;
-		statBar.Value = _stat.CurrentValue;
-
+		_statHolder.TryGetStat(Enums.Stat.Health, out _healthStat);
 		_stat.CurrentValueChanged += StatOnCurrentValueChanged;
+		if (_healthStat != null)
+		{
+			_healthStat.FatalWoundsChanged += HealthOnFatalWoundsChanged;
+		}
+		Refresh();
 	}
 
 	private void StatOnCurrentValueChanged(int value, GridObject gridObject)
 	{
-		statBar.Value = value;
+		Refresh();
+	}
+
+	private void HealthOnFatalWoundsChanged(
+		int totalWounds,
+		int bodyPart,
+		int woundsOnBodyPart,
+		GridObject gridObject
+	)
+	{
+		Refresh();
+	}
+
+	private void Refresh()
+	{
+		if (_statHolder == null || _stat == null) return;
+		_overlay ??= new StatProgressBarOverlay(statBar);
+		_overlay.Update(_statHolder, _stat);
+	}
+
+	private void UnbindStat()
+	{
+		if (_stat != null)
+		{
+			_stat.CurrentValueChanged -= StatOnCurrentValueChanged;
+		}
+		if (_healthStat != null)
+		{
+			_healthStat.FatalWoundsChanged -= HealthOnFatalWoundsChanged;
+		}
+		_stat = null;
+		_healthStat = null;
+		_statHolder = null;
+	}
+
+	public override void _ExitTree()
+	{
+		UnbindStat();
+		_overlay?.Dispose();
+		base._ExitTree();
 	}
 }

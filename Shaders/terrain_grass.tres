@@ -1,7 +1,26 @@
-[gd_resource type="ShaderMaterial" format=3]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://c40oxiq08kgc1"]
 
-[ext_resource type="Shader" path="res://Shaders/terrain_grass.gdshader" id="1_grass"]
+[ext_resource type="Shader" uid="uid://bas5witv2j51s" path="res://Shaders/terrain_grass.gdshader" id="1_grass"]
 
 [resource]
 render_priority = 0
 shader = ExtResource("1_grass")
+shader_parameter/grid_origin_world = Vector3(0, 0, 0)
+shader_parameter/cell_size_world = Vector3(1, 1, 1)
+shader_parameter/visibility_grid_min = Vector3(0, 0, 0)
+shader_parameter/visibility_grid_size = Vector3(1, 1, 1)
+shader_parameter/grass_color = Color(0.3137255, 0.5254902, 0.31764707, 1)
+shader_parameter/grass_tip_color = Color(0.3137255, 0.5254902, 0.31764707, 1)
+shader_parameter/color_variation = 0.16
+shader_parameter/stylized_unshaded = true
+shader_parameter/use_terrain_base_color = true
+shader_parameter/terrain_base_color = Color(0.3137255, 0.5254902, 0.31764707, 1)
+shader_parameter/blade_curvature = 0.40000000596046
+shader_parameter/curvature_power = 2.15000002458698
+shader_parameter/curvature_drop = 0.61999998614176
+shader_parameter/wind_direction = Vector2(0.9, 0.35)
+shader_parameter/wind_strength = 0.11999999731776
+shader_parameter/wind_speed = 2.20000003278264
+shader_parameter/wind_scale = 1.0999999754127998
+shader_parameter/gust_strength = 0.38
+shader_parameter/explored_brightness = 0.35

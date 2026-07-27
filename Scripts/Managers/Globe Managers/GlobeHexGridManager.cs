@@ -21,6 +21,16 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 	[Export] private Godot.Collections.Dictionary<string, Vector2> textureOffsets =
 		new Godot.Collections.Dictionary<string, Vector2>();
 
+	[ExportGroup("Texture Projection")]
+	// Infer the latitude coverage of cropped maps from their aspect ratio.
+	[Export]
+	private bool inferTextureLatitudeRanges = true;
+
+	// Optional per-texture (minimum latitude, maximum latitude) overrides in degrees.
+	[Export]
+	private Godot.Collections.Dictionary<string, Vector2> textureLatitudeRanges =
+		new Godot.Collections.Dictionary<string, Vector2>();
+
 	[Export] private Godot.Collections.Dictionary<string, Texture2D> textures =
 		new Godot.Collections.Dictionary<string, Texture2D>();
 
@@ -226,6 +236,8 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		// Cache per-texture offsets before entering the parallel loop
 		Vector2 waterOffset = GetTextureOffset("water");
 		Vector2 countryOffset = GetTextureOffset("countries");
+		Vector2 waterLatitudeRange = GetTextureLatitudeRange("water", waterSize);
+		Vector2 countryLatitudeRange = GetTextureLatitudeRange("countries", countrySize);
 
 		bool hasLoadedKeys =
 			_loadedCountryKeysFromSave != null
@@ -247,7 +259,11 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			Enums.HexGridType type = Enums.HexGridType.Land;
 			if (waterBytes != null)
 			{
-				var uv = LatLonToUv(latLon, waterOffset);
+				var uv = EquirectangularProjection.LatLonToUv(
+					latLon,
+					waterOffset,
+					waterLatitudeRange
+				);
 				int px = Mathf.Clamp(
 					(int)(uv.X * waterSize.X), 0, waterSize.X - 1
 				);
@@ -273,7 +289,11 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 
 			if (countryKey == 0 && countryBytes != null)
 			{
-				var uv = LatLonToUv(latLon, countryOffset);
+				var uv = EquirectangularProjection.LatLonToUv(
+					latLon,
+					countryOffset,
+					countryLatitudeRange
+				);
 				int px = Mathf.Clamp(
 					(int)(uv.X * countrySize.X), 0, countrySize.X - 1
 				);
@@ -575,13 +595,6 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 
 		bytes = packed.ToArray();
 		return bytes.Length >= size.X * size.Y * 4;
-	}
-
-	private static Vector2 LatLonToUv(Vector2 latLon)
-	{
-		float u = (latLon.Y + 180f) / 360f;
-		float v = 1.0f - ((latLon.X + 90f) / 180f);
-		return new Vector2(u, v);
 	}
 
 	private static byte GetRgba8A(byte[] rgba, int width, int x, int y)
@@ -908,19 +921,6 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return results;
 	}
 
-	private static Vector2 LatLonToUv(Vector2 latLon, Vector2 texOffset)
-	{
-		float lat = latLon.X + texOffset.X;
-		float lon = latLon.Y + texOffset.Y;
-
-		lon = Mathf.PosMod(lon + 180f, 360f) - 180f;
-		lat = Mathf.Clamp(lat, -90f, 90f);
-
-		float u = (lon + 180f) / 360f;
-		float v = 1.0f - ((lat + 90f) / 180f);
-		return new Vector2(u, v);
-	}
-
 	public List<HexCellData> GetCellsInWorldRadius(
 		Vector3 origin,
 		float worldRadius,
@@ -949,6 +949,20 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			return offset;
 
 		return Vector2.Zero;
+	}
+
+	private Vector2 GetTextureLatitudeRange(string textureKey, Vector2I textureSize)
+	{
+		if (textureLatitudeRanges != null
+		    && textureLatitudeRanges.TryGetValue(textureKey, out var configuredRange)
+		    && EquirectangularProjection.IsValidLatitudeRange(configuredRange))
+		{
+			return configuredRange;
+		}
+
+		return inferTextureLatitudeRanges
+			? EquirectangularProjection.InferLatitudeRange(textureSize)
+			: EquirectangularProjection.FullLatitudeRange;
 	}
 
 

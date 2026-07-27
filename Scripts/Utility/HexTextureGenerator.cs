@@ -15,6 +15,14 @@ public partial class HexTextureGenerator : Node
     [Export] private bool _useSourceResolution = true;
     [Export] private Vector2I _customResolution = new Vector2I(1024, 512);
     [Export(PropertyHint.File, "*.png")] private string _outputPath = "res://Generated/hex_texture.png";
+
+	[ExportCategory("Source Projection")]
+	// Infer a symmetrically cropped latitude range from the image aspect ratio.
+	[Export]
+	private bool _inferSourceLatitudeRange = true;
+	// Used when inference is disabled: (minimum latitude, maximum latitude).
+	[Export]
+	private Vector2 _sourceLatitudeRange = new Vector2(-90.0f, 90.0f);
     
     [ExportCategory("Processing")]
     [Export(PropertyHint.Range, "0.0,1.0")] private float _alphaThreshold = 0.5f;
@@ -43,7 +51,7 @@ public partial class HexTextureGenerator : Node
     }
     
     private TempCell[] _tempCells;
-    private ConcurrentDictionary<Vector3I, List<int>> _tempSpatialHash;
+    private ConcurrentDictionary<Vector3I, ConcurrentBag<int>> _tempSpatialHash;
     private float _hashSize;
     private float _gridRadius;
 
@@ -59,13 +67,23 @@ public partial class HexTextureGenerator : Node
         try 
         {
             resolution = (int)_gridManagerNode.Get("resolution");
-            _gridRadius = (float)_gridManagerNode.Get("radius");
+            // GlobeHexGridManager exports this C# property with an uppercase R.
+            _gridRadius = (float)_gridManagerNode.Get("Radius");
         }
         catch (Exception)
         {
-            GD.PrintErr("HexTextureGenerator: Assigned Node is missing 'resolution' or 'radius'.");
+            GD.PrintErr("HexTextureGenerator: Assigned node is missing 'resolution' or 'Radius'.");
             return;
         }
+
+		if (resolution < 0 || _gridRadius <= 0.0f)
+		{
+			GD.PrintErr(
+				$"HexTextureGenerator: Invalid grid settings " +
+				$"(resolution={resolution}, Radius={_gridRadius})."
+			);
+			return;
+		}
 
         BuildTemporaryGrid(resolution, _gridRadius);
 
@@ -79,6 +97,11 @@ public partial class HexTextureGenerator : Node
         int srcW = srcImage.GetWidth();
         int srcH = srcImage.GetHeight();
         byte[] srcData = srcImage.GetData();
+		Vector2 sourceLatitudeRange = _inferSourceLatitudeRange
+			? EquirectangularProjection.InferLatitudeRange(new Vector2I(srcW, srcH))
+			: _sourceLatitudeRange;
+		if (!EquirectangularProjection.IsValidLatitudeRange(sourceLatitudeRange))
+			sourceLatitudeRange = EquirectangularProjection.FullLatitudeRange;
 
         int outW = _useSourceResolution ? srcW : _customResolution.X;
         int outH = _useSourceResolution ? srcH : _customResolution.Y;
@@ -97,7 +120,8 @@ public partial class HexTextureGenerator : Node
                 float v = y / (float)srcH;
                 float u = x / (float)srcW;
                 
-                Vector3 worldPos = LatLonToVector3(90.0f - (v * 180.0f), (u * 360.0f) - 180.0f, _gridRadius);
+				float latitude = EquirectangularProjection.UvToLatitude(v, sourceLatitudeRange);
+                Vector3 worldPos = LatLonToVector3(latitude, (u * 360.0f) - 180.0f, _gridRadius);
                 int cellIndex = GetClosestCellIndex(worldPos);
 
                 if (cellIndex != -1)
@@ -151,6 +175,38 @@ public partial class HexTextureGenerator : Node
             }
         }
 
+		// A cropped map has no source pixels at the omitted polar caps. Fill any
+		// untouched polar cell from the closest available source row instead of
+		// leaving transparent holes in the generated globe texture.
+		foreach (TempCell cell in _tempCells)
+		{
+			if (finalHexColors.ContainsKey(cell.Index)) continue;
+
+			Vector3 direction = cell.Center.Normalized();
+			var latLon = new Vector2(
+				Mathf.RadToDeg(Mathf.Asin(direction.Y)),
+				Mathf.RadToDeg(Mathf.Atan2(direction.X, direction.Z))
+			);
+			Vector2 sourceUv = EquirectangularProjection.LatLonToUv(
+				latLon,
+				Vector2.Zero,
+				sourceLatitudeRange
+			);
+			int sourceX = Mathf.Clamp((int)(sourceUv.X * srcW), 0, srcW - 1);
+			int sourceY = Mathf.Clamp((int)(sourceUv.Y * srcH), 0, srcH - 1);
+			int sourceIndex = ((sourceY * srcW) + sourceX) * 4;
+			float alpha = srcData[sourceIndex + 3] / 255.0f;
+
+			finalHexColors[cell.Index] = alpha >= _alphaThreshold
+				? new Color(
+					srcData[sourceIndex] / 255.0f,
+					srcData[sourceIndex + 1] / 255.0f,
+					srcData[sourceIndex + 2] / 255.0f,
+					1.0f
+				)
+				: Colors.Transparent;
+		}
+
         // 3. PASS 2: Generate Output Texture
         byte[] outData = new byte[outW * outH * 4];
 
@@ -203,7 +259,7 @@ public partial class HexTextureGenerator : Node
         for (int r = 0; r < resolution; r++) Subdivide(verts, faces);
 
         _tempCells = new TempCell[verts.Count];
-        _tempSpatialHash = new ConcurrentDictionary<Vector3I, List<int>>();
+        _tempSpatialHash = new ConcurrentDictionary<Vector3I, ConcurrentBag<int>>();
         // Slightly increased hash size to prevent edge case lookups failing
         _hashSize = (radius * 2.5f) / (Mathf.Pow(2, resolution) + 1);
 
@@ -212,7 +268,7 @@ public partial class HexTextureGenerator : Node
             Vector3 center = verts[i] * radius;
             _tempCells[i] = new TempCell { Index = i, Center = center };
             Vector3I key = GetHashKey(center);
-            _tempSpatialHash.GetOrAdd(key, _ => new List<int>()).Add(i);
+            _tempSpatialHash.GetOrAdd(key, _ => new ConcurrentBag<int>()).Add(i);
         });
     }
 

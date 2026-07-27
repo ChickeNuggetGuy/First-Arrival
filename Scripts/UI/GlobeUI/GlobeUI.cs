@@ -56,11 +56,23 @@ public partial class GlobeUI : UIWindow
 			}
 
 			currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
-			monthlyScoreLabel.Text = $"Monthly Score: {teamHolder.monthlyScore}";
+			UpdateMonthlyScoreLabel(teamHolder.TotalMonthlyScore);
 			teamHolder.FundsChanged += TeamHolderOnFundsChanged;
 			teamHolder.MonthlyScoreChanged += TeamHolderOnMonthlyScoreChanged;
 			teamHolder.BaseAdded += TeamHolderOnBaseAdded;
 			teamHolder.BaseRemoved += TeamHolderOnBaseRemoved;
+
+			if(teamHolder.Bases.Count == 0)
+			{
+				sendMissionButton.Disabled = true;
+				buyCraftButton.Disabled = true;
+			}
+			else
+			{
+				sendMissionButton.Disabled = false;
+				buyCraftButton.Disabled = false;
+			}
+
 		}
 		else
 		{
@@ -70,11 +82,20 @@ public partial class GlobeUI : UIWindow
 		return base._Setup();
 	}
 
-	private void TeamHolderOnMonthlyScoreChanged(int score)
+	private void TeamHolderOnMonthlyScoreChanged(
+		Dictionary<Enums.MonthlyScoreReason, int> score)
 	{
-		monthlyScoreLabel.Text = $"Monthly Score: {score}";
+		int total = 0;
+		foreach (int amount in score.Values)
+			total += amount;
+		UpdateMonthlyScoreLabel(total);
 	}
 
+	private void UpdateMonthlyScoreLabel(int score)
+	{
+		if (monthlyScoreLabel != null)
+			monthlyScoreLabel.Text = $"Monthly Score: {score:N0}";
+	}
 
 	protected override async Task DrawUI()
 	{
@@ -114,6 +135,7 @@ public partial class GlobeUI : UIWindow
 				// Mark as async to await the scene change
 				baseButton.Pressed += async () => 
 				{
+					await OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
 					GameManager.Instance.currentBase = baseCellDefinition;
 					GameManager.Instance.currentBaseFunds = teamHolder.funds;
                 
@@ -124,9 +146,9 @@ public partial class GlobeUI : UIWindow
 				
 				Button panButton = new Button();
 				panButton.Icon = focusButtonTexture;
-				panButton.Pressed += () =>
+				panButton.Pressed += async() =>
 				{
-					OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
+					await OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
 				};
 				
 				container.AddChild(baseButton);
@@ -146,6 +168,17 @@ public partial class GlobeUI : UIWindow
 	private void TeamHolderOnBaseAdded(int hexCellIndex, GlobeTeamHolder teamHolder)
 	{
 		RefreshBaseButtons(teamHolder);
+
+		if (teamHolder.Bases.Count > 0)
+		{
+			sendMissionButton.Disabled = false;
+			buyCraftButton.Disabled = false;
+		}
+		else
+		{
+			sendMissionButton.Disabled = true;
+			buyCraftButton.Disabled = true;
+		}
 	}
 
 	private void sendMissionButtonOnPressed()
@@ -174,6 +207,15 @@ public partial class GlobeUI : UIWindow
 	{
 		GD.Print("Team funds changed: " + teamHolder.funds);
 		currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
+
+		if (currentFunds < teamHolder.newbaseCost)
+		{
+			buildBaseButton.Disabled = true;
+		}
+		else
+		{
+			buildBaseButton.Disabled = false;
+		}
 	}
 
 

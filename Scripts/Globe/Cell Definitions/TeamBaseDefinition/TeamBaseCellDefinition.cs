@@ -374,6 +374,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		// Early out: craft is already at its home base 
 		if (startCellIndex == targetCellIndex && targetCellIndex == craft.HomeBaseIndex)
 		{
+			craft.CancelActiveTravel();
+			GlobeMissionManager.Instance?.ClearCraftAssignment(craft);
+
 			// Move craft directly into Home status
 			TryChangeCraftStatus(Enums.CraftStatus.Home, craft);
 			craft.TargetCellIndex = -1;
@@ -474,8 +477,10 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			);
 		}
 
+		missionManager?.ClearCraftAssignment(craft);
 		craft.TargetCellIndex = targetCellIndex;
 		Tween shipTween = teamManager.GetTree().CreateTween();
+		Task<bool> travelCompletion = craft.SetActiveTravelTween(shipTween);
 		List<float> segmentDurations = CalculateFlightSegmentDurations(
 			path,
 			manager,
@@ -553,15 +558,20 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			);
 		}
 
+		bool completed;
 		try
 		{
-			await teamManager.ToSignal(shipTween, Tween.SignalName.Finished);
+			completed = await travelCompletion;
 		}
 		finally
 		{
 			if (timeManager != null && GodotObject.IsInstanceValid(timeManager))
 				timeManager.TimeSpeedChanged -= ApplyGlobeTimeSpeed;
 		}
+
+		// A newer destination owns the craft now. Do not let this superseded
+		// route apply its destination or arrival state after cancellation.
+		if (!completed) return false;
 
 		craft.CurrentCellIndex = targetCellIndex;
 

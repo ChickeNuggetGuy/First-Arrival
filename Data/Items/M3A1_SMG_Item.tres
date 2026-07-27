@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://chjnsdkavst0m"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://dmto5u2h5p625" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_SubMGun_01_BattleRoyale_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 8
+damage = 17
+accuracy = -32.0
+timeUnitCost = 18
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 11
+damage = 17
+accuracy = -12.0
+timeUnitCost = 27
+
+[sub_resource type="Resource" id="Auto"]
+script = ExtResource("1_ranged")
+Type = 2
+attackCount = 3
+range = 9
+damage = 17
+accuracy = -42.0
+timeUnitCost = 34
+staminaCost = 3
+confirmClick = true
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 3
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true, true, false])
+
+[resource]
+resource_name = "M3A1 Submachine Gun"
+script = ExtResource("3_item")
+ItemID = 130
+ItemName = "M3A1 Submachine Gun"
+ItemDescription = "Cheap surplus .45 submachine gun. Strong up close, but inaccurate and short-ranged."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 3
+HistoricalIntroductionYear = 1944
+ItemShape = SubResource("Shape")
+weight = 9
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.008, 0.008, 0.008)
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim"), SubResource("Auto")])
+buyPrice = 575
+sellPrice = 400

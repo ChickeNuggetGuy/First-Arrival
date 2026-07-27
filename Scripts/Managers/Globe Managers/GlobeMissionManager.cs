@@ -260,6 +260,23 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
         return new EliminateMission(missionType, enemyCount, cellIndex);
     }
+
+	/// <summary>
+	/// Releases any unresolved mission that still references a craft whose route
+	/// has been replaced, allowing that mission's timeout to resume.
+	/// </summary>
+	public void ClearCraftAssignment(Craft craft)
+	{
+		if (craft == null) return;
+
+		foreach (MissionCellDefinition missionDefinition in _activeMissions.Values)
+		{
+			if (missionDefinition?.onRouteCraft != craft) continue;
+
+			missionDefinition.SetOnRouteCraft(null);
+			missionDefinition.missionStatus &= ~Enums.MissionStatus.OnRoute;
+		}
+	}
     
 
     public void LoadMissionScene(MissionCellDefinition missionDefinition)
@@ -351,7 +368,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 		if (playerTeam != null && outcome != Enums.MissionStatus.None &&
             missionDefinition.scoreChange.TryGetValue(outcome, out int scoreChange))
         {
-            playerTeam.AddMonthlyScore(scoreChange);
+            playerTeam.AddMonthlyScore(scoreChange, GetMonthlyScoreReason(outcome));
         }
 
 		Craft craft = playerTeam == null
@@ -394,6 +411,17 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 		    return Enums.MissionStatus.Timeout;
 	    }
         return Enums.MissionStatus.None;
+    }
+
+    private static Enums.MonthlyScoreReason GetMonthlyScoreReason(Enums.MissionStatus outcome)
+    {
+	    return outcome switch
+	    {
+		    Enums.MissionStatus.Successful => Enums.MonthlyScoreReason.SuccessfulMission,
+		    Enums.MissionStatus.Failed => Enums.MonthlyScoreReason.FailedMission,
+		    Enums.MissionStatus.Timeout => Enums.MonthlyScoreReason.ExpiredMission,
+		    _ => Enums.MonthlyScoreReason.None
+	    };
     }
 
     private static Craft FindMissionCraft(GlobeTeamHolder playerTeam, Craft savedCraft)

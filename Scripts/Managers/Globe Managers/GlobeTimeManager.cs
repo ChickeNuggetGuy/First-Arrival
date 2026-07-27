@@ -16,6 +16,8 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		set => SetTimeSpeed(value);
 	}
 	[Export] private Label currentTimeUI;
+	[Export(PropertyHint.Range, "1,3600,1,or_greater")]
+	private double simulatedSecondsPerRealSecond = 20.0;
 
 	[ExportGroup("Sun / Day-Night")]
 	[Export] private DirectionalLight3D sunLight;
@@ -70,8 +72,9 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		Enums.Month.December
 	};
 
-	private Timer timer;
 	private int secondsOfDay;
+	private double accumulatedSimulatedSeconds;
+	private bool clockRunning;
 
 	#region Signals
 	[Signal]
@@ -91,13 +94,15 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 	[Signal]
 	public delegate void HourChangedEventHandler(
-		int hour
+		int hour,
+		int hoursAdvanced
 	);
 	[Signal]
 	public delegate void DayChangedEventHandler(
 		int dayOfYear,
 		int dayOfMonth,
-		Enums.Day day
+		Enums.Day day,
+		int daysAdvanced
 	);
 
 	[Signal]
@@ -116,17 +121,7 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 	{
 		RecomputeDerivedDateFields();
 		secondsOfDay = (CurrentHour * 3600) + (CurrentMinute * 60) + CurrentSeconds;
-
-		timer = new Timer
-		{
-			WaitTime = .05f,
-			OneShot = false,
-			Autostart = false,
-			Paused = true
-		};
-
-		timer.Timeout += OnTimerTimeout;
-		AddChild(timer);
+		accumulatedSimulatedSeconds = 0.0;
 
 		UpdateUI();
 		return Task.CompletedTask;
@@ -134,18 +129,14 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 	protected override Task _Execute(bool loadingData)
 	{
-		timer.Paused = false;
-		timer.Start();
+		clockRunning = true;
 		return Task.CompletedTask;
 	}
 
 	public override void Deinitialize()
 	{
-		if (timer != null)
-		{
-			timer.Timeout -= OnTimerTimeout;
-			timer.Stop();
-		}
+		clockRunning = false;
+		accumulatedSimulatedSeconds = 0.0;
 	}
 
 	public override Dictionary<string, Variant> Save()
@@ -176,18 +167,30 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		CurrentHour = data["CurrentHour"].AsInt32();
 		CurrentMinute = data["CurrentMinute"].AsInt32();
 		CurrentSeconds = data["CurrentSeconds"].AsInt32();
+		secondsOfDay = (CurrentHour * 3600) + (CurrentMinute * 60) + CurrentSeconds;
+		accumulatedSimulatedSeconds = 0.0;
+		RecomputeDerivedDateFields();
+		UpdateUI();
 		return Task.CompletedTask;
 	}
 
 	public override void _Process(double delta)
 	{
 		UpdateSunLight(delta);
-	}
 
-	private void OnTimerTimeout()
-	{
-		int add = Math.Max(0, timeSpeed);
-		AdvanceTimeBySeconds(add);
+		if (!clockRunning || timeSpeed <= 0 || delta <= 0.0) return;
+
+		accumulatedSimulatedSeconds +=
+			delta * simulatedSecondsPerRealSecond * timeSpeed;
+
+		int wholeSeconds = (int)Math.Min(
+			Math.Floor(accumulatedSimulatedSeconds),
+			int.MaxValue
+		);
+		if (wholeSeconds <= 0) return;
+
+		accumulatedSimulatedSeconds -= wholeSeconds;
+		AdvanceTimeBySeconds(wholeSeconds);
 
 		UpdateUI();
 		EmitSignal(
@@ -204,6 +207,7 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 		long total = (long)secondsOfDay + secondsToAdd;
 		int daysToAdvance = (int)(total / SecondsPerDay);
+		int hoursToAdvance = (int)((total / 3600) - (secondsOfDay / 3600));
 		secondsOfDay = (int)(total % SecondsPerDay);
 
 		if (daysToAdvance > 0)
@@ -212,9 +216,9 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		}
 		int hour = secondsOfDay / 3600;
 
-		if (hour != CurrentHour)
+		if (hoursToAdvance > 0)
 		{
-			EmitSignal(SignalName.HourChanged, hour);
+			EmitSignal(SignalName.HourChanged, hour, hoursToAdvance);
 		}
 
 		CurrentHour = hour;
@@ -224,6 +228,7 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 	private void AdvanceDateByDays(int days)
 	{
+		int daysAdvanced = days;
 		int dowShift = days % 7;
 		CurrentDay = (Enums.Day)((((int)CurrentDay - 1 + dowShift) % 7) + 1);
 
@@ -262,7 +267,13 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 
 		RecomputeDerivedDateFields();
 
-		EmitSignal(SignalName.DayChanged, CurrentDayOfYear, CurrentDayOfMonth, (int) CurrentDay);
+		EmitSignal(
+			SignalName.DayChanged,
+			CurrentDayOfYear,
+			CurrentDayOfMonth,
+			(int)CurrentDay,
+			daysAdvanced
+		);
 		EmitSignal(SignalName.DateChanged, CurrentYear, (int)CurrentMonth, CurrentDayOfMonth,  (int)CurrentDay);
 
 		if (monthChanged)

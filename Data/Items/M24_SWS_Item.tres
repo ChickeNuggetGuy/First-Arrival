@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://dx1lby7gdytrt"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://cl367i14j16se" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Preset_A_Sniper_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 22
+damage = 52
+accuracy = -18.0
+timeUnitCost = 35
+staminaCost = 5
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 34
+damage = 52
+accuracy = 35.0
+timeUnitCost = 52
+staminaCost = 5
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 4
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true, true, true, true, true])
+
+[resource]
+resource_name = "M24 Sniper Weapon System"
+script = ExtResource("3_item")
+ItemID = 161
+ItemName = "M24 Sniper Weapon System"
+ItemDescription = "Precision bolt-action 7.62 mm rifle. Slow to employ, but extremely accurate and lethal when aimed."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 8
+HistoricalIntroductionYear = 1988
+ResearchTier = 2
+RequiredResearch = "precision_rifles"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 16
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.012, 0.012, 0.012)
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+buyPrice = 2200
+sellPrice = 1540

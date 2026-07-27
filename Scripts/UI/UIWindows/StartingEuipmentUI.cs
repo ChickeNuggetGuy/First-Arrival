@@ -16,6 +16,7 @@ public partial class StartingEuipmentUI : UIWindow
 		new Dictionary<Enums.InventoryType, InventoryGridUI>();
 
 	[Export] public LoadingScreenUI loadingSCcreenUI;
+	[Export] public TextureRect unitThumbnail;
 	[Export] public Label unitNameLabel;
 	[Export] public Button acceptButton;
 	[Export] public Button previousButton;
@@ -116,7 +117,7 @@ public partial class StartingEuipmentUI : UIWindow
 
 		GridObject currentUnit = playerUnits[currentUnitIndex];
 		if (currentUnit == null) return;
-
+		unitThumbnail.Texture = currentUnit.Thumbnail;
 		unitNameLabel.Text = currentUnit.Name;
 
 		if (!currentUnit.TryGetGridObjectNode<GridObjectInventory>(out var gridObjectInventory))

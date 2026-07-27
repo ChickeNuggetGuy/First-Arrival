@@ -9,6 +9,8 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class BuySellUI : UIWindow
 {
+	private const int RecruitUnitTransactionId = int.MaxValue;
+
 	[Export] protected Tree itemTreeUI;
 	[Export] protected Texture2D buyTexture;
 	[Export] protected Texture2D sellTexture;
@@ -74,8 +76,23 @@ public partial class BuySellUI : UIWindow
 	private void ChangePendingQuantity(int itemId, int amount)
 	{
 		TeamBaseCellDefinition teamBase = GameManager.Instance.currentBase;
+		if (teamBase == null) return;
+
+		if (itemId == RecruitUnitTransactionId)
+		{
+			int newUnitChange = currentItemChange.GetValueOrDefault(itemId, 0) + amount;
+			if (newUnitChange < 0) return;
+
+			if (newUnitChange == 0) currentItemChange.Remove(itemId);
+			else currentItemChange[itemId] = newUnitChange;
+
+			UpdateDisplayedQuantity(itemId);
+			RefreshTransactionSummary();
+			return;
+		}
+
 		ItemData itemData = InventoryManager.Instance?.GetItemData(itemId);
-		if (teamBase == null || itemData == null) return;
+		if (itemData == null) return;
 
 		int oldChange = currentItemChange.GetValueOrDefault(itemId, 0);
 		int newChange = oldChange + amount;
@@ -102,6 +119,7 @@ public partial class BuySellUI : UIWindow
 		int change = 0;
 		foreach (KeyValuePair<int, int> pair in currentItemChange)
 		{
+			if (pair.Key == RecruitUnitTransactionId) continue;
 			if (InventoryManager.Instance.GetItemData(pair.Key) is Craft)
 				change += pair.Value;
 		}
@@ -113,6 +131,12 @@ public partial class BuySellUI : UIWindow
 		int cost = 0;
 		foreach (KeyValuePair<int, int> pair in currentItemChange)
 		{
+			if (pair.Key == RecruitUnitTransactionId)
+			{
+				cost += GameManager.UnitHiringCost * pair.Value;
+				continue;
+			}
+
 			ItemData itemData = InventoryManager.Instance.GetItemData(pair.Key);
 			if (itemData == null) continue;
 
@@ -142,10 +166,13 @@ public partial class BuySellUI : UIWindow
 		int cost = GetTransactionCost();
 		if (GameManager.Instance.currentBaseFunds < cost) return false;
 		if (!ValidateFinalQuantities(teamBase)) return false;
+		int unitsToHire = currentItemChange.GetValueOrDefault(RecruitUnitTransactionId, 0);
+		if (unitsToHire > 0 && !GameManager.Instance.TryAddHiredUnitsWithoutPurchase(unitsToHire))
+			return false;
 
 		foreach (KeyValuePair<int, int> pair in currentItemChange)
 		{
-			if (pair.Value >= 0) continue;
+			if (pair.Key == RecruitUnitTransactionId || pair.Value >= 0) continue;
 			ItemData itemData = InventoryManager.Instance.GetItemData(pair.Key);
 			int removeCount = -pair.Value;
 
@@ -162,7 +189,7 @@ public partial class BuySellUI : UIWindow
 
 		foreach (KeyValuePair<int, int> pair in currentItemChange)
 		{
-			if (pair.Value <= 0) continue;
+			if (pair.Key == RecruitUnitTransactionId || pair.Value <= 0) continue;
 			ItemData itemData = InventoryManager.Instance.GetItemData(pair.Key);
 
 			if (itemData is Craft craftData)
@@ -192,6 +219,12 @@ public partial class BuySellUI : UIWindow
 
 		foreach (KeyValuePair<int, int> pair in currentItemChange)
 		{
+			if (pair.Key == RecruitUnitTransactionId)
+			{
+				if (pair.Value < 0) return false;
+				continue;
+			}
+
 			ItemData itemData = InventoryManager.Instance.GetItemData(pair.Key);
 			if (itemData == null || GetOwnedCount(teamBase, itemData) + pair.Value < 0)
 				return false;
@@ -224,6 +257,12 @@ public partial class BuySellUI : UIWindow
 		}
 
 		TreeItem root = itemTreeUI.CreateItem();
+		TreeItem unitItem = itemTreeUI.CreateItem(root);
+		treeItems[RecruitUnitTransactionId] = unitItem;
+		unitItem.SetText(0, $"Unit Recruit  (${GameManager.UnitHiringCost:N0})");
+		unitItem.SetText(2, teamBase.GetStationedGridObjects().Count.ToString());
+		unitItem.AddButton(1, buyTexture, RecruitUnitTransactionId, false, "Hire unit");
+
 		foreach (ItemData itemData in inventoryManager.Database.GetAllItems())
 		{
 			if (itemData == null || !itemData.ShowInBuySellWindow) continue;
@@ -242,6 +281,14 @@ public partial class BuySellUI : UIWindow
 	private void UpdateDisplayedQuantity(int itemId)
 	{
 		if (!treeItems.TryGetValue(itemId, out TreeItem treeItem)) return;
+		if (itemId == RecruitUnitTransactionId)
+		{
+			int unitCount = GameManager.Instance.currentBase.GetStationedGridObjects().Count
+			                + currentItemChange.GetValueOrDefault(itemId, 0);
+			treeItem.SetText(2, unitCount.ToString());
+			return;
+		}
+
 		ItemData itemData = InventoryManager.Instance.GetItemData(itemId);
 		if (itemData == null) return;
 

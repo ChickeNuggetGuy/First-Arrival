@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://t5yoyoy40bfr"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://bcf0b1x3perwv" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Preset_B_Complex_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+range = 20
+damage = 25
+accuracy = -8.0
+timeUnitCost = 19
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+range = 27
+damage = 25
+accuracy = 18.0
+timeUnitCost = 30
+
+[sub_resource type="Resource" id="Auto"]
+script = ExtResource("1_ranged")
+Type = 2
+attackCount = 3
+range = 21
+damage = 25
+accuracy = -18.0
+timeUnitCost = 37
+staminaCost = 3
+confirmClick = true
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 3
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true, true, false])
+
+[resource]
+resource_name = "F2000 Prototype"
+script = ExtResource("3_item")
+ItemID = 153
+ItemName = "F2000 Prototype"
+ItemDescription = "Cutting-edge 2001 bullpup prototype offering rifle performance in a compact package."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 6
+ResearchTier = 3
+RequiredResearch = "advanced_bullpup_systems"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 9
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.009, 0.009, 0.009)
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim"), SubResource("Auto")])
+buyPrice = 2500
+sellPrice = 1750

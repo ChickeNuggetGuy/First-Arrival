@@ -198,18 +198,25 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 		_timeSignalsConnected = true;
 	}
 
-	private void OnDayChanged(int dayOfYear, int dayOfMonth, Enums.Day day)
+	private void OnDayChanged(
+		int dayOfYear,
+		int dayOfMonth,
+		Enums.Day day,
+		int daysAdvanced)
 	{
 		if (!aiEnabled) return;
 
 		if (_daysUntilNextDecision > 0)
-			_daysUntilNextDecision--;
+			_daysUntilNextDecision = Math.Max(
+				0,
+				_daysUntilNextDecision - daysAdvanced
+			);
 
 		if (_daysUntilNextDecision <= 0)
 			TryPlanOperation();
 	}
 
-	private void OnHourChanged(int hour)
+	private void OnHourChanged(int hour, int hoursAdvanced)
 	{
 		if (!aiEnabled) return;
 
@@ -219,7 +226,10 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 			AlienOperation operation = _operations[i];
 			if (operation.Stage != AlienOperationStage.Preparing) continue;
 
-			operation.HoursRemaining = Math.Max(0, operation.HoursRemaining - 1);
+			operation.HoursRemaining = Math.Max(
+				0,
+				operation.HoursRemaining - hoursAdvanced
+			);
 			if (operation.HoursRemaining > 0) continue;
 
 			DispatchOperation(operation);

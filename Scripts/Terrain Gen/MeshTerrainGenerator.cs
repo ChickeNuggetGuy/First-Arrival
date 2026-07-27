@@ -40,17 +40,31 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	[ExportGroup("Instanced Grass")]
 	[Export] private bool generateGrass = true;
-	[Export(PropertyHint.Range, "0,8,1")]
-	private int grassBladesPerCell = 2;
-	[Export(PropertyHint.Range, "2,8,1")]
-	private int grassCardsPerClump = 5;
+	[Export(PropertyHint.Range, "0,32,1")]
+	private int grassBladesPerCell = 16;
+	[Export(PropertyHint.Range, "2,6,1")]
+	private int grassCardsPerClump = 3;
+	[Export(PropertyHint.Range, "2,6,1")]
+	private int grassBladeSegments = 3;
 	[Export(PropertyHint.Range, "0.05,2.0,0.01")]
-	private float grassBladeHeight = 0.45f;
+	private float grassBladeHeight = 0.55f;
 	[Export(PropertyHint.Range, "0.01,1.0,0.01")]
-	private float grassBladeWidth = 0.09f;
+	private float grassBladeWidth = 0.08f;
+	[Export] private bool grassUnshaded = true;
+	[Export] private bool grassUseTerrainBaseColor = false;
 	[Export] private ShaderMaterial grassMaterial { get; set; }
 
 	public Vector3[,] terrainHeights { get; set; }
+	public float GrassVisualHeight => grassBladeHeight * 1.5f;
+
+	[ExportGroup("Structure Spawning")]
+	[Export]
+	private TerrainStructureDefinition[] structureDefinitions { get; set; } =
+		System.Array.Empty<TerrainStructureDefinition>();
+
+	[Export] private int structureSeed { get; set; } = 1729;
+	[Export] private Node3D structureContainer { get; set; }
+	[Export] private bool logStructurePlacements { get; set; } = false;
 
 	[ExportGroup("Chunk Overrides")]
 	[Export]
@@ -88,8 +102,19 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	private Array<ChunkData> chunkTypes;
 	private bool[,] lockedVertices;
 	private readonly RandomNumberGenerator rng = new();
+	private readonly List<StructurePlacement> structurePlacements = new();
+	private readonly HashSet<Vector2I> structureOccupiedCells = new();
+	private readonly HashSet<Vector2I> grassExcludedCells = new();
 
 	private readonly System.Collections.Generic.Dictionary<string, PackedScene> packedSceneCache = new();
+
+	private sealed class StructurePlacement
+	{
+		public int DefinitionIndex;
+		public Vector2I AnchorCell;
+		public int QuarterTurns;
+		public float TerrainHeight;
+	}
 
 	#endregion
 
@@ -120,7 +145,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 		BuildChunkTypesForCurrentMap();
 
-		if (generateTerrainMesh)
+		if (generateTerrainMesh && (!HasLoadedData || terrainHeights == null))
 		{
 			GenerateHeightMap();
 			GD.Print("MeshTerrainGenerator: base height data ready.");
@@ -181,6 +206,41 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		// Only generate mesh terrain when procedural terrain is enabled
 		if (generateTerrainMesh)
 		{
+			if (grassMaterial != null)
+			{
+				grassMaterial.SetShaderParameter("stylized_unshaded", grassUnshaded);
+				grassMaterial.SetShaderParameter(
+					"use_terrain_base_color",
+					grassUseTerrainBaseColor
+				);
+
+				if (
+					grassUseTerrainBaseColor
+					&& chunkMaterial is ShaderMaterial terrainMaterial
+				)
+				{
+					Variant terrainColor =
+						terrainMaterial.GetShaderParameter("terrain_color");
+					if (terrainColor.VariantType == Variant.Type.Color)
+					{
+						grassMaterial.SetShaderParameter(
+							"terrain_base_color",
+							terrainColor.AsColor()
+						);
+					}
+				}
+				else if (
+					grassUseTerrainBaseColor
+					&& chunkMaterial is StandardMaterial3D standardTerrainMaterial
+				)
+				{
+					grassMaterial.SetShaderParameter(
+						"terrain_base_color",
+						standardTerrainMaterial.AlbedoColor
+					);
+				}
+			}
+
 			if (!HasLoadedData)
 			{
 				await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
@@ -194,6 +254,12 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 					terrainValidationPasses,
 					GetTerrainHeightStep() * maxAdjacentHeightSteps
 				);
+
+				GenerateStructurePlacements();
+			}
+			else
+			{
+				RebuildStructureMasksFromPlacements();
 			}
 
 			for (int chunkX = 0; chunkX < gameManager.mapSize.X; chunkX++)
@@ -217,12 +283,15 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 						generateGrass ? grassMaterial : null,
 						generateGrass ? grassBladesPerCell : 0,
 						grassCardsPerClump,
+						grassBladeSegments,
 						grassBladeHeight,
-						grassBladeWidth
+						grassBladeWidth,
+						grassExcludedCells
 					);
 				}
 			}
 
+			SpawnGeneratedStructures();
 			GD.Print($"MeshTerrainGenerator: chunks built. {GetMapSize()}");
 		}
 
@@ -811,6 +880,609 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	#endregion
 
+	#region Structure Placement
+
+	private void GenerateStructurePlacements()
+	{
+		structurePlacements.Clear();
+		structureOccupiedCells.Clear();
+		grassExcludedCells.Clear();
+
+		if (
+			terrainHeights == null
+			|| structureDefinitions == null
+			|| structureDefinitions.Length == 0
+		)
+			return;
+
+		ulong resolvedSeed = structureSeed != 0
+			? unchecked((ulong)(long)structureSeed)
+			: terrainSeed != 0
+				? unchecked((ulong)(long)terrainSeed)
+				: rng.Randi();
+		var structureRng = new RandomNumberGenerator { Seed = resolvedSeed };
+
+		int mapCellsX = terrainHeights.GetLength(0) - 1;
+		int mapCellsZ = terrainHeights.GetLength(1) - 1;
+
+		for (int definitionIndex = 0; definitionIndex < structureDefinitions.Length; definitionIndex++)
+		{
+			TerrainStructureDefinition definition = structureDefinitions[definitionIndex];
+			if (
+				definition == null
+				|| !definition.Enabled
+				|| definition.SpawnCount <= 0
+			)
+				continue;
+
+			if (definition.StructureScene == null || definition.Footprint == null)
+			{
+				GD.PushWarning(
+					$"MeshTerrainGenerator: Structure definition {definitionIndex} needs both "
+					+ "a StructureScene and a GridShape footprint."
+				);
+				continue;
+			}
+
+			if (GetFootprintOffsets(definition.Footprint, 0).Count == 0)
+			{
+				GD.PushWarning(
+					$"MeshTerrainGenerator: Structure definition {definitionIndex} has no "
+					+ "occupied footprint cells."
+				);
+				continue;
+			}
+
+			for (int spawnIndex = 0; spawnIndex < definition.SpawnCount; spawnIndex++)
+			{
+				bool placed = false;
+				bool usesFixedAnchor =
+					definition.Location
+					== TerrainStructureDefinition.LocationMode.FixedAnchor;
+				int attempts = usesFixedAnchor
+					? 1
+					: Mathf.Max(1, definition.AttemptsPerInstance);
+
+				for (int attempt = 0; attempt < attempts; attempt++)
+				{
+					int quarterTurns = definition.AllowQuarterTurns
+						? structureRng.RandiRange(0, 3)
+						: 0;
+					List<Vector2I> offsets =
+						GetFootprintOffsets(definition.Footprint, quarterTurns);
+
+					int minOffsetX = offsets.Min(offset => offset.X);
+					int maxOffsetX = offsets.Max(offset => offset.X);
+					int minOffsetZ = offsets.Min(offset => offset.Y);
+					int maxOffsetZ = offsets.Max(offset => offset.Y);
+					int padding = Mathf.Max(0, definition.EdgePaddingCells);
+
+					int minAnchorX = padding - minOffsetX;
+					int maxAnchorX = mapCellsX - 1 - padding - maxOffsetX;
+					int minAnchorZ = padding - minOffsetZ;
+					int maxAnchorZ = mapCellsZ - 1 - padding - maxOffsetZ;
+					if (minAnchorX > maxAnchorX || minAnchorZ > maxAnchorZ)
+						break;
+
+					Vector2I anchor = usesFixedAnchor
+						? definition.FixedAnchorCell
+						: new Vector2I(
+							structureRng.RandiRange(minAnchorX, maxAnchorX),
+							structureRng.RandiRange(minAnchorZ, maxAnchorZ)
+						);
+					if (
+						anchor.X < minAnchorX
+						|| anchor.X > maxAnchorX
+						|| anchor.Y < minAnchorZ
+						|| anchor.Y > maxAnchorZ
+					)
+						continue;
+
+					if (
+						!TryEvaluateStructureCandidate(
+							definition,
+							anchor,
+							offsets,
+							out List<Vector2I> footprintCells,
+							out HashSet<Vector2I> footprintVertices,
+							out float targetHeight
+						)
+					)
+						continue;
+
+					if (
+						definition.Interaction
+						== TerrainStructureDefinition.TerrainInteraction.FlattenAndBlend
+					)
+					{
+						FlattenAndBlendStructureSite(
+							definition,
+							footprintVertices,
+							targetHeight
+						);
+					}
+					else
+					{
+						foreach (Vector2I vertex in footprintVertices)
+							lockedVertices[vertex.X, vertex.Y] = true;
+					}
+
+					var placement = new StructurePlacement
+					{
+						DefinitionIndex = definitionIndex,
+						AnchorCell = anchor,
+						QuarterTurns = quarterTurns,
+						TerrainHeight = targetHeight
+					};
+					structurePlacements.Add(placement);
+					ReserveStructureCells(definition, footprintCells);
+					placed = true;
+
+					if (logStructurePlacements)
+					{
+						GD.Print(
+							$"MeshTerrainGenerator: Placed structure definition "
+							+ $"{definitionIndex} at {anchor}, rotation {quarterTurns * 90}°."
+						);
+					}
+					break;
+				}
+
+				if (!placed)
+				{
+					GD.PushWarning(
+						$"MeshTerrainGenerator: Could not place structure definition "
+						+ $"{definitionIndex} instance {spawnIndex + 1}/"
+						+ $"{definition.SpawnCount} after {attempts} attempts."
+					);
+				}
+			}
+		}
+
+		if (structurePlacements.Count == 0)
+			return;
+
+		ClampHeightsToMin(minHeightY, includeManMade: false);
+		ValidateHeights(
+			terrainHeights,
+			terrainValidationPasses,
+			GetTerrainHeightStep() * maxAdjacentHeightSteps
+		);
+
+		GD.Print(
+			$"MeshTerrainGenerator: Prepared {structurePlacements.Count} terrain "
+			+ "structure placement(s)."
+		);
+	}
+
+	private bool TryEvaluateStructureCandidate(
+		TerrainStructureDefinition definition,
+		Vector2I anchor,
+		List<Vector2I> offsets,
+		out List<Vector2I> footprintCells,
+		out HashSet<Vector2I> footprintVertices,
+		out float targetHeight
+	)
+	{
+		footprintCells = new List<Vector2I>(offsets.Count);
+		footprintVertices = new HashSet<Vector2I>();
+		targetHeight = 0f;
+
+		int mapCellsX = terrainHeights.GetLength(0) - 1;
+		int mapCellsZ = terrainHeights.GetLength(1) - 1;
+		int separation = Mathf.Max(0, definition.SeparationCells);
+
+		foreach (Vector2I offset in offsets)
+		{
+			Vector2I cell = anchor + offset;
+			if (
+				cell.X < 0
+				|| cell.Y < 0
+				|| cell.X >= mapCellsX
+				|| cell.Y >= mapCellsZ
+			)
+				return false;
+
+			if (definition.AvoidManMadeChunks && IsManMadeCell(cell))
+				return false;
+
+			for (int dz = -separation; dz <= separation; dz++)
+			{
+				for (int dx = -separation; dx <= separation; dx++)
+				{
+					if (structureOccupiedCells.Contains(cell + new Vector2I(dx, dz)))
+						return false;
+				}
+			}
+
+			footprintCells.Add(cell);
+			footprintVertices.Add(cell);
+			footprintVertices.Add(cell + Vector2I.Right);
+			footprintVertices.Add(cell + Vector2I.Down);
+			footprintVertices.Add(cell + Vector2I.One);
+		}
+
+		var sampledHeights = new List<float>(footprintVertices.Count);
+		float minHeight = float.PositiveInfinity;
+		float maxHeight = float.NegativeInfinity;
+		foreach (Vector2I vertex in footprintVertices)
+		{
+			if (definition.AvoidManMadeChunks && lockedVertices[vertex.X, vertex.Y])
+				return false;
+
+			float height = terrainHeights[vertex.X, vertex.Y].Y;
+			sampledHeights.Add(height);
+			minHeight = Mathf.Min(minHeight, height);
+			maxHeight = Mathf.Max(maxHeight, height);
+		}
+
+		if (
+			definition.Interaction
+				== TerrainStructureDefinition.TerrainInteraction.FitExistingTerrain
+			&& maxHeight - minHeight > Mathf.Max(0f, definition.MaxHeightDifference)
+		)
+			return false;
+
+		sampledHeights.Sort();
+		int middle = sampledHeights.Count / 2;
+		float median = sampledHeights.Count % 2 == 0
+			? (sampledHeights[middle - 1] + sampledHeights[middle]) * 0.5f
+			: sampledHeights[middle];
+		targetHeight = QuantizeHeight(Mathf.Max(minHeightY, median));
+		return true;
+	}
+
+	private void FlattenAndBlendStructureSite(
+		TerrainStructureDefinition definition,
+		HashSet<Vector2I> footprintVertices,
+		float targetHeight
+	)
+	{
+		foreach (Vector2I vertexCoords in footprintVertices)
+		{
+			Vector3 vertex = terrainHeights[vertexCoords.X, vertexCoords.Y];
+			vertex.Y = targetHeight;
+			terrainHeights[vertexCoords.X, vertexCoords.Y] = vertex;
+			lockedVertices[vertexCoords.X, vertexCoords.Y] = true;
+		}
+
+		int radius = Mathf.Max(0, definition.BlendRadiusCells);
+		if (radius == 0)
+			return;
+
+		int minX = Mathf.Max(0, footprintVertices.Min(vertex => vertex.X) - radius);
+		int maxX = Mathf.Min(
+			terrainHeights.GetLength(0) - 1,
+			footprintVertices.Max(vertex => vertex.X) + radius
+		);
+		int minZ = Mathf.Max(0, footprintVertices.Min(vertex => vertex.Y) - radius);
+		int maxZ = Mathf.Min(
+			terrainHeights.GetLength(1) - 1,
+			footprintVertices.Max(vertex => vertex.Y) + radius
+		);
+		float exponent = Mathf.Max(0.0001f, definition.BlendExponent);
+
+		for (int z = minZ; z <= maxZ; z++)
+		{
+			for (int x = minX; x <= maxX; x++)
+			{
+				var coords = new Vector2I(x, z);
+				if (footprintVertices.Contains(coords) || lockedVertices[x, z])
+					continue;
+
+				float distance = float.PositiveInfinity;
+				foreach (Vector2I footprintVertex in footprintVertices)
+				{
+					distance = Mathf.Min(distance, coords.DistanceTo(footprintVertex));
+				}
+
+				if (distance > radius)
+					continue;
+
+				float transition = Smooth01(
+					Mathf.Pow(Mathf.Clamp(distance / radius, 0f, 1f), exponent)
+				);
+				Vector3 vertex = terrainHeights[x, z];
+				vertex.Y = QuantizeHeight(
+					Mathf.Lerp(targetHeight, vertex.Y, transition)
+				);
+				terrainHeights[x, z] = vertex;
+			}
+		}
+	}
+
+	private void ReserveStructureCells(
+		TerrainStructureDefinition definition,
+		IEnumerable<Vector2I> footprintCells
+	)
+	{
+		int mapCellsX = terrainHeights.GetLength(0) - 1;
+		int mapCellsZ = terrainHeights.GetLength(1) - 1;
+		int grassClearance = Mathf.Max(0, definition.GrassClearanceCells);
+
+		foreach (Vector2I cell in footprintCells)
+		{
+			structureOccupiedCells.Add(cell);
+			for (int dz = -grassClearance; dz <= grassClearance; dz++)
+			{
+				for (int dx = -grassClearance; dx <= grassClearance; dx++)
+				{
+					Vector2I grassCell = cell + new Vector2I(dx, dz);
+					if (
+						grassCell.X >= 0
+						&& grassCell.Y >= 0
+						&& grassCell.X < mapCellsX
+						&& grassCell.Y < mapCellsZ
+					)
+						grassExcludedCells.Add(grassCell);
+				}
+			}
+		}
+	}
+
+	private bool IsManMadeCell(Vector2I cell)
+	{
+		int chunkX = cell.X / chunkSize;
+		int chunkZ = cell.Y / chunkSize;
+		if (
+			chunkX < 0
+			|| chunkZ < 0
+			|| chunkX >= GameManager.Instance.mapSize.X
+			|| chunkZ >= GameManager.Instance.mapSize.Y
+		)
+			return false;
+
+		return GetChunkData(chunkX, chunkZ).chunkType == ChunkData.ChunkType.ManMade;
+	}
+
+	private static List<Vector2I> GetFootprintOffsets(
+		GridShape footprint,
+		int quarterTurns
+	)
+	{
+		var uniqueOffsets = new HashSet<Vector2I>();
+		if (footprint == null)
+			return uniqueOffsets.ToList();
+
+		foreach (Vector3I localCell in footprint.GetOccupiedLocalCells())
+		{
+			var relative = new Vector2I(
+				localCell.X - footprint.PivotCell.X,
+				localCell.Z - footprint.PivotCell.Z
+			);
+			uniqueOffsets.Add(RotateQuarterTurns(relative, quarterTurns));
+		}
+
+		return uniqueOffsets.ToList();
+	}
+
+	private static Vector2I RotateQuarterTurns(Vector2I value, int quarterTurns)
+	{
+		return Mathf.PosMod(quarterTurns, 4) switch
+		{
+			1 => new Vector2I(value.Y, -value.X),
+			2 => new Vector2I(-value.X, -value.Y),
+			3 => new Vector2I(-value.Y, value.X),
+			_ => value
+		};
+	}
+
+	private void RebuildStructureMasksFromPlacements()
+	{
+		structureOccupiedCells.Clear();
+		grassExcludedCells.Clear();
+
+		foreach (StructurePlacement placement in structurePlacements)
+		{
+			if (!TryGetStructureDefinition(placement.DefinitionIndex, out var definition))
+				continue;
+
+			List<Vector2I> offsets =
+				GetFootprintOffsets(definition.Footprint, placement.QuarterTurns);
+			ReserveStructureCells(
+				definition,
+				offsets.Select(offset => placement.AnchorCell + offset)
+			);
+		}
+	}
+
+	private void SpawnGeneratedStructures()
+	{
+		if (structureContainer != null && IsInstanceValid(structureContainer))
+		{
+			foreach (Node child in structureContainer.GetChildren())
+			{
+				if (!child.IsInGroup("GeneratedTerrainStructures"))
+					continue;
+
+				structureContainer.RemoveChild(child);
+				child.QueueFree();
+			}
+		}
+
+		if (structurePlacements.Count == 0)
+			return;
+
+		if (structureContainer == null || !IsInstanceValid(structureContainer))
+		{
+			structureContainer = new Node3D { Name = "GeneratedStructures" };
+			AddChild(structureContainer);
+		}
+
+		int spawnedCount = 0;
+		foreach (StructurePlacement placement in structurePlacements)
+		{
+			if (
+				!TryGetStructureDefinition(placement.DefinitionIndex, out var definition)
+				|| definition.StructureScene == null
+			)
+				continue;
+
+			Node sceneRoot = definition.StructureScene.Instantiate();
+			if (sceneRoot is not Node3D structure)
+			{
+				GD.PushWarning(
+					$"MeshTerrainGenerator: Structure scene "
+					+ $"{definition.StructureScene.ResourcePath} must have a Node3D root."
+				);
+				sceneRoot.QueueFree();
+				continue;
+			}
+
+			RotateNestedManualGridShapes(structure, placement.QuarterTurns);
+			if (definition.ApplyFootprintToGridPositionData)
+			{
+				GridShape rotatedFootprint =
+					CreateRotatedGridShape(definition.Footprint, placement.QuarterTurns);
+				ApplyFootprintToGridPositionData(structure, rotatedFootprint);
+			}
+
+			structureContainer.AddChild(structure, forceReadableName: true);
+			structure.AddToGroup("GeneratedTerrainStructures");
+			structure.GlobalPosition = new Vector3(
+				(placement.AnchorCell.X + 0.5f) * cellSize.X,
+				placement.TerrainHeight + definition.HeightOffset,
+				(placement.AnchorCell.Y + 0.5f) * cellSize.X
+			);
+			Vector3 rotation = structure.GlobalRotation;
+			rotation.Y += placement.QuarterTurns * Mathf.Pi * 0.5f;
+			structure.GlobalRotation = rotation;
+
+			GridPositionData anchorData = FindFirstGridPositionData(structure);
+			if (anchorData != null)
+			{
+				Vector3 adjustedPosition = structure.GlobalPosition;
+				adjustedPosition.X +=
+					(placement.AnchorCell.X + 0.5f) * cellSize.X
+					- anchorData.GlobalPosition.X;
+				adjustedPosition.Z +=
+					(placement.AnchorCell.Y + 0.5f) * cellSize.X
+					- anchorData.GlobalPosition.Z;
+				structure.GlobalPosition = adjustedPosition;
+			}
+
+			spawnedCount++;
+		}
+
+		if (spawnedCount > 0)
+			GD.Print($"MeshTerrainGenerator: Spawned {spawnedCount} terrain structure(s).");
+	}
+
+	private bool TryGetStructureDefinition(
+		int definitionIndex,
+		out TerrainStructureDefinition definition
+	)
+	{
+		definition = null;
+		if (
+			structureDefinitions == null
+			|| definitionIndex < 0
+			|| definitionIndex >= structureDefinitions.Length
+		)
+			return false;
+
+		definition = structureDefinitions[definitionIndex];
+		return definition != null && definition.Enabled && definition.Footprint != null;
+	}
+
+	private static GridShape CreateRotatedGridShape(
+		GridShape source,
+		int quarterTurns
+	)
+	{
+		if (source == null)
+			return new GridShape();
+
+		var rotatedCells = new List<Vector3I>();
+		foreach (Vector3I localCell in source.GetOccupiedLocalCells())
+		{
+			var relativeXZ = new Vector2I(
+				localCell.X - source.PivotCell.X,
+				localCell.Z - source.PivotCell.Z
+			);
+			Vector2I rotatedXZ = RotateQuarterTurns(relativeXZ, quarterTurns);
+			rotatedCells.Add(
+				new Vector3I(
+					rotatedXZ.X,
+					localCell.Y - source.PivotCell.Y,
+					rotatedXZ.Y
+				)
+			);
+		}
+
+		if (rotatedCells.Count == 0)
+			return new GridShape();
+
+		int minX = rotatedCells.Min(cell => cell.X);
+		int maxX = rotatedCells.Max(cell => cell.X);
+		int minZ = rotatedCells.Min(cell => cell.Z);
+		int maxZ = rotatedCells.Max(cell => cell.Z);
+		var rotated = new GridShape
+		{
+			SizeX = maxX - minX + 1,
+			SizeY = source.SizeY,
+			SizeZ = maxZ - minZ + 1,
+			PivotCell = new Vector3I(-minX, source.PivotCell.Y, -minZ)
+		};
+		rotated.FillAll(false);
+
+		foreach (Vector3I relativeCell in rotatedCells)
+		{
+			rotated.SetOccupied(
+				relativeCell.X - minX,
+				relativeCell.Y + rotated.PivotCell.Y,
+				relativeCell.Z - minZ,
+				true
+			);
+		}
+
+		return rotated;
+	}
+
+	private static void RotateNestedManualGridShapes(Node node, int quarterTurns)
+	{
+		if (
+			Mathf.PosMod(quarterTurns, 4) != 0
+			&& node is GridPositionData positionData
+			&& !positionData.AutoCalculateShape
+			&& positionData.Shape != null
+		)
+		{
+			positionData.Shape =
+				CreateRotatedGridShape(positionData.Shape, quarterTurns);
+		}
+
+		foreach (Node child in node.GetChildren())
+			RotateNestedManualGridShapes(child, quarterTurns);
+	}
+
+	private static void ApplyFootprintToGridPositionData(
+		Node node,
+		GridShape rotatedFootprint
+	)
+	{
+		GridPositionData positionData = FindFirstGridPositionData(node);
+		if (positionData != null && !positionData.AutoCalculateShape)
+			positionData.Shape = rotatedFootprint.Duplicate(true) as GridShape;
+	}
+
+	private static GridPositionData FindFirstGridPositionData(Node node)
+	{
+		if (node is GridPositionData positionData)
+			return positionData;
+
+		foreach (Node child in node.GetChildren())
+		{
+			GridPositionData found = FindFirstGridPositionData(child);
+			if (found != null)
+				return found;
+		}
+
+		return null;
+	}
+
+	#endregion
+
 	#region Chunk Node Management
 
 	private PackedScene LoadPackedSceneCached(string prefabPath)
@@ -1212,12 +1884,33 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			}
 		}
 
+		int placementCount = structurePlacements.Count;
+		int[] definitionIndices = new int[placementCount];
+		int[] anchorCellsX = new int[placementCount];
+		int[] anchorCellsZ = new int[placementCount];
+		int[] quarterTurns = new int[placementCount];
+		float[] placementHeights = new float[placementCount];
+		for (int i = 0; i < placementCount; i++)
+		{
+			StructurePlacement placement = structurePlacements[i];
+			definitionIndices[i] = placement.DefinitionIndex;
+			anchorCellsX[i] = placement.AnchorCell.X;
+			anchorCellsZ[i] = placement.AnchorCell.Y;
+			quarterTurns[i] = placement.QuarterTurns;
+			placementHeights[i] = placement.TerrainHeight;
+		}
+
 		return new Godot.Collections.Dictionary<string, Variant>
 		{
 			{ "GridWidth", width },
 			{ "GridDepth", depth },
 			{ "Heights", flatHeights },
-			{ "LockedVertices", flatLocked }
+			{ "LockedVertices", flatLocked },
+			{ "StructureDefinitionIndices", definitionIndices },
+			{ "StructureAnchorCellsX", anchorCellsX },
+			{ "StructureAnchorCellsZ", anchorCellsZ },
+			{ "StructureQuarterTurns", quarterTurns },
+			{ "StructurePlacementHeights", placementHeights }
 		};
 	}
 
@@ -1232,6 +1925,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		if (data == null || !data.ContainsKey("Heights"))
 		{
 			HasLoadedData = false;
+			structurePlacements.Clear();
 			return Task.CompletedTask;
 		}
 
@@ -1260,6 +1954,45 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 				if (flatLocked != null)
 					lockedVertices[x, z] = flatLocked[index] > 0;
+			}
+		}
+
+		structurePlacements.Clear();
+		if (
+			data.ContainsKey("StructureDefinitionIndices")
+			&& data.ContainsKey("StructureAnchorCellsX")
+			&& data.ContainsKey("StructureAnchorCellsZ")
+			&& data.ContainsKey("StructureQuarterTurns")
+			&& data.ContainsKey("StructurePlacementHeights")
+		)
+		{
+			int[] definitionIndices =
+				data["StructureDefinitionIndices"].As<int[]>();
+			int[] anchorCellsX = data["StructureAnchorCellsX"].As<int[]>();
+			int[] anchorCellsZ = data["StructureAnchorCellsZ"].As<int[]>();
+			int[] quarterTurns = data["StructureQuarterTurns"].As<int[]>();
+			float[] placementHeights =
+				data["StructurePlacementHeights"].As<float[]>();
+			int placementCount = new[]
+			{
+				definitionIndices.Length,
+				anchorCellsX.Length,
+				anchorCellsZ.Length,
+				quarterTurns.Length,
+				placementHeights.Length
+			}.Min();
+
+			for (int i = 0; i < placementCount; i++)
+			{
+				structurePlacements.Add(
+					new StructurePlacement
+					{
+						DefinitionIndex = definitionIndices[i],
+						AnchorCell = new Vector2I(anchorCellsX[i], anchorCellsZ[i]),
+						QuarterTurns = Mathf.PosMod(quarterTurns[i], 4),
+						TerrainHeight = placementHeights[i]
+					}
+				);
 			}
 		}
 

@@ -1,6 +1,6 @@
 using Godot;
 using System;
-using System.Linq; // Needed for sorting
+using System.Linq;
 using System.Collections.Generic;
 using FirstArrival.Scripts.Inventory_System;
 
@@ -37,7 +37,6 @@ public partial class ItemDatabase : Resource
 			return;
 		}
 
-		// 1. Collect all valid items into a temporary list
 		List<ItemInfo> foundItems = new List<ItemInfo>();
 
 		using var dir = DirAccess.Open(DirectoryPath);
@@ -58,7 +57,7 @@ public partial class ItemDatabase : Resource
 						
 						if (rawRes is ItemData item)
 						{
-							foundItems.Add(new ItemInfo { Data = item, FileName = fileName, FullPath = fullPath });
+							foundItems.Add(new ItemInfo { Data = item, FileName = fileName });
 						}
 					}
 					catch (System.Exception e)
@@ -70,44 +69,40 @@ public partial class ItemDatabase : Resource
 			}
 		}
 
-		// 2. Sort them Alphabetically by Filename
-		// This ensures that 'Apple.tres' always gets a lower ID than 'Sword.tres',
-		// making the ID assignment deterministic/stable.
-		foundItems.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
-
-		// 3. Re-assign IDs sequentially
-		int newIdCounter = 0;
-		int fixedCount = 0;
+		foundItems.Sort((a, b) =>
+		{
+			int idComparison = a.Data.ItemID.CompareTo(b.Data.ItemID);
+			return idComparison != 0
+				? idComparison
+				: string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase);
+		});
 
 		foreach (var info in foundItems)
 		{
 			ItemData item = info.Data;
 
-			// Check if ID needs update
-			if (item.ItemID != newIdCounter)
+			if (item.ItemID < 0)
 			{
-				// Use Set because the setter is protected
-				item.Set("ItemID", newIdCounter);
-				
-				// SAVE the change to disk so it sticks
-				ResourceSaver.Save(item, info.FullPath);
-				fixedCount++;
+				GD.PushError(
+					$"[ItemDatabase] '{info.FileName}' has no stable ItemID. " +
+					"Assign a non-negative ID before adding it to the database."
+				);
+				continue;
 			}
 
-			// Add to dictionary
-			if (!Items.ContainsKey(newIdCounter))
+			if (Items.ContainsKey(item.ItemID))
 			{
-				Items.Add(newIdCounter, item);
+				GD.PushError(
+					$"[ItemDatabase] Duplicate ItemID {item.ItemID} in '{info.FileName}'. " +
+					$"Keeping '{Items[item.ItemID].ItemName}' and skipping '{item.ItemName}'."
+				);
+				continue;
 			}
 
-			newIdCounter++;
+			Items.Add(item.ItemID, item);
 		}
     
 		EmitChanged();
-		
-		if (fixedCount > 0)
-			GD.Print($"[ItemDatabase] Auto-fixed {fixedCount} IDs.");
-			
 		GD.Print($"[ItemDatabase] Scan complete. Database contains {Items.Count} items.");
 	}
 
@@ -126,6 +121,5 @@ public partial class ItemDatabase : Resource
 	{
 		public ItemData Data;
 		public string FileName;
-		public string FullPath;
 	}
 }

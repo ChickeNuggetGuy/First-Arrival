@@ -77,9 +77,11 @@ public partial class Chunk : Node3D
         Material material,
         ShaderMaterial grassMaterial = null,
         int grassBladesPerCell = 0,
-		int grassCardsPerClump = 5,
-        float grassBladeHeight = 0.45f,
-        float grassBladeWidth = 0.09f
+        int grassCardsPerClump = 3,
+        int grassBladeSegments = 3,
+        float grassBladeHeight = 0.55f,
+        float grassBladeWidth = 0.08f,
+        ISet<Vector2I> grassExcludedCells = null
     )
     {
         if (chunkData.chunkType == ChunkData.ChunkType.ManMade)
@@ -139,8 +141,10 @@ public partial class Chunk : Node3D
             grassMaterial,
             grassBladesPerCell,
             grassCardsPerClump,
+            grassBladeSegments,
             grassBladeHeight,
-            grassBladeWidth
+            grassBladeWidth,
+            grassExcludedCells
         );
 
         if (meshInstance.GetChildCount() > 0)
@@ -161,57 +165,120 @@ public partial class Chunk : Node3D
     private void GenerateGrass(
         ShaderMaterial grassMaterial,
         int bladesPerCell,
-		int cardsPerClump,
+        int cardsPerClump,
+        int bladeSegments,
         float bladeHeight,
-        float bladeWidth
+        float bladeWidth,
+        ISet<Vector2I> excludedCells
     )
     {
         var existingGrass = GetNodeOrNull<MultiMeshInstance3D>("Grass");
-        existingGrass?.QueueFree();
+        if (existingGrass != null)
+        {
+            RemoveChild(existingGrass);
+            existingGrass.QueueFree();
+        }
 
         if (grassMaterial == null || bladesPerCell <= 0 || localVertices == null)
             return;
 
-        var grass = new MultiMeshInstance3D { Name = "Grass" };
+        var grass = new MultiMeshInstance3D
+        {
+            Name = "Grass",
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            ExtraCullMargin = bladeHeight
+        };
         var bladeMesh = CreateGrassClumpMesh(
             bladeWidth,
             bladeHeight,
             Mathf.Max(2, cardsPerClump),
+            Mathf.Max(2, bladeSegments),
             grassMaterial
         );
 
-        int bladeCount = chunkSize * chunkSize * bladesPerCell;
+        int includedCellCount = 0;
+        for (int z = 0; z < chunkSize; z++)
+        {
+            for (int x = 0; x < chunkSize; x++)
+            {
+                var globalCell = new Vector2I(
+                    gridCoords.X * chunkSize + x,
+                    gridCoords.Y * chunkSize + z
+                );
+                if (excludedCells == null || !excludedCells.Contains(globalCell))
+                    includedCellCount++;
+            }
+        }
+
+        int bladeCount = includedCellCount * bladesPerCell;
+        if (bladeCount <= 0)
+            return;
+
+        float windMargin = Mathf.Max(bladeWidth * 2f, bladeHeight * 0.75f);
+        float chunkWorldSize = chunkSize * cellSize;
         var multiMesh = new MultiMesh
         {
             TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
             InstanceCount = bladeCount,
             Mesh = bladeMesh,
             CustomAabb = new Aabb(
-                Vector3.Zero,
-                new Vector3(chunkSize * cellSize, bladeHeight * 1.5f, chunkSize * cellSize)
+                new Vector3(-windMargin, -0.05f, -windMargin),
+                new Vector3(
+                    chunkWorldSize + windMargin * 2f,
+                    bladeHeight * 1.75f + 0.05f,
+                    chunkWorldSize + windMargin * 2f
+                )
             )
         };
 
+        // A jittered grid fills each terrain cell more evenly than unrelated random
+        // points. Hashing global cell coordinates prevents a visible repeated pattern
+        // at every chunk boundary.
+        int strataX = Mathf.CeilToInt(Mathf.Sqrt(bladesPerCell));
+        int strataZ = Mathf.CeilToInt((float)bladesPerCell / strataX);
         int instance = 0;
         for (int z = 0; z < chunkSize; z++)
         {
             for (int x = 0; x < chunkSize; x++)
             {
+                int globalCellX = gridCoords.X * chunkSize + x;
+                int globalCellZ = gridCoords.Y * chunkSize + z;
+                if (
+                    excludedCells != null
+                    && excludedCells.Contains(new Vector2I(globalCellX, globalCellZ))
+                )
+                    continue;
+
                 for (int blade = 0; blade < bladesPerCell; blade++)
                 {
-                    float xFraction = Hash01(x, z, blade, 17);
-                    float zFraction = Hash01(x, z, blade, 59);
-                    float scale = Mathf.Lerp(0.7f, 1.25f, Hash01(x, z, blade, 101));
-                    float yaw = Hash01(x, z, blade, 149) * Mathf.Tau;
+                    int stratumX = blade % strataX;
+                    int stratumZ = blade / strataX;
+                    float xJitter = Hash01(globalCellX, globalCellZ, blade, 17);
+                    float zJitter = Hash01(globalCellX, globalCellZ, blade, 59);
+                    float xFraction = (stratumX + xJitter) / strataX;
+                    float zFraction = (stratumZ + zJitter) / strataZ;
+                    float heightScale = Mathf.Lerp(
+                        0.72f,
+                        1.3f,
+                        Hash01(globalCellX, globalCellZ, blade, 101)
+                    );
+                    float widthScale = Mathf.Lerp(
+                        0.78f,
+                        1.18f,
+                        Hash01(globalCellX, globalCellZ, blade, 127)
+                    );
+                    float yaw =
+                        Hash01(globalCellX, globalCellZ, blade, 149) * Mathf.Tau;
 
                     float height = SampleLocalHeight(x, z, xFraction, zFraction);
                     var position = new Vector3(
                         (x + xFraction) * cellSize,
-						height + 0.01f,
+                        height + 0.005f,
                         (z + zFraction) * cellSize
                     );
 
-                    var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * scale);
+                    var scale = new Vector3(widthScale, heightScale, widthScale);
+                    var basis = new Basis(Vector3.Up, yaw).Scaled(scale);
                     multiMesh.SetInstanceTransform(instance++, new Transform3D(basis, position));
                 }
             }
@@ -225,48 +292,95 @@ public partial class Chunk : Node3D
         float bladeWidth,
         float bladeHeight,
         int cardCount,
+        int segmentCount,
         ShaderMaterial material
     )
     {
-        var vertices = new List<Vector3>(cardCount * 4);
-        var normals = new List<Vector3>(cardCount * 4);
-        var uvs = new List<Vector2>(cardCount * 4);
-        var indices = new List<int>(cardCount * 6);
+        int verticesPerCard = (segmentCount + 1) * 2;
+        var vertices = new List<Vector3>(cardCount * verticesPerCard);
+        var normals = new List<Vector3>(cardCount * verticesPerCard);
+        var uvs = new List<Vector2>(cardCount * verticesPerCard);
+        var colors = new List<Color>(cardCount * verticesPerCard);
+        var indices = new List<int>(cardCount * segmentCount * 6);
 
         for (int card = 0; card < cardCount; card++)
         {
-            float angle = card * Mathf.Tau / cardCount;
+            // The golden angle keeps the cards from forming an obvious, uniform star.
+            float angle = card * 2.3999632f;
             Vector3 forward = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
             Vector3 right = new Vector3(forward.Z, 0f, -forward.X);
 
-            // Offset the cards slightly so each instance reads as a clump,
-            // rather than several identical blades occupying one plane.
-            Vector3 center = forward * bladeWidth * (card % 2 == 0 ? 0.3f : 0.6f);
-            Vector3 halfWidth = right * bladeWidth * 0.5f;
+            float rootAngle = (card + 0.5f) * 3.883222f;
+            float rootRadius = bladeWidth * 0.55f
+                * Mathf.Sqrt((card + 0.5f) / cardCount);
+            Vector3 center = new Vector3(
+                Mathf.Cos(rootAngle),
+                0f,
+                Mathf.Sin(rootAngle)
+            ) * rootRadius;
+
+            float cardWidth = bladeWidth
+                * Mathf.Lerp(0.82f, 1.12f, Hash01(card, cardCount, 0, 211));
+            float cardHeight = bladeHeight
+                * Mathf.Lerp(0.86f, 1.08f, Hash01(card, cardCount, 0, 263));
+            Vector3 halfWidth = right * cardWidth * 0.5f;
+
+            // Vertex color carries per-card shape data to the shader:
+            // RG = local bend direction, B = curvature amount, A = wind phase.
+            float curveAngle = angle + Mathf.Lerp(
+                -0.45f,
+                0.45f,
+                Hash01(card, cardCount, 0, 307)
+            );
+            Vector3 curveDirection = new Vector3(
+                Mathf.Sin(curveAngle),
+                0f,
+                Mathf.Cos(curveAngle)
+            );
+            if (Hash01(card, cardCount, 0, 331) < 0.5f)
+                curveDirection = -curveDirection;
+
+            var shapeData = new Color(
+                curveDirection.X * 0.5f + 0.5f,
+                curveDirection.Z * 0.5f + 0.5f,
+                Hash01(card, cardCount, 0, 359),
+                Hash01(card, cardCount, 0, 383)
+            );
             int start = vertices.Count;
 
-            vertices.Add(center - halfWidth);
-            vertices.Add(center + halfWidth);
-            vertices.Add(center + halfWidth + Vector3.Up * bladeHeight);
-            vertices.Add(center - halfWidth + Vector3.Up * bladeHeight);
+            for (int segment = 0; segment <= segmentCount; segment++)
+            {
+                float heightFraction = (float)segment / segmentCount;
+                Vector3 rowCenter =
+                    center + Vector3.Up * cardHeight * heightFraction;
 
-            normals.Add(forward);
-            normals.Add(forward);
-            normals.Add(forward);
-            normals.Add(forward);
+                vertices.Add(rowCenter - halfWidth);
+                vertices.Add(rowCenter + halfWidth);
+                normals.Add(forward);
+                normals.Add(forward);
 
-            // UV.y is one at the ground and zero at the grass tip.
-            uvs.Add(new Vector2(0f, 1f));
-            uvs.Add(new Vector2(1f, 1f));
-            uvs.Add(new Vector2(1f, 0f));
-            uvs.Add(new Vector2(0f, 0f));
+                // UV.y is one at the ground and zero at the grass tip.
+                float uvY = 1f - heightFraction;
+                uvs.Add(new Vector2(0f, uvY));
+                uvs.Add(new Vector2(1f, uvY));
+                colors.Add(shapeData);
+                colors.Add(shapeData);
+            }
 
-            indices.Add(start);
-            indices.Add(start + 1);
-            indices.Add(start + 2);
-            indices.Add(start);
-            indices.Add(start + 2);
-            indices.Add(start + 3);
+            for (int segment = 0; segment < segmentCount; segment++)
+            {
+                int bottomLeft = start + segment * 2;
+                int bottomRight = bottomLeft + 1;
+                int topLeft = bottomLeft + 2;
+                int topRight = bottomLeft + 3;
+
+                indices.Add(bottomLeft);
+                indices.Add(bottomRight);
+                indices.Add(topRight);
+                indices.Add(bottomLeft);
+                indices.Add(topRight);
+                indices.Add(topLeft);
+            }
         }
 
         var arrays = new Godot.Collections.Array();
@@ -274,6 +388,7 @@ public partial class Chunk : Node3D
         arrays[(int)Mesh.ArrayType.Vertex] = vertices.ToArray();
         arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
         arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
+        arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
         arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
 
         var mesh = new ArrayMesh();
@@ -290,9 +405,26 @@ public partial class Chunk : Node3D
         int topLeft = (cellZ + 1) * rowWidth + cellX;
         int topRight = topLeft + 1;
 
-        float bottom = Mathf.Lerp(localVertices[bottomLeft].Y, localVertices[bottomRight].Y, xFraction);
-        float top = Mathf.Lerp(localVertices[topLeft].Y, localVertices[topRight].Y, xFraction);
-        return Mathf.Lerp(bottom, top, zFraction);
+        float bottomLeftHeight = localVertices[bottomLeft].Y;
+        float bottomRightHeight = localVertices[bottomRight].Y;
+        float topLeftHeight = localVertices[topLeft].Y;
+        float topRightHeight = localVertices[topRight].Y;
+
+        // Match the two triangles used by the terrain mesh. Bilinear interpolation
+        // can otherwise leave grass floating above or buried in a sloped cell.
+        if (xFraction + zFraction <= 1f)
+        {
+            return bottomLeftHeight
+                + xFraction * (bottomRightHeight - bottomLeftHeight)
+                + zFraction * (topLeftHeight - bottomLeftHeight);
+        }
+
+        float bottomRightWeight = 1f - zFraction;
+        float topLeftWeight = 1f - xFraction;
+        float topRightWeight = xFraction + zFraction - 1f;
+        return bottomRightHeight * bottomRightWeight
+            + topLeftHeight * topLeftWeight
+            + topRightHeight * topRightWeight;
     }
 
     private static float Hash01(int x, int z, int blade, int salt)

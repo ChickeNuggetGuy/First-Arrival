@@ -44,6 +44,34 @@ public partial class GridObjectStatHolder : GridObjectNode
 		if (stat == null) return false;
 		else return true;
 	}
+
+	public float GetEffectiveMaxValue(Enums.Stat statType)
+	{
+		if (!TryGetStat(statType, out GridObjectStat stat)) return 0;
+
+		float effectiveMax = stat.MinMaxValue.max;
+		if (!TryGetStat(Enums.Stat.Health, out GridObjectStat health))
+			return effectiveMax;
+
+		float modifier = statType switch
+		{
+			Enums.Stat.RangedAccuracy => health.GetRangedAccuracyMultiplier(),
+			Enums.Stat.TimeUnits => health.GetTimeUnitMultiplier(),
+			_ => 1f
+		};
+
+		return Mathf.Clamp(
+			effectiveMax * modifier,
+			stat.MinMaxValue.min,
+			stat.MinMaxValue.max
+		);
+	}
+
+	public float GetEffectiveCurrentValue(Enums.Stat statType)
+	{
+		if (!TryGetStat(statType, out GridObjectStat stat)) return 0;
+		return Mathf.Min(stat.CurrentValue, GetEffectiveMaxValue(statType));
+	}
 	
 	public bool CanAffordStatCost(Godot.Collections.Dictionary<Enums.Stat, int> costs)
 	{

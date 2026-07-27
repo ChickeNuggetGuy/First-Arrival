@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bfepqresb4he1"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_ranged"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://dysf556r7ndxj" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Shotgun_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Snap"]
+script = ExtResource("1_ranged")
+attackCount = 5
+range = 8
+damage = 8
+accuracy = -34.0
+timeUnitCost = 30
+staminaCost = 5
+
+[sub_resource type="Resource" id="Aim"]
+script = ExtResource("1_ranged")
+Type = 1
+attackCount = 5
+range = 11
+damage = 8
+accuracy = -18.0
+timeUnitCost = 42
+staminaCost = 5
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 3
+SizeZ = 2
+OccupiedCells = Array[bool]([true, true, true, true, true, true])
+
+[resource]
+resource_name = "Mossberg 500"
+script = ExtResource("3_item")
+ItemID = 140
+ItemName = "Mossberg 500"
+ItemDescription = "Rugged pump-action combat shotgun. Multiple pellets deliver excellent close-range stopping power."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 5
+HistoricalIntroductionYear = 1961
+ResearchTier = 1
+RequiredResearch = "combat_shotguns"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 11
+ItemMesh = ExtResource("5_mesh")
+ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+buyPrice = 800
+sellPrice = 560

@@ -6,8 +6,8 @@
 [resource]
 resource_name = "Troop Transport _Item"
 script = ExtResource("1_myolf")
-MaxSpeed = 60
-Acceleration = 30
+MaxSpeed = 100
+Acceleration = 50
 maxUnits = 9
 maxweight = 350
 ItemID = 4

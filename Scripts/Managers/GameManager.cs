@@ -10,6 +10,8 @@ namespace FirstArrival.Scripts.Managers;
 
 public partial class GameManager : Manager<GameManager>
 {
+	public const int UnitHiringCost = 25000;
+
 	#region Variables / Properties
 
 	// Track managers in the current active scene
@@ -332,6 +334,53 @@ public partial class GameManager : Manager<GameManager>
 	#endregion
 
 	#region Game Logic & Rules
+
+	public bool CanHireUnits(int count = 1)
+	{
+		if (count <= 0 || currentBase == null || unitScene == null) return false;
+
+		long totalCost = (long)UnitHiringCost * count;
+		return currentBaseFunds >= totalCost;
+	}
+
+	public bool TryHireUnits(int count = 1)
+	{
+		if (!CanHireUnits(count) || !TryAddHiredUnitsWithoutPurchase(count))
+			return false;
+
+		currentBaseFunds -= UnitHiringCost * count;
+		if (!SyncCurrentBaseToGlobeState())
+			GD.PrintErr("Units were hired locally, but the globe transition state could not be updated.");
+		return true;
+	}
+
+	internal bool TryAddHiredUnitsWithoutPurchase(int count)
+	{
+		if (count <= 0 || currentBase == null || unitScene == null) return false;
+
+		var addedUnits = new Godot.Collections.Array<GridObject>();
+		for (int i = 0; i < count; i++)
+		{
+			GridObject newUnit = unitScene.Instantiate<GridObject>();
+			newUnit.Name = UnitNameGenerator.Generate();
+
+			if (currentBase.TryAddStationedGridObject(newUnit))
+			{
+				addedUnits.Add(newUnit);
+				continue;
+			}
+
+			newUnit.QueueFree();
+			foreach (GridObject addedUnit in addedUnits)
+			{
+				currentBase.TryRemoveStationedGridObject(addedUnit);
+				addedUnit.QueueFree();
+			}
+			return false;
+		}
+
+		return true;
+	}
 
 	public void PrepareBattleLoadout(Craft craft)
 	{

@@ -15,6 +15,8 @@ public partial class GridCellHighlighter : Node3D
 	public float HeightOffset { get; set; } = 0.06f;
 	[Export(PropertyHint.Range, "0.1,1.0,0.01")]
 	public float CellScale { get; set; } = 0.92f;
+	[Export(PropertyHint.Range, "0.1,3.0,0.05")]
+	public float GrassHeightAllowance { get; set; } = 0.9f;
 
 	private MultiMeshInstance3D _instance;
 	private MultiMesh _multiMesh;
@@ -26,10 +28,19 @@ public partial class GridCellHighlighter : Node3D
 		_quad = new QuadMesh();
 		_material = new ShaderMaterial
 		{
-			Shader = GD.Load<Shader>(ShaderPath)
+			Shader = GD.Load<Shader>(ShaderPath),
+			RenderPriority = 100
 		};
 		_material.SetShaderParameter("highlight_color", HighlightColor);
 		_material.SetShaderParameter("border_color", BorderColor);
+		_material.SetShaderParameter(
+			"grass_height_allowance",
+			GrassHeightAllowance
+		);
+		_material.SetShaderParameter(
+			"horizontal_occlusion_allowance",
+			GrassHeightAllowance * 1.5f + 0.1f
+		);
 		_quad.Material = _material;
 
 		_multiMesh = new MultiMesh

@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://d1xkwxyo62qb"]
+
+[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_melee"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://d0axcepqc77pv" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Fireaxe_01_BattleRoyale_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://bek1vn1e44jct" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Bat_01.obj" id="5_mesh"]
+
+[sub_resource type="Resource" id="Melee"]
+script = ExtResource("1_melee")
+damage = 48
+timeUnitCost = 34
+staminaCost = 28
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeX = 2
+SizeZ = 3
+OccupiedCells = Array[bool]([true, true, true, true, true, true])
+
+[resource]
+resource_name = "Tactical Breaching Axe"
+script = ExtResource("3_item")
+ItemID = 112
+ItemName = "Tactical Breaching Axe"
+ItemDescription = "Heavy entry tool adapted for combat. Devastating, but slow and exhausting to swing."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 1
+HistoricalIntroductionYear = 1990
+ResearchTier = 2
+RequiredResearch = "tactical_breaching"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 7
+ItemMesh = ExtResource("5_mesh")
+visualScale = Vector3(0.014, 0.014, 0.014)
+ActionDefinitions = Array[Object]([SubResource("Melee")])
+buyPrice = 650
+sellPrice = 455

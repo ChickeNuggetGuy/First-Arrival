@@ -26,6 +26,6 @@ public partial class MissionButtonUI : UIElement
 	private void ButtonOnPressed()
 	{
 		GD.Print($"Button.OnPressed(): {mission.cellIndex}");
-		OrbitalCamera.Instance.FocusOnCell(mission.cellIndex);
+		_ =  OrbitalCamera.Instance.FocusOnCell(mission.cellIndex);
 	}
 }

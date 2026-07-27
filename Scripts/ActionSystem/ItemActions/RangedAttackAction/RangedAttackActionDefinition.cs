@@ -14,10 +14,15 @@ public partial class RangedAttackActionDefinition
 	[Export] public int attackCount = 1;
 	[Export] public int range;
 	[Export] public int damage;
+	[Export] public bool canCauseFatalWounds = true;
 	// Added to the shooter's RangedAccuracy when calculating projectile spread.
 	// Positive values make this attack more accurate; negative values make it less accurate.
 	[Export(PropertyHint.Range, "-100,100,1")] public float accuracy = 0f;
 	[Export] public Godot.Collections.Dictionary<Enums.Stat, int> damagingStats = new();
+
+	[ExportGroup("Action Cost")]
+	[Export(PropertyHint.Range, "1,100,1")] public int timeUnitCost = 20;
+	[Export(PropertyHint.Range, "0,100,1")] public int staminaCost;
 	
 	public override ActionBase InstantiateAction(
 		GridObject parent,
@@ -80,10 +85,8 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
-		for (int i = 0; i < attackCount; i++)
-		{
-			AddCost(costs, Enums.Stat.TimeUnits, 2 * Item.ItemData.weight);
-		}
+		AddCost(costs, Enums.Stat.TimeUnits, timeUnitCost);
+		AddCost(costs, Enums.Stat.Stamina, staminaCost);
 
 
 		reason = "success";

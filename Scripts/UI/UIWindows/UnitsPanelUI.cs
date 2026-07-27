@@ -31,6 +31,7 @@ public partial class UnitsPanelUI : UIWindow
 		if (hireButton != null )
 		{
 			hireButton.Pressed += HireButtonOnPressed;
+			hireButton.Text = $"Hire (${GameManager.UnitHiringCost:N0})";
 		}
 		
 		if (fireButton != null)
@@ -60,17 +61,10 @@ public partial class UnitsPanelUI : UIWindow
 
 	private void HireButtonOnPressed()
 	{
-		if (CurrentBase == null) return;
+		if (!GameManager.Instance.TryHireUnits()) return;
 
-		GridObject newUnit = unitScene.Instantiate<GridObject>();
-		newUnit.Name = UnitNameGenerator.Generate();
-		
-		CurrentBase.TryAddStationedGridObject(newUnit);
-    
-		// Refresh UI
 		ContstructUnitList();
-    
-		GD.Print($"Hired {newUnit.Name}. Total units in manager: {CurrentBase.GetStationedGridObjects().Count}");
+		GD.Print($"Hired a unit for ${GameManager.UnitHiringCost:N0}. Total units at base: {CurrentBase.GetStationedGridObjects().Count}");
 	}
 
 	
@@ -82,6 +76,9 @@ public partial class UnitsPanelUI : UIWindow
 
 	private void ContstructUnitList()
 	{
+		if (hireButton != null)
+			hireButton.Disabled = !GameManager.Instance.CanHireUnits();
+
 		if(unitItemList == null)
 			return;
 		if (CurrentBase == null)

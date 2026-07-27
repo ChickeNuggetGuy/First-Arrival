@@ -17,7 +17,8 @@ public partial class ExplodeActionBase : ActionBase, ICompositeAction, IDelayedA
     public int TurnsRemaining { get; set; }
     private int explosionRadius;
     private CsgSphere3D grenadeVisual;
-    private float grenadeDamage;
+    private Godot.Collections.Dictionary<Enums.Stat, int> affectedStats;
+    private bool canCauseFatalWounds;
 
     public ExplodeActionBase() { }
 
@@ -28,15 +29,17 @@ public partial class ExplodeActionBase : ActionBase, ICompositeAction, IDelayedA
         ActionDefinition parent,
         Item item,
         Godot.Collections.Dictionary<Enums.Stat, int> costs,
+        Godot.Collections.Dictionary<Enums.Stat, int> affectedStats,
+        bool canCauseFatalWounds = true,
         int turnsUntilExplode = 2,
-        int radius = 2,
-        float damage = 50
+        int radius = 2
     ) : base(parentGridObject, startingGridCell, targetGridCell, parent, costs)
     {
         Item = item;
         TurnsRemaining = turnsUntilExplode;
         explosionRadius = radius;
-        grenadeDamage = damage;
+        this.affectedStats = affectedStats ?? new();
+        this.canCauseFatalWounds = canCauseFatalWounds;
     }
 
 
@@ -138,8 +141,23 @@ public partial class ExplodeActionBase : ActionBase, ICompositeAction, IDelayedA
 	                if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out var gridObjectStatHolder)) continue;
 	                
 	                //TODO: make the grenade decide which stats it affects (i.e emp grnades, falshbangs affecting accuracy etc)
+	                foreach (var affectedStat in affectedStats)
+	                {
+		                if (!gridObjectStatHolder.TryGetStat(affectedStat.Key, out var stat))
+			                continue;
 
-	                gridObjectStatHolder.TryRemoveStatCosts(costs);
+		                if (affectedStat.Key == Enums.Stat.Health)
+		                {
+			                stat.ApplyDamage(
+				                affectedStat.Value,
+				                canCauseFatalWounds
+			                );
+		                }
+		                else
+		                {
+			                stat.RemoveValue(affectedStat.Value);
+		                }
+	                }
                 }
             }
         }

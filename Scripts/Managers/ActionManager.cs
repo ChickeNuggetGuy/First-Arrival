@@ -37,7 +37,13 @@ public partial class ActionManager : Manager<ActionManager>
 
 	protected override async Task _Execute(bool loadingData)
 	{
-		_cellHighlighter = new GridCellHighlighter { Name = "ActionCellHighlighter" };
+		float grassOverlayHeight =
+			MeshTerrainGenerator.Instance?.GrassVisualHeight ?? 0.9f;
+		_cellHighlighter = new GridCellHighlighter
+		{
+			Name = "ActionCellHighlighter",
+			GrassHeightAllowance = grassOverlayHeight
+		};
 		AddChild(_cellHighlighter);
 
 		GridObjectTeamHolder playerTeam = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);

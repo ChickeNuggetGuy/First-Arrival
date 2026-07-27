@@ -9,6 +9,7 @@ public class PhysicsLayer
 	public const int GRIDOBJECT = 1 << 2;     // Layer 3
 	public const int ENEMY = 1 << 3;      // Layer 4
 	public const int OBSTACLE = 1 << 4;   // Layer 5
+	public const int LOS_BLOCKER = 1 << 5; // Layer 6
 	
 	public static int get_layer_bit(int layerNumber)
 	{

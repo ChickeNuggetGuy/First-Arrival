@@ -19,3 +19,4 @@ ItemIcon = ExtResource("1_iw0w2")
 globeOnly = true
 weight = 9999
 ActionDefinitions = []
+ShowInBuySellWindow = false

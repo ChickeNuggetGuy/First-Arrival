@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Threading.Tasks;
 
 [GlobalClass]
 public partial class OrbitalCamera : Node3D
@@ -17,6 +18,8 @@ public partial class OrbitalCamera : Node3D
     [Export] public float PanSpeed = 90.0f;
     [Export(PropertyHint.Range, "0, 2, 0.01")] public float MinZoomPanSpeedMultiplier = 0.5f;
     [Export(PropertyHint.Range, "0, 2, 0.01")] public float MaxZoomPanSpeedMultiplier = 1.0f;
+    [Export(PropertyHint.Range, "0.05, 2, 0.01")] public float FocusToleranceDegrees = 0.25f;
+    [Export(PropertyHint.Range, "0.1, 10, 0.1")] public float FocusTimeoutSeconds = 3.0f;
 
     [ExportGroup("Auto Orbit")]
     [Export] public bool AutoOrbit = false;
@@ -195,57 +198,71 @@ public partial class OrbitalCamera : Node3D
     /// </summary>
     public void FocusOnCell(HexCellData cell, float? optionalZoom = null)
     {
-
-	    Vector3 dir = cell.Center.Normalized();
-
-
-	    float targetYawRad = Mathf.Atan2(dir.X, dir.Z);
-	    float targetYawDeg = Mathf.RadToDeg(targetYawRad);
-
-
-	    float targetPitchRad = Mathf.Asin(dir.Y);
-	    float targetPitchDeg = -Mathf.RadToDeg(targetPitchRad);
-	    
-	    _yaw = Mathf.LerpAngle(_yaw, targetYawDeg, 1.0f); 
+	    SetFocusTarget(cell, optionalZoom);
+    }
     
-	    _yaw = targetYawDeg;
-	    _pitch = targetPitchDeg;
+    /// <summary>
+    /// Focuses a cell and completes when the smoothed camera motion settles.
+    /// Callers that transition away from the globe can await this method so the
+    /// player sees the pan before the globe scene is removed.
+    /// </summary>
+    public async Task FocusOnCell(int cellIndex, float? optionalZoom = null)
+    {
+	    HexCellData? cell = GlobeHexGridManager.Instance?.GetCellFromIndex(cellIndex);
 	    
+	    if (!cell.HasValue) return;
+
+	    SetFocusTarget(cell.Value, optionalZoom);
+	    await WaitForFocus();
+    }
+
+    private void SetFocusTarget(HexCellData cell, float? optionalZoom)
+    {
+	    Vector3 dir = cell.Center.Normalized();
+	    _yaw = Mathf.RadToDeg(Mathf.Atan2(dir.X, dir.Z));
+	    _pitch = -Mathf.RadToDeg(Mathf.Asin(dir.Y));
+
 	    if (optionalZoom.HasValue)
-	    {
 		    _targetDistance = Mathf.Clamp(optionalZoom.Value, MinZoom, MaxZoom);
-	    }
 
 	    ClampPitch();
     }
-    
-    public void FocusOnCell(int cellIndex, float? optionalZoom = null)
+
+    private async Task WaitForFocus()
     {
-	    HexCellData? cell = GlobeHexGridManager.Instance.GetCellFromIndex(cellIndex);
-	    
-	    if (cell == null) return;
-	    
+	    if (!IsInsideTree()) return;
 
-	    Vector3 dir = cell.Value.Center.Normalized();
-
-
-	    float targetYawRad = Mathf.Atan2(dir.X, dir.Z);
-	    float targetYawDeg = Mathf.RadToDeg(targetYawRad);
-
-
-	    float targetPitchRad = Mathf.Asin(dir.Y);
-	    float targetPitchDeg = -Mathf.RadToDeg(targetPitchRad);
-	    
-	    _yaw = Mathf.LerpAngle(_yaw, targetYawDeg, 1.0f); 
-    
-	    _yaw = targetYawDeg;
-	    _pitch = targetPitchDeg;
-	    
-	    if (optionalZoom.HasValue)
+	    if (!UseSmoothing || SmoothSpeed <= 0.0f)
 	    {
-		    _targetDistance = Mathf.Clamp(optionalZoom.Value, MinZoom, MaxZoom);
+		    Rotation = new Vector3(Mathf.DegToRad(_pitch), Mathf.DegToRad(_yaw), 0.0f);
+		    if (_camera != null)
+		    {
+			    Vector3 position = _camera.Position;
+			    position.Z = _targetDistance;
+			    _camera.Position = position;
+		    }
+		    return;
 	    }
 
-	    ClampPitch();
+	    ulong timeoutAt = Time.GetTicksMsec() +
+		    (ulong)(Mathf.Max(FocusTimeoutSeconds, 0.1f) * 1000.0f);
+	    while (IsInsideTree() && Time.GetTicksMsec() < timeoutAt)
+	    {
+		    await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		    if (HasReachedFocusTarget()) return;
+	    }
+    }
+
+    private bool HasReachedFocusTarget()
+    {
+	    if (_camera == null) return true;
+
+	    float pitchDelta = Mathf.Abs(Mathf.AngleDifference(RotationDegrees.X, _pitch));
+	    float yawDelta = Mathf.Abs(Mathf.AngleDifference(RotationDegrees.Y, _yaw));
+	    float zoomDelta = Mathf.Abs(_camera.Position.Z - _targetDistance);
+
+	    return pitchDelta <= FocusToleranceDegrees &&
+		    yawDelta <= FocusToleranceDegrees &&
+		    zoomDelta <= 0.01f;
     }
 }

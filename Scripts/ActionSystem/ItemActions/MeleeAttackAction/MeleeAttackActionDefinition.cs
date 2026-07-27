@@ -10,6 +10,11 @@ public partial class MeleeAttackActionDefinition
 	: ItemActionDefinition
 {
 	[Export] public int damage;
+	[Export] public bool canCauseFatalWounds = true;
+
+	[ExportGroup("Action Cost")]
+	[Export(PropertyHint.Range, "1,100,1")] public int timeUnitCost = 24;
+	[Export(PropertyHint.Range, "0,100,1")] public int staminaCost = 16;
 	
 	public override ActionBase InstantiateAction(
 		GridObject parent,
@@ -153,8 +158,8 @@ public partial class MeleeAttackActionDefinition
 			}
 		}
 
-		AddCost(costs, Enums.Stat.TimeUnits, 4 * Item.ItemData.weight);
-		AddCost(costs, Enums.Stat.Stamina, 4 * Item.ItemData.weight);
+		AddCost(costs, Enums.Stat.TimeUnits, timeUnitCost);
+		AddCost(costs, Enums.Stat.Stamina, staminaCost);
 
 		reason = "success";
 		return true;

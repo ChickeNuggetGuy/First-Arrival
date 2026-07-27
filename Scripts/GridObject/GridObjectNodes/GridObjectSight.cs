@@ -18,6 +18,7 @@ public partial class GridObjectSight : GridObjectNode
     [ExportCategory("Proximity")]
     [Export] private bool _useProximityCheck = true;
     [Export] private int _proximityRadius = 3;
+    [Export] private bool _proximityIgnoresLos = false;
 
     [ExportCategory("Line Of Sight")]
     [Export] private bool _useLosForGridObjects = true;
@@ -165,10 +166,9 @@ public partial class GridObjectSight : GridObjectNode
             if (cell == null || cell == GridCell.Null)
                 continue;
 
-            // Proximity vision is deliberately not occluded. These cells are
-            // included as an immediate-awareness radius, rather than as a
-            // ray-based field of view.
-            if (_useLosForCells && cell != startCell && !_proximityCellSet.Contains(cell))
+            bool bypassLos =
+                _proximityIgnoresLos && _proximityCellSet.Contains(cell);
+            if (_useLosForCells && cell != startCell && !bypassLos)
             {
                 Vector3 cellPoint = cell.WorldCenter + Vector3.Up * _targetHeight;
                 if (IsLineBlocked(eye, cellPoint))
@@ -256,7 +256,10 @@ public partial class GridObjectSight : GridObjectNode
         uint mask = _losBlockerMask;
         if (mask == 0)
         {
-            mask = (uint)PhysicsLayer.OBSTACLE | (uint)PhysicsLayer.TERRAIN;
+            mask =
+                (uint)PhysicsLayer.OBSTACLE
+                | (uint)PhysicsLayer.TERRAIN
+                | (uint)PhysicsLayer.LOS_BLOCKER;
         }
 
         var rayParams = new PhysicsRayQueryParameters3D

@@ -5,12 +5,43 @@ using Godot.Collections;
 
 namespace FirstArrival.Scripts.Inventory_System;
 
+public enum ItemCategory
+{
+	General,
+	Weapon,
+	Explosive,
+	Craft
+}
+
+public enum WeaponClass
+{
+	None,
+	Melee,
+	Sidearm,
+	SubmachineGun,
+	PersonalDefenseWeapon,
+	Shotgun,
+	AssaultRifle,
+	MarksmanRifle,
+	SniperRifle,
+	LightMachineGun,
+	GeneralPurposeMachineGun
+}
+
+public enum EquipmentTier
+{
+	Starting,
+	Standard,
+	Advanced,
+	Experimental
+}
+
 [Tool]
 [GlobalClass]
 public partial class ItemData : Resource
 {
 	[Export]
-	public int ItemID { get; protected set; }
+	public int ItemID { get; protected set; } = -1;
 
 	[Export]
 	public string ItemName { get; protected set; }
@@ -23,7 +54,16 @@ public partial class ItemData : Resource
 
 	[Export] public bool globeOnly { get; protected set; } = false;
 
+	[ExportGroup("Classification")]
+	[Export] public ItemCategory Category { get; protected set; } = ItemCategory.General;
+	[Export] public WeaponClass WeaponClass { get; protected set; } = WeaponClass.None;
+	[Export(PropertyHint.Range, "1900,2100,1")]
+	public int HistoricalIntroductionYear { get; protected set; } = 2001;
 
+	[ExportGroup("Progression")]
+	[Export] public EquipmentTier ResearchTier { get; protected set; } = EquipmentTier.Starting;
+	[Export] public string RequiredResearch { get; protected set; } = string.Empty;
+	[Export] public bool AvailableAtCampaignStart { get; protected set; } = true;
 
 	[Export(PropertyHint.ResourceType, "GridShape")]
 	public GridShape ItemShape { get; set; }

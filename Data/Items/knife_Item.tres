@@ -1,36 +1,30 @@
 [gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://pfmnbs1rycon"]
 
-[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_5cfim"]
-[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_sqtke"]
-[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_5cfim"]
-[ext_resource type="Script" uid="uid://60yksynr5w30" path="res://Scripts/ActionSystem/ItemActions/ThrowAction/ThrowActionDefinition.cs" id="2_did8u"]
-[ext_resource type="Texture2D" uid="uid://cj6wghw17um65" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Badges/SPR_MilitaryCombat_Badge_Element_Knife_02_Silver.png" id="3_pyvyk"]
+[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_melee"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://ylsq47kqk3sw" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Knife_01_Military_Side.png" id="4_icon"]
+[ext_resource type="ArrayMesh" uid="uid://dgby2r0mt3w07" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Knife_01.obj" id="5_mesh"]
 
-[sub_resource type="Resource" id="Resource_u2q4j"]
-script = ExtResource("1_5cfim")
+[sub_resource type="Resource" id="Melee"]
+script = ExtResource("1_melee")
 damage = 28
-metadata/_custom_type_script = "uid://cqq7u24ovq2wo"
 
-[sub_resource type="Resource" id="Resource_lvcgx"]
-script = ExtResource("2_did8u")
-metadata/_custom_type_script = "uid://60yksynr5w30"
-
-[sub_resource type="Resource" id="Resource_did8u"]
-script = ExtResource("2_5cfim")
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
 SizeZ = 2
 OccupiedCells = Array[bool]([true, true])
-metadata/_custom_type_script = "uid://cdhdv6w5jignj"
 
 [resource]
-resource_name = "knife_Item"
-script = ExtResource("1_sqtke")
+resource_name = "KA-BAR Combat Knife"
+script = ExtResource("3_item")
 ItemID = 1
-ItemName = "knife"
-ItemDescription = "sharp blade"
-ItemIcon = ExtResource("3_pyvyk")
-ItemShape = SubResource("Resource_did8u")
+ItemName = "KA-BAR Combat Knife"
+ItemDescription = "Light, dependable fighting knife. Cheap to field and fast to use."
+ItemIcon = ExtResource("4_icon")
+ItemShape = SubResource("Shape")
 weight = 2
-ActionDefinitions = Array[Object]([SubResource("Resource_u2q4j"), SubResource("Resource_lvcgx")])
-MaxStackSize = 5
-buyPrice = 250
-sellPrice = 175
+ItemMesh = ExtResource("5_mesh")
+ActionDefinitions = Array[Object]([SubResource("Melee")])
+buyPrice = 180
+sellPrice = 125

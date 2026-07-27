@@ -12,6 +12,8 @@ public partial class UnitActionUI : UIWindow
 {
 	[Export] private GridContainer _actionButtonContainer;
 	[Export] PackedScene _actionButtonScene;
+	[Export] private Label unitName;
+	[Export] private TextureRect _unitIcon;
 	List<ActionButtonUI>  _actionButtons = new List<ActionButtonUI>();
 	
 	[Export] private VBoxContainer _statBarContainer;
@@ -46,7 +48,8 @@ public partial class UnitActionUI : UIWindow
 
 	private void OnSelectedGridObjectChanged(GridObject gridObject)
 	{
-		
+		unitName.Text = gridObject.Name;
+		_unitIcon.Texture = gridObject.Thumbnail;
 		UpdateActionButtons(gridObject);
 		UpdateStatBars(gridObject);
 	}

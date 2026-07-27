@@ -23,10 +23,13 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
 	    GridCell gridCell,
 	    bool allowMissingGridCell = false)
     {
-        // Door cells themselves control navigation. Keep the visual/LOS body
-        // off the obstacle layer so its physical width cannot remove unrelated
-        // connections from cells beside the doorway.
-        CollisionLayer = (CollisionLayer & ~(uint)PhysicsLayer.OBSTACLE) | 1u;
+        // Door cells themselves control navigation. Keep the physical body off
+        // the obstacle layer so its width cannot remove connections beside the
+        // doorway, but retain a dedicated layer for closed-door sight blocking.
+        CollisionLayer =
+            (CollisionLayer & ~(uint)PhysicsLayer.OBSTACLE)
+            | (uint)PhysicsLayer.DEFAULT
+            | (uint)PhysicsLayer.LOS_BLOCKER;
 
         await base.Initialize(team, gridCell);
 
