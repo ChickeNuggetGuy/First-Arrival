@@ -22,7 +22,6 @@ public partial class UnitActionUI : UIWindow
 
 	protected override async Task _Setup()
 	{
-		await base._Setup();
 		GridObject selectedGridObject = GridObjectManager.Instance.CurrentPlayerGridObject;
 		
 		foreach (UIElement uiElement in uiElements)

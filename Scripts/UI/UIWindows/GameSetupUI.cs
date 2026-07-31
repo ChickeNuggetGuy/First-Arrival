@@ -16,10 +16,11 @@ public partial class GameSetupUI : UIWindow
 	private Vector2I mapSize = Vector2I.Zero;
 	private Vector2I unitCounts = Vector2I.Zero;
 	
-	public override void _EnterTree()
+
+	protected override Task _Setup()
 	{
-		base._EnterTree();
 		startGameButton.Pressed += StartGameButtonOnPressed;
+		return Task.CompletedTask;
 	}
 
 	public override void _ExitTree()

@@ -21,7 +21,7 @@ public partial class TurnUI : UIWindow
 			TurnManager.Instance.TurnStarted += InstanceOnTurnStarted;
 		}
 
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	public override void _ExitTree()

@@ -12,6 +12,7 @@ public partial class GlobeUI : UIWindow
 	[Export] private Button buildBaseButton;
 	[Export] private Button sendMissionButton;
 	[Export] private Button buyCraftButton;
+	[Export] private Button researchButton;
 	[Export] private SelectCraftUI selectCraftUI;
 	[Export] private Label monthlyScoreLabel;
 	
@@ -64,13 +65,15 @@ public partial class GlobeUI : UIWindow
 
 			if(teamHolder.Bases.Count == 0)
 			{
-				sendMissionButton.Disabled = true;
+				if (sendMissionButton != null) sendMissionButton.Disabled = true;
 				buyCraftButton.Disabled = true;
+				researchButton.Disabled = true;
 			}
 			else
 			{
-				sendMissionButton.Disabled = false;
+				if (sendMissionButton != null) sendMissionButton.Disabled = false;
 				buyCraftButton.Disabled = false;
+				researchButton.Disabled = false;
 			}
 
 		}
@@ -79,7 +82,7 @@ public partial class GlobeUI : UIWindow
 			GD.Print("not found!");
 		}
 		DrawUI();
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	private void TeamHolderOnMonthlyScoreChanged(
@@ -173,11 +176,13 @@ public partial class GlobeUI : UIWindow
 		{
 			sendMissionButton.Disabled = false;
 			buyCraftButton.Disabled = false;
+			researchButton.Disabled = false;
 		}
 		else
 		{
 			sendMissionButton.Disabled = true;
 			buyCraftButton.Disabled = true;
+			researchButton.Disabled = true;
 		}
 	}
 
@@ -203,7 +208,7 @@ public partial class GlobeUI : UIWindow
 		currentDateUI.Text = $"Current Time: {month}, {date},{year}";
 	}
 
-	private void TeamHolderOnFundsChanged(GlobeTeamHolder teamHolder, int currentFunds)
+	private void TeamHolderOnFundsChanged(GlobeTeamHolder teamHolder, long currentFunds)
 	{
 		GD.Print("Team funds changed: " + teamHolder.funds);
 		currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
@@ -228,7 +233,7 @@ public partial class GlobeUI : UIWindow
 			return;
 		}
 		
-		baseManager.buildBaseMode = !baseManager.buildBaseMode;
+		baseManager.SetBuildBaseMode(!baseManager.buildBaseMode);
 		GD.Print($"Build Base Mode set to {baseManager.buildBaseMode}");
 	}
 

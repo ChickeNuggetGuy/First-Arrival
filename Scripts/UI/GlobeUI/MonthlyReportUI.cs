@@ -9,21 +9,24 @@ public partial class MonthlyReportUI : UIWindow
 {
 	[Export] private Label reportTitleLabel;
 	[Export] private VBoxContainer teamReportsContainer;
+	[Export] private VBoxContainer financeReportsContainer;
 	[Export] private Button continueButton;
 
 	private readonly Dictionary<
 		Enums.UnitTeam,
 		Godot.Collections.Dictionary<Enums.MonthlyScoreReason, int>> reportScores = new();
+	private readonly Dictionary<Enums.UnitTeam, MonthlyFinanceSnapshot>
+		reportFinances = new();
 
 	private Enums.Month reportedMonth;
 	private int reportedYear;
 	private bool wasPausedBeforeReport;
 	private bool pausedByReport;
+	private bool reportPending;
 
 	protected override async Task _Setup()
 	{
 		ProcessMode = ProcessModeEnum.Always;
-		await base._Setup();
 
 		if (continueButton != null &&
 		    !continueButton.IsConnected(
@@ -45,30 +48,57 @@ public partial class MonthlyReportUI : UIWindow
 	protected override Task DrawUI()
 	{
 		if (reportTitleLabel != null)
-			reportTitleLabel.Text = $"{reportedMonth} {reportedYear} Score Report";
+			reportTitleLabel.Text = $"{reportedMonth} {reportedYear} Monthly Report";
 
-		if (teamReportsContainer == null)
-			return Task.CompletedTask;
+		ClearContainer(teamReportsContainer);
+		ClearContainer(financeReportsContainer);
 
-		foreach (Node child in teamReportsContainer.GetChildren())
+		if (teamReportsContainer != null)
 		{
-			teamReportsContainer.RemoveChild(child);
-			child.QueueFree();
+			foreach (var teamReport in reportScores)
+				AddTeamReport(teamReport.Key, teamReport.Value);
 		}
 
-		foreach (var teamReport in reportScores)
-			AddTeamReport(teamReport.Key, teamReport.Value);
+		if (financeReportsContainer != null && reportFinances.TryGetValue(
+			Enums.UnitTeam.Player,
+			out MonthlyFinanceSnapshot playerFinances))
+		{
+			AddFinanceReport(Enums.UnitTeam.Player, playerFinances);
+		}
 
 		return Task.CompletedTask;
 	}
 
+	private static void ClearContainer(VBoxContainer container)
+	{
+		if (container == null) return;
+		foreach (Node child in container.GetChildren())
+		{
+			container.RemoveChild(child);
+			child.QueueFree();
+		}
+	}
+
 	private async void TimeManagerOnMonthChanged(Enums.Month newMonth)
 	{
-		if (IsShown) return;
+		if (IsShown || reportPending) return;
+		reportPending = true;
+		// Let all monthly gameplay handlers apply income and upkeep before the UI
+		// snapshots and resets the completed month's ledgers.
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		if (IsShown)
+		{
+			reportPending = false;
+			return;
+		}
 
 		GlobeTimeManager timeManager = GlobeTimeManager.Instance;
 		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
-		if (timeManager == null || teamManager == null) return;
+		if (timeManager == null || teamManager == null)
+		{
+			reportPending = false;
+			return;
+		}
 
 		reportedMonth = newMonth == Enums.Month.January
 			? Enums.Month.December
@@ -78,11 +108,14 @@ public partial class MonthlyReportUI : UIWindow
 			: timeManager.CurrentYear;
 
 		reportScores.Clear();
+		reportFinances.Clear();
 		foreach (var team in teamManager.GetAllTeamData())
 		{
 			if (team.Value == null) continue;
 			reportScores[team.Key] = team.Value.GetMonthlyScoreSnapshot();
+			reportFinances[team.Key] = team.Value.GetMonthlyFinanceSnapshot();
 			team.Value.ResetMonthlyScore();
+			team.Value.ResetMonthlyFinances();
 		}
 
 		SceneTree tree = GetTree();
@@ -91,6 +124,7 @@ public partial class MonthlyReportUI : UIWindow
 		pausedByReport = true;
 
 		await ShowCall();
+		reportPending = false;
 	}
 
 	private void AddTeamReport(
@@ -108,7 +142,7 @@ public partial class MonthlyReportUI : UIWindow
 		int total = 0;
 		if (scores.Count == 0)
 		{
-			AddScoreRow("No score changes", 0);
+				AddScoreRow(teamReportsContainer, "No score changes", 0);
 		}
 		else
 		{
@@ -118,15 +152,19 @@ public partial class MonthlyReportUI : UIWindow
 				string reason = score.Key == Enums.MonthlyScoreReason.None
 					? "Other"
 					: FormatName(score.Key.ToString());
-				AddScoreRow(reason, score.Value);
+					AddScoreRow(teamReportsContainer, reason, score.Value);
 			}
 		}
 
-		AddScoreRow("Total", total, true);
+		AddScoreRow(teamReportsContainer, "Total", total, true);
 		teamReportsContainer.AddChild(new HSeparator());
 	}
 
-	private void AddScoreRow(string reason, int score, bool isTotal = false)
+	private static void AddScoreRow(
+		VBoxContainer container,
+		string reason,
+		int score,
+		bool isTotal = false)
 	{
 		var row = new HBoxContainer();
 		var reasonLabel = new Label
@@ -148,7 +186,88 @@ public partial class MonthlyReportUI : UIWindow
 
 		row.AddChild(reasonLabel);
 		row.AddChild(scoreLabel);
-		teamReportsContainer.AddChild(row);
+		container.AddChild(row);
+	}
+
+	private void AddFinanceReport(
+		Enums.UnitTeam team,
+		MonthlyFinanceSnapshot finances)
+	{
+		var teamLabel = new Label
+		{
+			Text = $"{FormatName(team.ToString())} Team Finances",
+			HorizontalAlignment = HorizontalAlignment.Center
+		};
+		teamLabel.AddThemeFontSizeOverride("font_size", 20);
+		financeReportsContainer.AddChild(teamLabel);
+
+		AddFinanceSection("Income", finances.Income, finances.TotalIncome);
+		AddFinanceSection(
+			"Expenditure",
+			finances.Expenditure,
+			finances.TotalExpenditure);
+		financeReportsContainer.AddChild(new HSeparator());
+		AddMoneyRow(
+			financeReportsContainer,
+			"Net change",
+			finances.NetChange,
+			true,
+			showSign: true);
+	}
+
+	private void AddFinanceSection(
+		string title,
+		IReadOnlyDictionary<string, long> entries,
+		long total)
+	{
+		var heading = new Label { Text = title };
+		heading.AddThemeFontSizeOverride("font_size", 18);
+		financeReportsContainer.AddChild(heading);
+
+		if (entries.Count == 0)
+			AddMoneyRow(financeReportsContainer, $"No {title.ToLowerInvariant()}", 0);
+		else
+		{
+			foreach (var entry in entries)
+				AddMoneyRow(financeReportsContainer, entry.Key, entry.Value);
+		}
+
+		AddMoneyRow(financeReportsContainer, $"Total {title}", total, true);
+		financeReportsContainer.AddChild(new HSeparator());
+	}
+
+	private static void AddMoneyRow(
+		VBoxContainer container,
+		string reason,
+		long amount,
+		bool isTotal = false,
+		bool showSign = false)
+	{
+		var row = new HBoxContainer();
+		var reasonLabel = new Label
+		{
+			Text = reason,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill
+		};
+		var amountLabel = new Label
+		{
+			Text = showSign && amount > 0
+				? $"+${amount:N0}"
+				: amount < 0
+					? $"-${Math.Abs(amount):N0}"
+					: $"${amount:N0}",
+			HorizontalAlignment = HorizontalAlignment.Right
+		};
+
+		if (isTotal)
+		{
+			reasonLabel.AddThemeFontSizeOverride("font_size", 18);
+			amountLabel.AddThemeFontSizeOverride("font_size", 18);
+		}
+
+		row.AddChild(reasonLabel);
+		row.AddChild(amountLabel);
+		container.AddChild(row);
 	}
 
 	private async void ContinueButtonOnPressed()
@@ -158,6 +277,7 @@ public partial class MonthlyReportUI : UIWindow
 		await HideCall();
 		RestorePauseState();
 		reportScores.Clear();
+		reportFinances.Clear();
 	}
 
 	private void RestorePauseState()
@@ -186,6 +306,7 @@ public partial class MonthlyReportUI : UIWindow
 		}
 
 		RestorePauseState();
+		reportPending = false;
 		base._ExitTree();
 	}
 

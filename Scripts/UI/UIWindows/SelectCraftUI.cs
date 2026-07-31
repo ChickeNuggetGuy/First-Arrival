@@ -21,7 +21,7 @@ public partial class SelectCraftUI : UIWindow
 		}
 		
 		treeUI.ButtonClicked += TreeUIOnButtonClicked;
-		return base._Setup();
+		return Task.CompletedTask;
 		
 	}
 

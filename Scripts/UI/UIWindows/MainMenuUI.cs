@@ -43,7 +43,6 @@ public partial class MainMenuUI : UIWindow
 
 	protected override Task _Setup()
 	{
-		base._Setup();
 		return Task.CompletedTask;
 	}
 

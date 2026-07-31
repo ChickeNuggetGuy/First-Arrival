@@ -16,6 +16,7 @@ public partial class UnitsPanelUI : UIWindow
 	[Export] private Button hireButton;
 	[Export] private Button fireButton;
 	[Export] private PackedScene unitScene;
+	private bool signalsConnected;
 	
 	private TeamBaseCellDefinition CurrentBase
 	{
@@ -28,6 +29,9 @@ public partial class UnitsPanelUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		if (signalsConnected)
+			return Task.CompletedTask;
+
 		if (hireButton != null )
 		{
 			hireButton.Pressed += HireButtonOnPressed;
@@ -38,20 +42,22 @@ public partial class UnitsPanelUI : UIWindow
 		{
 			fireButton.Pressed += FireButtonOnPressed;
 		}
-		return base._Setup();
+		signalsConnected = true;
+		return Task.CompletedTask;
 	}
 
 	public override void _ExitTree()
 	{
-		if (hireButton != null )
+		if (signalsConnected && hireButton != null )
 		{
 			hireButton.Pressed -= HireButtonOnPressed;
 		}
 		
-		if (fireButton != null)
+		if (signalsConnected && fireButton != null)
 		{
 			fireButton.Pressed -= FireButtonOnPressed;
 		}
+		signalsConnected = false;
 		base._ExitTree();
 	}
 

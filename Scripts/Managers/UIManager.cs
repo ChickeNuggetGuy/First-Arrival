@@ -27,6 +27,12 @@ public partial class UIManager : Manager<UIManager>
 
 	public override string GetManagerName() => "UIManager";
 
+	public override void _Ready()
+	{
+		base._Ready();
+		GatherWindowsAndApplyInitialVisibility();
+	}
+
 	
 	/// <summary>
 	/// Finds and loops through all children Ui Windows and adds them to Windows 
@@ -34,15 +40,29 @@ public partial class UIManager : Manager<UIManager>
 	/// <param name="loadingData"></param>
 	protected override async Task _Setup(bool loadingData)
 	{
-		_windows.Clear();
-		foreach (var child in uiHolder.GetChildren())
-		{
-			if (child is UIWindow window)
-				_windows.Add(window);
-		}
+		GatherWindowsAndApplyInitialVisibility();
 
 		EmitSignal(SignalName.SetupCompleted);
 		await Task.CompletedTask;
+	}
+
+	private void GatherWindowsAndApplyInitialVisibility()
+	{
+		_windows.Clear();
+		if (uiHolder == null)
+		{
+			GD.PushError("UIManager cannot initialize windows because uiHolder is not assigned.");
+			return;
+		}
+
+		foreach (var child in uiHolder.GetChildren())
+		{
+			if (child is UIWindow window)
+			{
+				_windows.Add(window);
+				window.ApplyInitialVisibility();
+			}
+		}
 	}
 
 	

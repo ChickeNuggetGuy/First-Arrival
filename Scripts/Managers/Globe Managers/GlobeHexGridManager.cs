@@ -45,7 +45,8 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 	private uint[] _countryKeyByIndex = Array.Empty<uint>();
 	private Dictionary<uint, int[]> _countryToCellIndices = new();
 	private readonly Dictionary<uint, CountryRuntimeState> _countryStates = new();
-	private readonly Dictionary<uint, (double Gdp, float Opinion)> _loadedCountryStates = new();
+	private readonly Dictionary<uint, (double Gdp, float Opinion, double ContributionRate)>
+		_loadedCountryStates = new();
 	private long[]? _loadedCountryKeysFromSave;
 	public int[] DebugHighlightedCellIndices { get; private set; } = Array.Empty<int>();
 
@@ -108,9 +109,10 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		{
 			states.Add(new Godot.Collections.Dictionary<string, Variant>
 			{
-				["country_key"] = (long)state.CountryKey,
-				["gdp"] = state.GrossDomesticProduct,
-				["player_opinion"] = state.PlayerOpinion
+					["country_key"] = (long)state.CountryKey,
+					["gdp"] = state.GrossDomesticProduct,
+					["player_opinion"] = state.PlayerOpinion,
+					["monthly_contribution_rate"] = state.MonthlyContributionRate
 			});
 		}
 		data["country_states"] = states;
@@ -138,10 +140,15 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 				double gdp = saved.TryGetValue("gdp", out Variant gdpVariant)
 					? gdpVariant.AsDouble()
 					: 0.0;
-				float opinion = saved.TryGetValue("player_opinion", out Variant opinionVariant)
-					? opinionVariant.AsSingle()
-					: 0.0f;
-				_loadedCountryStates[key] = (gdp, opinion);
+					float opinion = saved.TryGetValue("player_opinion", out Variant opinionVariant)
+						? opinionVariant.AsSingle()
+						: 0.0f;
+					double contributionRate = saved.TryGetValue(
+						"monthly_contribution_rate",
+						out Variant contributionVariant)
+						? contributionVariant.AsDouble()
+						: double.NaN;
+					_loadedCountryStates[key] = (gdp, opinion, contributionRate);
 			}
 		}
 
@@ -491,6 +498,11 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return _countryStates.TryGetValue(countryKey, out state);
 	}
 
+	public List<CountryRuntimeState> GetCountryStatesSnapshot() =>
+		_countryStates.Values
+			.OrderBy(state => state.CountryName, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
 	private void InitializeCountryStates()
 	{
 		_countryStates.Clear();
@@ -505,6 +517,11 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 			{
 				state.GrossDomesticProduct = saved.Gdp;
 				state.PlayerOpinion = Mathf.Clamp(saved.Opinion, -100.0f, 100.0f);
+				if (!double.IsNaN(saved.ContributionRate))
+					state.MonthlyContributionRate = Math.Clamp(
+						saved.ContributionRate,
+						0.0,
+						1.0);
 			}
 
 			_countryStates[key] = state;

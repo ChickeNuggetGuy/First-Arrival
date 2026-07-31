@@ -4,17 +4,38 @@ using Godot;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 
+public sealed class MonthlyFinanceSnapshot
+{
+	public IReadOnlyDictionary<string, long> Income { get; }
+	public IReadOnlyDictionary<string, long> Expenditure { get; }
+	public long TotalIncome { get; }
+	public long TotalExpenditure { get; }
+	public long NetChange => TotalIncome - TotalExpenditure;
+
+	public MonthlyFinanceSnapshot(
+		Dictionary<string, long> income,
+		Dictionary<string, long> expenditure)
+	{
+		Income = new Dictionary<string, long>(income);
+		Expenditure = new Dictionary<string, long>(expenditure);
+		foreach (long amount in Income.Values) TotalIncome += amount;
+		foreach (long amount in Expenditure.Values) TotalExpenditure += amount;
+	}
+}
+
 [GlobalClass]
 public partial class GlobeTeamHolder : Node
 {
 	public Enums.UnitTeam Team;
-	public int funds;
+	public long funds;
 	public int newbaseCost = 200000;
 	public List<TeamBaseCellDefinition> Bases = new List<TeamBaseCellDefinition>();
 	
 	public Craft SelectedCraft { get; protected set; }
 	
 	public Godot.Collections.Dictionary<Enums.MonthlyScoreReason, int> monthlyScore { get; private set; } = new();
+	private Dictionary<string, long> monthlyIncome = new(StringComparer.OrdinalIgnoreCase);
+	private Dictionary<string, long> monthlyExpenditure = new(StringComparer.OrdinalIgnoreCase);
 	public int TotalMonthlyScore
 	{
 		get
@@ -25,12 +46,12 @@ public partial class GlobeTeamHolder : Node
 			return total;
 		}
 	}
-	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, int currentFunds);
+	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, long currentFunds);
 	[Signal] public delegate void BaseAddedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
 	[Signal] public delegate void BaseRemovedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
 	[Signal] public delegate void MonthlyScoreChangedEventHandler(Godot.Collections.Dictionary<Enums.MonthlyScoreReason, int> score);
 	
-	public GlobeTeamHolder(Enums.UnitTeam affiliation, List<TeamBaseCellDefinition> bases, int startingFunds = 1000000)
+	public GlobeTeamHolder(Enums.UnitTeam affiliation, List<TeamBaseCellDefinition> bases, long startingFunds = 1000000)
 	{
 		Team = affiliation;
 		Bases = bases ?? new List<TeamBaseCellDefinition>();
@@ -39,15 +60,64 @@ public partial class GlobeTeamHolder : Node
 
 	public GlobeTeamHolder() : this(Enums.UnitTeam.None, new List<TeamBaseCellDefinition>(), 0) { }
 
-	public bool CanAffordCost(int cost) => funds >= cost;
+	public bool CanAffordCost(long cost) => cost >= 0 && funds >= cost;
 
-	public bool TryRemoveFunds(int amount)
+	public bool TryRemoveFunds(long amount, string expenseCategory = "Purchases")
 	{
-		if (funds < amount) return false;
-		funds -= amount;
-		GD.Print("Try remove funds: " + funds);
-		EmitSignal(SignalName.FundsChanged, this, funds);
+		if (amount < 0 || funds < amount) return false;
+		ChangeFunds(-amount, expenseCategory);
 		return true;
+	}
+
+	/// <summary>
+	/// Applies income or unavoidable expenses such as monthly facility upkeep.
+	/// Unlike a purchase, upkeep may take a team into debt.
+	/// </summary>
+	public long ChangeFunds(long amount, string category = "Other")
+	{
+		long previousFunds = funds;
+		decimal changedFunds = (decimal)funds + amount;
+		funds = (long)Math.Clamp(changedFunds, long.MinValue, long.MaxValue);
+		long appliedAmount = funds - previousFunds;
+		if (appliedAmount > 0)
+			RecordMonthlyIncome(appliedAmount, category);
+		else if (appliedAmount < 0)
+			RecordMonthlyExpenditure(-appliedAmount, category);
+		EmitSignal(SignalName.FundsChanged, this, funds);
+		return appliedAmount;
+	}
+
+	public void RecordMonthlyIncome(long amount, string category)
+	{
+		RecordFinanceEntry(monthlyIncome, amount, category, "Other Income");
+	}
+
+	public void RecordMonthlyExpenditure(long amount, string category)
+	{
+		RecordFinanceEntry(monthlyExpenditure, amount, category, "Other Expenditure");
+	}
+
+	private static void RecordFinanceEntry(
+		Dictionary<string, long> ledger,
+		long amount,
+		string category,
+		string fallbackCategory)
+	{
+		if (amount <= 0) return;
+		string key = string.IsNullOrWhiteSpace(category) ? fallbackCategory : category;
+		long current = ledger.GetValueOrDefault(key);
+		ledger[key] = current > long.MaxValue - amount
+			? long.MaxValue
+			: current + amount;
+	}
+
+	public MonthlyFinanceSnapshot GetMonthlyFinanceSnapshot() =>
+		new(monthlyIncome, monthlyExpenditure);
+
+	public void ResetMonthlyFinances()
+	{
+		monthlyIncome.Clear();
+		monthlyExpenditure.Clear();
 	}
 
 
@@ -112,7 +182,7 @@ public partial class GlobeTeamHolder : Node
 	{
 		if (!CanAffordCost(cost)) return false;
 
-		TryRemoveFunds(cost);
+		TryRemoveFunds(cost, "Base construction");
 		TeamBaseCellDefinition baseCellDefinition =
 			new TeamBaseCellDefinition(cell.Index, "Base " + Bases.Count + 1, Team, null);
 		Bases.Add(baseCellDefinition);
@@ -135,6 +205,8 @@ public partial class GlobeTeamHolder : Node
 			["team"] = (int)Team,
 			["funds"] = funds,
 			["monthlyScore"] = monthlyScoreData,
+			["monthlyIncome"] = SaveFinanceLedger(monthlyIncome),
+			["monthlyExpenditure"] = SaveFinanceLedger(monthlyExpenditure),
 			["bases"] = basesData
 		};
 	}
@@ -145,9 +217,11 @@ public partial class GlobeTeamHolder : Node
 			Team = (Enums.UnitTeam)data["team"].AsInt32();
 
 		if (data.ContainsKey("funds"))
-			funds = data["funds"].AsInt32();
+			funds = data["funds"].AsInt64();
 
 		LoadMonthlyScore(data);
+		monthlyIncome = LoadFinanceLedger(data, "monthlyIncome");
+		monthlyExpenditure = LoadFinanceLedger(data, "monthlyExpenditure");
 
 		if (data.ContainsKey("bases"))
 		{
@@ -172,6 +246,34 @@ public partial class GlobeTeamHolder : Node
 				Bases.Add(newBase);
 			}
 		}
+	}
+
+	private static Godot.Collections.Dictionary<string, Variant> SaveFinanceLedger(
+		Dictionary<string, long> ledger)
+	{
+		var saved = new Godot.Collections.Dictionary<string, Variant>();
+		foreach (var entry in ledger)
+			saved[entry.Key] = entry.Value;
+		return saved;
+	}
+
+	private static Dictionary<string, long> LoadFinanceLedger(
+		Godot.Collections.Dictionary<string, Variant> data,
+		string key)
+	{
+		var ledger = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+		if (!data.TryGetValue(key, out Variant savedLedger) ||
+		    savedLedger.VariantType != Variant.Type.Dictionary)
+			return ledger;
+
+		foreach (var entry in savedLedger.AsGodotDictionary())
+		{
+			string category = entry.Key.AsString();
+			long amount = Math.Max(0, entry.Value.AsInt64());
+			if (!string.IsNullOrWhiteSpace(category) && amount > 0)
+				ledger[category] = amount;
+		}
+		return ledger;
 	}
 
 	private void LoadMonthlyScore(Godot.Collections.Dictionary<string, Variant> data)

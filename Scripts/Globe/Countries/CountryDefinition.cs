@@ -33,6 +33,10 @@ public partial class CountryDefinition : Resource
 	[Export(PropertyHint.Range, "-100,100,0.1")]
 	public float PlayerOpinion { get; set; }
 
+	// Legacy save/resource value. Monthly contributions are now allocated from
+	// GlobeTeamManager's global pool using GDP as a relative weight.
+	public double InitialMonthlyContributionPercent { get; set; } = 0.01;
+
 	/// <summary>The atlas RGB packed in exactly the same format used by GlobeHexGridManager.</summary>
 	public uint CountryKey => ColorToCountryKey(MapColor);
 

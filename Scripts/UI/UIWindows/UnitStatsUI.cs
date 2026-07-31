@@ -10,4 +10,7 @@ public partial class UnitStatsUI : UIWindow
 	{
 	}
 
+	protected override async Task _Setup()
+	{
+	}
 }

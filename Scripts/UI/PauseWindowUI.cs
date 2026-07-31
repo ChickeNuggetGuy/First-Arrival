@@ -15,8 +15,6 @@ public partial class PauseWindowUI : UIWindow
 	protected override Task _Setup()
 	{
 		
-		base._Setup();
-		
 		if(!_resumeButton.IsConnected(Button.SignalName.Pressed, Callable.From(ResumeButtonPressed)))
 			_resumeButton.Pressed += ResumeButtonPressed;
 		

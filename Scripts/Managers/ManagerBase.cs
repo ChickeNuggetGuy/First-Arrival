@@ -5,11 +5,8 @@ namespace FirstArrival.Scripts.Managers;
 
 public abstract partial class ManagerBase : Node
 {
-	
-	// Inside ManagerBase.cs
 	public bool HasInitialized { get; set; } = false;
 
-	// If this is an Autoload, we usually want to run Setup/Execute only once at game start.
 	[Export] public bool ShouldExecuteOnlyOnce { get; set; } = false;
 	
 	[Export] protected bool DebugMode = false;

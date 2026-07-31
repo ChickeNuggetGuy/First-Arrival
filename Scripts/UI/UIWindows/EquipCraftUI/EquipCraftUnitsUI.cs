@@ -38,7 +38,7 @@ public partial class EquipCraftUnitsUI : UIWindow
 		{
 			removeButton.Pressed += RemoveButtonOnPressed;
 		}
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	private void AddButtonOnPressed()

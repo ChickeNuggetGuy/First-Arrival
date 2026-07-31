@@ -28,7 +28,7 @@ public partial class GameSaveUI : UIWindow
 		
 		SavesManager.Instance.GameSavesChanged += LoadSaveGameData;
 		LoadSaveGameData();
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 

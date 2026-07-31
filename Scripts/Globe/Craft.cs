@@ -211,6 +211,7 @@ public new Godot.Collections.Dictionary<string, Variant> Save()
 {
 	return new Godot.Collections.Dictionary<string, Variant>
 	{
+		{"name", GetName()},
 		{ "itemID", ItemID },
 		{ "index", Index },
 		{ "status", (int)Status },
@@ -248,6 +249,11 @@ private void LoadDataOnly(
 			int count = savedItemCounts[key].AsInt32();
 			if (count > 0) itemCounts[itemId] = count;
 		}
+	}
+
+	if (data.ContainsKey("name"))
+	{
+		SetName(data["name"].AsString());
 	}
 
 	if (data.ContainsKey("index")) Index = data["index"].AsInt32();
@@ -338,7 +344,9 @@ public async Task LoadAsync(
 
 	public void SetVisual(MeshInstance3D instance)
 	{
-		visual = instance;
+		visual = instance != null && GodotObject.IsInstanceValid(instance)
+			? instance
+			: null;
 	}
 
 	/// <summary>

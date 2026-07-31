@@ -27,8 +27,13 @@ public abstract partial class UIWindow : UIElement
 
 	
 	#endregion
-	protected override async Task _Setup()
+	public override async Task SetupCall()
 	{
+		// Enforce the startup state before any asynchronous child setup. If a
+		// different manager fails during scene loading, start-hidden windows must
+		// not remain visible over the main window.
+		ApplyInitialVisibility();
+
 		// Find all UIElements that belong to this window
 		uiElements = GetChildUIElements();
     
@@ -49,6 +54,28 @@ public abstract partial class UIWindow : UIElement
 			// instead of assuming that startHidden == false means it is visible.
 			IsShown = Visible && (Visual == null || Visual.Visible);
 		}
+		await base.SetupCall();
+	}
+
+	/// <summary>
+	/// Applies only the scene's initial visibility contract. UIManager calls this
+	/// from _Ready so hidden windows are safe before the first rendered frame.
+	/// </summary>
+	public void ApplyInitialVisibility()
+	{
+		if (startHidden)
+		{
+			Hide();
+			Visual?.Hide();
+			IsShown = false;
+			MouseFilter = MouseFilterEnum.Ignore;
+			return;
+		}
+
+		IsShown = Visible && (Visual == null || Visual.Visible);
+		MouseFilter = IsShown
+			? MouseFilterEnum.Stop
+			: MouseFilterEnum.Ignore;
 	}
 
 	private void ToggleButtonOnPressed()
@@ -94,6 +121,7 @@ public abstract partial class UIWindow : UIElement
 		{
 			if (uiElement is UIWindow uiWindow)
 			{
+				if(uiWindow.GetParent() == this) continue;
 				await uiWindow.ShowCall();
 			}
 		}
@@ -130,6 +158,7 @@ public abstract partial class UIWindow : UIElement
 		{
 			if (uiElement is UIWindow uiWindow)
 			{
+				if(uiWindow.GetParent() == this) continue;
 				await uiWindow.HideCall();
 			}
 		}
@@ -209,6 +238,7 @@ public abstract partial class UIWindow : UIElement
 	public override void _EnterTree()
 	{
 		base._EnterTree();
+		AddToGroup("UIWindows");
 		if (toggleButton != null)
 		{
 			toggleButton.Pressed += ToggleButtonOnPressed;

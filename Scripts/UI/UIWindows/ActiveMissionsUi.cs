@@ -38,8 +38,8 @@ public partial class ActiveMissionsUi : UIWindow
 		
 		//Update any existing Active Missions 
 		UpdateActiveMissionButtons();
-		return base._Setup();
-		
+		return Task.CompletedTask;
+
 	}
 
 	private void MissionManagerOnMissionCompleted()

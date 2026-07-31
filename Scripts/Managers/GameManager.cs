@@ -49,7 +49,7 @@ public partial class GameManager : Manager<GameManager>
 	public Vector2I unitCounts = new Vector2I(2, 2);
 	public MissionCellDefinition currentMission;
 	public TeamBaseCellDefinition currentBase;
-	public int currentBaseFunds;
+	public long currentBaseFunds;
 	public PackedScene unitScene;
 	private Godot.Collections.Array<
 		Godot.Collections.Dictionary<string, Variant>> _pendingBattlePlayerUnits;
@@ -338,6 +338,9 @@ public partial class GameManager : Manager<GameManager>
 	public bool CanHireUnits(int count = 1)
 	{
 		if (count <= 0 || currentBase == null || unitScene == null) return false;
+		if (currentBase.GetStationedGridObjects().Count + count >
+			currentBase.MaxStationedUnits)
+			return false;
 
 		long totalCost = (long)UnitHiringCost * count;
 		return currentBaseFunds >= totalCost;
@@ -349,6 +352,9 @@ public partial class GameManager : Manager<GameManager>
 			return false;
 
 		currentBaseFunds -= UnitHiringCost * count;
+		currentBase.RecordBaseExpenditure(
+			(long)UnitHiringCost * count,
+			"Unit recruitment");
 		if (!SyncCurrentBaseToGlobeState())
 			GD.PrintErr("Units were hired locally, but the globe transition state could not be updated.");
 		return true;
@@ -566,7 +572,7 @@ public partial class GameManager : Manager<GameManager>
 		if (data.ContainsKey("mapSize")) mapSize = (Vector2I)data["mapSize"];
 		if (data.ContainsKey("unitCounts")) unitCounts = (Vector2I)data["unitCounts"];
 		if (data.ContainsKey("currentScene")) currentScene = (GameScene)(int)data["currentScene"];
-		if (data.ContainsKey("currentBaseFunds")) currentBaseFunds = data["currentBaseFunds"].AsInt32();
+		if (data.ContainsKey("currentBaseFunds")) currentBaseFunds = data["currentBaseFunds"].AsInt64();
 		if (data.ContainsKey("currentBase") && data["currentBase"].VariantType != Variant.Type.Nil)
 		{
 			currentBase = new TeamBaseCellDefinition(-1, "", Enums.UnitTeam.None, null);

@@ -16,7 +16,7 @@ public partial class ContextMenuUI : UIWindow
 
 	protected override Task _Setup()
 	{
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	

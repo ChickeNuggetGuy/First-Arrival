@@ -75,7 +75,7 @@ public partial class StartingEuipmentUI : UIWindow
 		previousButton.Pressed += PreviousUnit;
 		nextButton.Pressed += NextUnit;
 
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	private void AcceptButtonOnPressed()

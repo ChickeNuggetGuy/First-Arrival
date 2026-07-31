@@ -10,6 +10,9 @@ using FirstArrival.Scripts.Utility;
 public partial class BuySellUI : UIWindow
 {
 	private const int RecruitUnitTransactionId = int.MaxValue;
+	private const int TransactionButtonSize = 24;
+	private const int TransactionColumnWidth = 40;
+	private const int QuantityColumnWidth = 44;
 
 	[Export] protected Tree itemTreeUI;
 	[Export] protected Texture2D buyTexture;
@@ -20,6 +23,8 @@ public partial class BuySellUI : UIWindow
 
 	private readonly Dictionary<int, int> currentItemChange = new();
 	private readonly Dictionary<int, TreeItem> treeItems = new();
+	private Texture2D scaledBuyTexture;
+	private Texture2D scaledSellTexture;
 
 	protected override Task _Setup()
 	{
@@ -33,10 +38,19 @@ public partial class BuySellUI : UIWindow
 		itemTreeUI.SetColumnTitle(3, "Sell");
 		itemTreeUI.SetColumnTitleAlignment(3, HorizontalAlignment.Left);
 
+		itemTreeUI.SetColumnExpand(0, true);
+		itemTreeUI.SetColumnExpand(1, false);
+		itemTreeUI.SetColumnExpand(2, false);
+		itemTreeUI.SetColumnExpand(3, false);
+		itemTreeUI.SetColumnCustomMinimumWidth(1, TransactionColumnWidth);
+		itemTreeUI.SetColumnCustomMinimumWidth(2, QuantityColumnWidth);
+		itemTreeUI.SetColumnCustomMinimumWidth(3, TransactionColumnWidth);
+		itemTreeUI.SetColumnClipContent(2, true);
+
 		itemTreeUI.ButtonClicked += ItemTreeUIOnButtonClicked;
 		if (confirmButton != null) confirmButton.Pressed += ConfirmButtonOnPressed;
 		if (cancelButton != null) cancelButton.Pressed += CancelButtonOnPressed;
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	private async void ConfirmButtonOnPressed()
@@ -150,9 +164,10 @@ public partial class BuySellUI : UIWindow
 	private void RefreshTransactionSummary()
 	{
 		int cost = GetTransactionCost();
-		int resultingFunds = GameManager.Instance.currentBaseFunds - cost;
+		long resultingFunds = GameManager.Instance.currentBaseFunds - cost;
 		if (finalValueLabel != null)
-			finalValueLabel.Text = $"Transaction: {(cost >= 0 ? "Cost" : "Credit")} ${Math.Abs(cost):N0} | Funds: ${resultingFunds:N0}";
+			finalValueLabel.Text =
+				$"{(cost >= 0 ? "Cost" : "Credit")}: ${Math.Abs(cost):N0}\nFunds: ${resultingFunds:N0}";
 
 		if (confirmButton != null)
 			confirmButton.Disabled = currentItemChange.Count == 0 || resultingFunds < 0;
@@ -206,6 +221,10 @@ public partial class BuySellUI : UIWindow
 		}
 
 		GameManager.Instance.currentBaseFunds -= cost;
+		if (cost > 0)
+			teamBase.RecordBaseExpenditure(cost, "Base purchases and recruitment");
+		else if (cost < 0)
+			teamBase.RecordBaseIncome(-(long)cost, "Equipment and craft sales");
 		if (!GameManager.Instance.SyncCurrentBaseToGlobeState())
 			GD.PrintErr("Transaction completed locally, but the globe transition state could not be updated.");
 		currentItemChange.Clear();
@@ -216,6 +235,12 @@ public partial class BuySellUI : UIWindow
 	{
 		int finalCraftCount = teamBase.CraftCount + GetPendingCraftChange();
 		if (finalCraftCount < 0 || finalCraftCount > teamBase.MaxCraft) return false;
+		int unitsToHire = currentItemChange.GetValueOrDefault(
+			RecruitUnitTransactionId,
+			0);
+		if (teamBase.GetStationedGridObjects().Count + unitsToHire >
+			teamBase.MaxStationedUnits)
+			return false;
 
 		foreach (KeyValuePair<int, int> pair in currentItemChange)
 		{
@@ -256,26 +281,53 @@ public partial class BuySellUI : UIWindow
 			return;
 		}
 
+		scaledBuyTexture ??= CreateButtonTexture(buyTexture, TransactionButtonSize);
+		scaledSellTexture ??= CreateButtonTexture(sellTexture, TransactionButtonSize);
+
 		TreeItem root = itemTreeUI.CreateItem();
 		TreeItem unitItem = itemTreeUI.CreateItem(root);
 		treeItems[RecruitUnitTransactionId] = unitItem;
 		unitItem.SetText(0, $"Unit Recruit  (${GameManager.UnitHiringCost:N0})");
 		unitItem.SetText(2, teamBase.GetStationedGridObjects().Count.ToString());
-		unitItem.AddButton(1, buyTexture, RecruitUnitTransactionId, false, "Hire unit");
+		unitItem.AddButton(1, scaledBuyTexture, RecruitUnitTransactionId, false, "Hire unit");
+		unitItem.AddButton(3, scaledSellTexture, RecruitUnitTransactionId, true, "Remove pending hire");
 
 		foreach (ItemData itemData in inventoryManager.Database.GetAllItems())
 		{
 			if (itemData == null || !itemData.ShowInBuySellWindow) continue;
 
-			TreeItem subItem = itemTreeUI.CreateItem(root);
-			treeItems[itemData.ItemID] = subItem;
-			subItem.SetText(0, $"{itemData.ItemName}  (${itemData.buyPrice:N0}/${itemData.sellPrice:N0})");
-			subItem.SetText(2, GetOwnedCount(teamBase, itemData).ToString());
-			subItem.AddButton(1, buyTexture, itemData.ItemID);
-			subItem.AddButton(3, sellTexture, itemData.ItemID);
+			TreeItem itemNode = itemTreeUI.CreateItem(root);
+			treeItems[itemData.ItemID] = itemNode;
+
+			itemNode.SetText(0, $"{itemData.ItemName}");
+			itemNode.SetText(2, GetOwnedCount(teamBase, itemData).ToString());
+
+			itemNode.AddButton(1, scaledBuyTexture, itemData.ItemID, false, $"Buy {itemData.ItemName}");
+
+			itemNode.AddButton(3, scaledSellTexture, itemData.ItemID, false, $"Sell {itemData.ItemName}");
 		}
 
 		RefreshTransactionSummary();
+	}
+
+	private static Texture2D CreateButtonTexture(Texture2D source, int maxSize)
+	{
+		if (source == null) return null;
+
+		Vector2 sourceSize = source.GetSize();
+		if (sourceSize.X <= maxSize && sourceSize.Y <= maxSize) return source;
+
+		float scale = Mathf.Min(maxSize / sourceSize.X, maxSize / sourceSize.Y);
+		Vector2I targetSize = new(
+			Mathf.Max(1, Mathf.RoundToInt(sourceSize.X * scale)),
+			Mathf.Max(1, Mathf.RoundToInt(sourceSize.Y * scale)));
+
+		Image image = source.GetImage();
+		if (image == null || image.IsEmpty()) return source;
+		if (image.IsCompressed() && image.Decompress() != Error.Ok) return source;
+
+		image.Resize(targetSize.X, targetSize.Y, Image.Interpolation.Lanczos);
+		return ImageTexture.CreateFromImage(image);
 	}
 
 	private void UpdateDisplayedQuantity(int itemId)
@@ -283,9 +335,11 @@ public partial class BuySellUI : UIWindow
 		if (!treeItems.TryGetValue(itemId, out TreeItem treeItem)) return;
 		if (itemId == RecruitUnitTransactionId)
 		{
+			int pendingUnitCount = currentItemChange.GetValueOrDefault(itemId, 0);
 			int unitCount = GameManager.Instance.currentBase.GetStationedGridObjects().Count
-			                + currentItemChange.GetValueOrDefault(itemId, 0);
+			                + pendingUnitCount;
 			treeItem.SetText(2, unitCount.ToString());
+			treeItem.SetButtonDisabled(3, 0, pendingUnitCount == 0);
 			return;
 		}
 

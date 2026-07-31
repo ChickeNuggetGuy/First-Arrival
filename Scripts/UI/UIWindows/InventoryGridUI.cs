@@ -21,7 +21,7 @@ public partial class InventoryGridUI : UIWindow
 	{
 		InventoryManager.Instance.AddRuntimeInventoryGridUI(inventoryType, this);
 
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	protected override async Task DrawUI()

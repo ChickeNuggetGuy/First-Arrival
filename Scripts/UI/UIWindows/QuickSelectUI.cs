@@ -17,7 +17,6 @@ public partial class QuickSelectUI : UIWindow
 	
 	protected override async Task _Setup()
 	{
-		await base._Setup();
 
 		GridObjectTeamHolder playerTeamHolder =
 			GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);

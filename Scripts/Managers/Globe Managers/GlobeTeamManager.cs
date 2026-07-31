@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.Globe.Countries;
 using FirstArrival.Scripts.Utility;
 using Godot.Collections;
 
@@ -15,7 +16,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	public PackedScene shipScene;
 	public Node shipContainer;
 	
-	public bool buildBaseMode = false;
+	public bool buildBaseMode { get; private set; }= false;
 	public bool buyCraftMode = false;
 	private bool _sendCraftMode = false;
 	private readonly HashSet<HexCellDefinition> _registeredDefinitions = new();
@@ -23,7 +24,35 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 
 	[Export] public Enums.UnitTeam ViewingTeam { get; set; } = Enums.UnitTeam.Player;
 	[Export] private bool scanForDefinitionsDaily = true;
+
+	[ExportGroup("Country Funding")]
+	[Export(PropertyHint.Range, "0,1000000000,10000,or_greater")]
+	private long globalMonthlyFundingPool = 750_000;
+	[Export(PropertyHint.Range, "0.1,1,0.05")]
+	private double gdpFundingExponent = 0.75;
+	[Export]
+	private bool applyCountryOpinionToFunding = true;
+	[Export(PropertyHint.Range, "0,1,0.05")]
+	private double countryOpinionFundingEffect = 0.5;
+
 	private bool _timeSignalsConnected;
+
+	private sealed class CountryFundingAllocation
+	{
+		public CountryRuntimeState Country { get; }
+		public long BaseContribution { get; set; }
+		public double FractionalRemainder { get; }
+
+		public CountryFundingAllocation(
+			CountryRuntimeState country,
+			long baseContribution,
+			double fractionalRemainder)
+		{
+			Country = country;
+			BaseContribution = baseContribution;
+			FractionalRemainder = fractionalRemainder;
+		}
+	}
 
 	[Signal]
 	public delegate void CraftDetectedEventHandler(
@@ -148,12 +177,28 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			}
 		}
 
-		if (scanForDefinitionsDaily && GlobeTimeManager.Instance != null && !_timeSignalsConnected)
+		TransferPendingBaseExpenditureToLedgers();
+
+		if (GlobeTimeManager.Instance != null && !_timeSignalsConnected)
 		{
 			GlobeTimeManager.Instance.DayChanged += OnDayChanged;
+			GlobeTimeManager.Instance.MonthChanged += OnMonthChanged;
 			_timeSignalsConnected = true;
 		}
 		await Task.CompletedTask;
+	}
+
+	public void SetBuildBaseMode(bool buildBaseMode)
+	{
+		this.buildBaseMode = buildBaseMode;
+		if (buildBaseMode)
+		{
+			GlobeTimeManager.Instance.SetTimeSpeed(0);
+		}
+		else
+		{
+			GlobeTimeManager.Instance.SetTimeSpeed(1);
+		}
 	}
 	
 	#region Visual Restoration
@@ -197,12 +242,13 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			return;
 		}
 
-		MeshInstance3D shipNode = craft.visual ?? shipScene.Instantiate<MeshInstance3D>();
-
-		if (craft.visual == null)
+		MeshInstance3D shipNode = craft.visual;
+		if (shipNode == null || !GodotObject.IsInstanceValid(shipNode))
 		{
+			shipNode = shipScene.Instantiate<MeshInstance3D>();
 			craft.SetVisual(shipNode);
 		}
+
 		shipNode.Visible = craftTeam == ViewingTeam || craft.IsVisibleTo(ViewingTeam);
 
 		if (shipContainer != null && shipNode.GetParent() != shipContainer)
@@ -494,12 +540,19 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		if (definition == null || !_registeredDefinitions.Add(definition)) return;
 		definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
 		definition.VisibilityChanged += OnDefinitionVisibilityChanged;
+		if (definition is TeamBaseCellDefinition teamBase)
+		{
+			teamBase.FacilityEffectsChanged -= OnBaseFacilityEffectsChanged;
+			teamBase.FacilityEffectsChanged += OnBaseFacilityEffectsChanged;
+		}
 	}
 
 	public void UnregisterCellDefinition(HexCellDefinition definition)
 	{
 		if (definition == null || !_registeredDefinitions.Remove(definition)) return;
 		definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
+		if (definition is TeamBaseCellDefinition teamBase)
+			teamBase.FacilityEffectsChanged -= OnBaseFacilityEffectsChanged;
 	}
 
 	/// <summary>
@@ -652,6 +705,15 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		Enums.Day day,
 		int daysAdvanced)
 	{
+		foreach (GlobeTeamHolder holder in teamData.Values)
+		{
+			if (holder?.Bases == null) continue;
+			foreach (TeamBaseCellDefinition baseDefinition in holder.Bases)
+				baseDefinition?.AdvanceFacilityConstruction(daysAdvanced);
+		}
+
+		if (!scanForDefinitionsDaily) return;
+
 		foreach (Enums.UnitTeam team in teamData.Keys)
 			ScanAllDetectors(team);
 
@@ -671,6 +733,157 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 				}
 			}
 		}
+	}
+
+	private void OnMonthChanged(Enums.Month month)
+	{
+		GlobeTeamHolder playerTeam = GetTeamData(Enums.UnitTeam.Player);
+		if (playerTeam != null && GlobeHexGridManager.Instance != null)
+			ApplyMonthlyCountryFunding(playerTeam);
+
+		foreach (GlobeTeamHolder holder in teamData.Values)
+		{
+			if (holder?.Bases == null) continue;
+
+			long upkeep = 0;
+			foreach (TeamBaseCellDefinition baseDefinition in holder.Bases)
+				upkeep += baseDefinition?.MonthlyFacilityCost ?? 0;
+
+			if (upkeep <= 0) continue;
+			holder.ChangeFunds(-upkeep, "Facility upkeep");
+		}
+	}
+
+	private void ApplyMonthlyCountryFunding(GlobeTeamHolder playerTeam)
+	{
+		long fundingPool = Math.Max(0, globalMonthlyFundingPool);
+		if (fundingPool == 0) return;
+
+		List<CountryRuntimeState> countries =
+			GlobeHexGridManager.Instance.GetCountryStatesSnapshot();
+		double exponent = Math.Clamp(gdpFundingExponent, 0.1, 1.0);
+		double totalWeight = 0.0;
+		var weightedCountries = new List<(CountryRuntimeState Country, double Weight)>();
+
+		foreach (CountryRuntimeState country in countries)
+		{
+			double weight = country.GetFundingWeight(exponent);
+			if (weight <= 0.0 || double.IsNaN(weight) || double.IsInfinity(weight))
+				continue;
+
+			weightedCountries.Add((country, weight));
+			totalWeight += weight;
+		}
+
+		if (weightedCountries.Count == 0 ||
+		    totalWeight <= 0.0 ||
+		    double.IsNaN(totalWeight) ||
+		    double.IsInfinity(totalWeight))
+			return;
+
+		var allocations = new List<CountryFundingAllocation>(weightedCountries.Count);
+		long distributed = 0;
+		foreach (var weightedCountry in weightedCountries)
+		{
+			double exactContribution =
+				fundingPool * (weightedCountry.Weight / totalWeight);
+			long wholeContribution = (long)Math.Floor(exactContribution);
+			allocations.Add(new CountryFundingAllocation(
+				weightedCountry.Country,
+				wholeContribution,
+				exactContribution - wholeContribution));
+			distributed += wholeContribution;
+		}
+
+		// Give any rounding remainder to the countries with the largest fractions.
+		// With neutral opinion, this guarantees the full funding pool is distributed.
+		long remaining = fundingPool - distributed;
+		allocations.Sort((left, right) =>
+		{
+			int fractionComparison = right.FractionalRemainder.CompareTo(
+				left.FractionalRemainder);
+			return fractionComparison != 0
+				? fractionComparison
+				: string.Compare(
+					left.Country.CountryName,
+					right.Country.CountryName,
+					StringComparison.OrdinalIgnoreCase);
+		});
+		for (int i = 0; i < remaining && i < allocations.Count; i++)
+			allocations[i].BaseContribution++;
+
+		allocations.Sort((left, right) => string.Compare(
+			left.Country.CountryName,
+			right.Country.CountryName,
+			StringComparison.OrdinalIgnoreCase));
+
+		double opinionEffect = Math.Clamp(countryOpinionFundingEffect, 0.0, 1.0);
+		foreach (CountryFundingAllocation allocation in allocations)
+		{
+			double opinionMultiplier = 1.0;
+			if (applyCountryOpinionToFunding)
+			{
+				double normalizedOpinion = Math.Clamp(
+					allocation.Country.PlayerOpinion / 100.0,
+					-1.0,
+					1.0);
+				opinionMultiplier += normalizedOpinion * opinionEffect;
+			}
+
+			double adjustedContribution =
+				allocation.BaseContribution * opinionMultiplier;
+			long contribution = adjustedContribution >= long.MaxValue
+				? long.MaxValue
+				: Math.Max(0, (long)Math.Round(
+					adjustedContribution,
+					MidpointRounding.AwayFromZero));
+			if (contribution <= 0) continue;
+
+			playerTeam.ChangeFunds(
+				contribution,
+				$"{allocation.Country.CountryName} contribution");
+		}
+	}
+
+	private void TransferPendingBaseExpenditureToLedgers()
+	{
+		foreach (GlobeTeamHolder holder in teamData.Values)
+		{
+			if (holder?.Bases == null) continue;
+			foreach (TeamBaseCellDefinition baseDefinition in holder.Bases)
+			{
+				if (baseDefinition == null) continue;
+				long expenditure =
+					baseDefinition.ConsumeFacilityConstructionExpenditure();
+				if (expenditure > 0)
+				{
+					holder.RecordMonthlyExpenditure(
+						expenditure,
+						$"Facility construction ({baseDefinition.definitionName})");
+				}
+
+				foreach (var income in baseDefinition.ConsumeBaseIncome())
+					holder.RecordMonthlyIncome(income.Value, income.Key);
+				foreach (var expense in baseDefinition.ConsumeBaseExpenditure())
+					holder.RecordMonthlyExpenditure(expense.Value, expense.Key);
+			}
+		}
+	}
+
+	private void OnBaseFacilityEffectsChanged(
+		TeamBaseCellDefinition definition)
+	{
+		if (definition == null ||
+			!_baseVisuals.TryGetValue(definition, out TeambasedVisual visual) ||
+			!GodotObject.IsInstanceValid(visual))
+			return;
+
+		DetectionRadiusVisualizer.AttachOrUpdate(
+			visual,
+			definition.cellIndex,
+			definition.DetectionRadius,
+			GetTeamDetectionColor(definition.teamAffiliation),
+			definition.ShowDetectionRadius);
 	}
 
 	private void OnDefinitionVisibilityChanged(HexCellDefinition definition)
@@ -714,8 +927,42 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	
 	public override void Deinitialize()
 	{
+		// Craft data persists between scenes, but its visual and travel tween are
+		// owned by this globe scene. Cancel the tween before the visual is freed and
+		// never leave a disposed Godot object stored on the persistent resource.
+		if (teamData != null)
+		{
+			foreach (GlobeTeamHolder holder in teamData.Values)
+			{
+				if (holder?.Bases == null) continue;
+				foreach (TeamBaseCellDefinition baseDefinition in holder.Bases)
+				{
+					if (baseDefinition == null) continue;
+					foreach (Craft craft in baseDefinition.CraftList)
+					{
+						if (craft == null) continue;
+						craft.CancelActiveTravel();
+						MeshInstance3D visual = craft.GetVisual();
+						if (visual != null && GodotObject.IsInstanceValid(visual))
+							visual.QueueFree();
+						craft.SetVisual(null);
+					}
+				}
+			}
+		}
+
 		if (_timeSignalsConnected && GlobeTimeManager.Instance != null)
+		{
 			GlobeTimeManager.Instance.DayChanged -= OnDayChanged;
+			GlobeTimeManager.Instance.MonthChanged -= OnMonthChanged;
+		}
+		foreach (HexCellDefinition definition in _registeredDefinitions)
+		{
+			definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
+			if (definition is TeamBaseCellDefinition teamBase)
+				teamBase.FacilityEffectsChanged -= OnBaseFacilityEffectsChanged;
+		}
+		_registeredDefinitions.Clear();
 		_timeSignalsConnected = false;
 	}
 	

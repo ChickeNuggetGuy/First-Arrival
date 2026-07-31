@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="LivingQuartersFacilityDefinition" format=3 uid="uid://b2vjomhs3gy4"]
+
+[ext_resource type="Script" uid="uid://hp1mxnldqp70" path="res://Scripts/Base Scripts/LivingQuartersFacilityDefinition.cs" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+FacilityId = "living_quarters"
+DisplayName = "Living Quarters"
+Purpose = "Increases the number of troops that can be stationed at this base."
+MonthlyCost = 3000
+GridSize = Vector2i(2, 1)
+BuildTimeDays = 10

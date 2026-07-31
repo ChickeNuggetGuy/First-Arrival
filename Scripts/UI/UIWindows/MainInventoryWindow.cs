@@ -20,7 +20,7 @@ public partial class MainInventoryWindow : UIWindow
 		{
 			playerTeamHolder.SelectedGridObjectChanged += PlayerTeamHolderOnSelectedGridObjectChanged;
 		}
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	private void PlayerTeamHolderOnSelectedGridObjectChanged(GridObject gridObject)

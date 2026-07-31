@@ -25,7 +25,7 @@ public partial class EquipCraftItemsUI : UIWindow
 		if (removeButton != null)
 			removeButton.Pressed += RemoveButtonOnPressed;
 
-		return base._Setup();
+		return Task.CompletedTask;
 	}
 
 	private void AddButtonOnPressed()

@@ -8,12 +8,27 @@ using FirstArrival.Scripts.Utility;
 
 public partial class TeamBaseCellDefinition : HexCellDefinition
 {
+	public const string HeadquartersDefinitionPath =
+		"res://Data/Facilities/Headquarters.tres";
+	public const string HeadquartersScenePath =
+		"res://Scenes/BaseCells/HQCell.tscn";
+	public static readonly Vector2I HeadquartersGridOrigin = new(4, 4);
+
 	public Enums.UnitTeam teamAffiliation = Enums.UnitTeam.None;
 	public int DetectionRadius { get; set; } = 10;
 	public float DetectionChance { get; set; } = 0.35f;
 	public bool ShowDetectionRadius { get; set; } = true;
+	public int BaseTroopCapacity { get; private set; } = 8;
+	public int FacilityTroopCapacity { get; private set; }
+	public int MaxStationedUnits => BaseTroopCapacity + FacilityTroopCapacity;
 
 	private Godot.Collections.Array<GridObject> stationedGridObjects = new Godot.Collections.Array<GridObject>();
+	private readonly List<FacilityConstruction> facilities = new();
+	private long pendingFacilityConstructionExpenditure;
+	private readonly Dictionary<string, long> pendingBaseIncome =
+		new(StringComparer.OrdinalIgnoreCase);
+	private readonly Dictionary<string, long> pendingBaseExpenditure =
+		new(StringComparer.OrdinalIgnoreCase);
 
 	private int maxCraft = 3;
 	private Godot.Collections.Dictionary<Enums.CraftStatus, Godot.Collections.Array<Craft>> craft = new();
@@ -56,12 +71,31 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	}
 
 	public int MaxCraft => maxCraft;
+	public IReadOnlyList<FacilityConstruction> Facilities => facilities;
+	public int MonthlyFacilityCost
+	{
+		get
+		{
+			int total = 0;
+			foreach (FacilityConstruction facility in facilities)
+			{
+				if (facility.IsConstructed)
+					total += facility.MonthlyCost;
+			}
+			return total;
+		}
+	}
+
+	public event Action<FacilityConstruction> FacilityAdded;
+	public event Action<FacilityConstruction> FacilityCompleted;
+	public event Action<TeamBaseCellDefinition> FacilityEffectsChanged;
 
 	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(
 		cellIndex, name, true)
 	{
 		this.teamAffiliation = team;
 		RevealForTeam(team);
+		EnsureHeadquarters();
 		if (craftList != null)
 		{
 			craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
@@ -88,6 +122,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	{
 		if (gridObject == null) return false;
 		if (stationedGridObjects.Contains(gridObject)) return false;
+		if (stationedGridObjects.Count >= MaxStationedUnits) return false;
 
 		gridObject.SetIsActive(false);
 		gridObject.Visible = false;
@@ -127,8 +162,56 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		data["detectionRadius"] = DetectionRadius;
 		data["detectionChance"] = DetectionChance;
 		data["showDetectionRadius"] = ShowDetectionRadius;
+		data["baseTroopCapacity"] = BaseTroopCapacity;
+		data["facilityTroopCapacity"] = FacilityTroopCapacity;
+		data["pendingFacilityConstructionExpenditure"] =
+			pendingFacilityConstructionExpenditure;
+		data["pendingBaseIncome"] = SavePendingFinanceLedger(pendingBaseIncome);
+		data["pendingBaseExpenditure"] =
+			SavePendingFinanceLedger(pendingBaseExpenditure);
+
+		var facilityData = new Godot.Collections.Array<
+			Godot.Collections.Dictionary<string, Variant>>();
+		foreach (FacilityConstruction facility in facilities)
+			facilityData.Add(facility.Save());
+		data["facilities"] = facilityData;
 
 		return data;
+	}
+
+	public override void Load(
+		Godot.Collections.Dictionary<string, Variant> data)
+	{
+		base.Load(data);
+
+		if (data.ContainsKey("teamAffiliation"))
+			teamAffiliation = (Enums.UnitTeam)data["teamAffiliation"].AsInt32();
+		if (data.ContainsKey("detectionRadius"))
+			DetectionRadius = data["detectionRadius"].AsInt32();
+		if (data.ContainsKey("detectionChance"))
+			DetectionChance = data["detectionChance"].AsSingle();
+		if (data.ContainsKey("showDetectionRadius"))
+			ShowDetectionRadius = data["showDetectionRadius"].AsBool();
+		if (data.ContainsKey("baseTroopCapacity"))
+			BaseTroopCapacity = Mathf.Max(
+				0,
+				data["baseTroopCapacity"].AsInt32());
+		if (data.ContainsKey("facilityTroopCapacity"))
+			FacilityTroopCapacity = Mathf.Max(
+				0,
+				data["facilityTroopCapacity"].AsInt32());
+		pendingFacilityConstructionExpenditure = data.TryGetValue(
+			"pendingFacilityConstructionExpenditure",
+			out Variant pendingExpenditure)
+			? Math.Max(0, pendingExpenditure.AsInt64())
+			: 0;
+		LoadPendingFinanceLedger(data, "pendingBaseIncome", pendingBaseIncome);
+		LoadPendingFinanceLedger(
+			data,
+			"pendingBaseExpenditure",
+			pendingBaseExpenditure);
+
+		LoadFacilities(data);
 	}
 
 	public async Task LoadAsync(
@@ -136,20 +219,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		Node unitParent
 	)
 	{
-		base.Load(data);
-
-		if (data.ContainsKey("teamAffiliation"))
-		{
-			teamAffiliation =
-				(Enums.UnitTeam)data["teamAffiliation"].AsInt32();
-		}
-
-		if (data.ContainsKey("detectionRadius"))
-			DetectionRadius = data["detectionRadius"].AsInt32();
-		if (data.ContainsKey("detectionChance"))
-			DetectionChance = data["detectionChance"].AsSingle();
-		if (data.ContainsKey("showDetectionRadius"))
-			ShowDetectionRadius = data["showDetectionRadius"].AsBool();
+		Load(data);
 
 		craft.Clear();
 		craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
@@ -240,6 +310,267 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 	}
 
+	#region Facility Construction
+
+	public FacilityConstruction GetFacility(string constructionId)
+	{
+		if (string.IsNullOrEmpty(constructionId)) return null;
+		return facilities.Find(facility => facility.Id == constructionId);
+	}
+
+	public FacilityConstruction GetFacilityAtGridCell(Vector2I gridCell)
+	{
+		foreach (FacilityConstruction facility in facilities)
+		{
+			foreach (Vector2I occupiedCell in facility.GetOccupiedCells())
+			{
+				if (occupiedCell == gridCell) return facility;
+			}
+		}
+		return null;
+	}
+
+	public bool TryAddFacilityConstruction(FacilityConstruction construction)
+	{
+		if (construction == null || GetFacility(construction.Id) != null)
+			return false;
+
+		foreach (Vector2I occupiedCell in construction.GetOccupiedCells())
+		{
+			if (GetFacilityAtGridCell(occupiedCell) != null)
+				return false;
+		}
+
+		FacilityConstruction dependency = GetFacility(construction.AttachedToId);
+		if (!string.IsNullOrEmpty(construction.AttachedToId) && dependency == null)
+			return false;
+
+		facilities.Add(construction);
+		if (dependency?.IsConstructed == true)
+			construction.StartConstruction();
+
+		if (construction.IsConstructed)
+			CompleteFacility(construction);
+
+		FacilityAdded?.Invoke(construction);
+		return true;
+	}
+
+	public bool TryRemoveFacilityConstruction(FacilityConstruction construction) =>
+		construction != null && facilities.Remove(construction);
+
+	public void RecordFacilityConstructionExpenditure(int amount)
+	{
+		if (amount <= 0) return;
+		pendingFacilityConstructionExpenditure =
+			pendingFacilityConstructionExpenditure > long.MaxValue - amount
+				? long.MaxValue
+				: pendingFacilityConstructionExpenditure + amount;
+	}
+
+	public long ConsumeFacilityConstructionExpenditure()
+	{
+		long expenditure = pendingFacilityConstructionExpenditure;
+		pendingFacilityConstructionExpenditure = 0;
+		return expenditure;
+	}
+
+	public void RecordBaseIncome(long amount, string category) =>
+		RecordPendingFinanceEntry(
+			pendingBaseIncome,
+			amount,
+			category,
+			"Other base income");
+
+	public void RecordBaseExpenditure(long amount, string category) =>
+		RecordPendingFinanceEntry(
+			pendingBaseExpenditure,
+			amount,
+			category,
+			"Other base expenditure");
+
+	public Dictionary<string, long> ConsumeBaseIncome() =>
+		ConsumePendingFinanceLedger(pendingBaseIncome);
+
+	public Dictionary<string, long> ConsumeBaseExpenditure() =>
+		ConsumePendingFinanceLedger(pendingBaseExpenditure);
+
+	private static void RecordPendingFinanceEntry(
+		Dictionary<string, long> ledger,
+		long amount,
+		string category,
+		string fallback)
+	{
+		if (amount <= 0) return;
+		string key = string.IsNullOrWhiteSpace(category) ? fallback : category;
+		long current = ledger.GetValueOrDefault(key);
+		ledger[key] = current > long.MaxValue - amount
+			? long.MaxValue
+			: current + amount;
+	}
+
+	private static Dictionary<string, long> ConsumePendingFinanceLedger(
+		Dictionary<string, long> ledger)
+	{
+		var snapshot = new Dictionary<string, long>(
+			ledger,
+			StringComparer.OrdinalIgnoreCase);
+		ledger.Clear();
+		return snapshot;
+	}
+
+	private static Godot.Collections.Dictionary<string, Variant>
+		SavePendingFinanceLedger(Dictionary<string, long> ledger)
+	{
+		var saved = new Godot.Collections.Dictionary<string, Variant>();
+		foreach (var entry in ledger) saved[entry.Key] = entry.Value;
+		return saved;
+	}
+
+	private static void LoadPendingFinanceLedger(
+		Godot.Collections.Dictionary<string, Variant> data,
+		string key,
+		Dictionary<string, long> target)
+	{
+		target.Clear();
+		if (!data.TryGetValue(key, out Variant saved) ||
+		    saved.VariantType != Variant.Type.Dictionary)
+			return;
+
+		foreach (var entry in saved.AsGodotDictionary())
+		{
+			string category = entry.Key.AsString();
+			long amount = Math.Max(0, entry.Value.AsInt64());
+			if (!string.IsNullOrWhiteSpace(category) && amount > 0)
+				target[category] = amount;
+		}
+	}
+
+	/// <summary>
+	/// Advances every buildable branch of the base construction graph. A child
+	/// begins on the first new day after its attached facility has completed.
+	/// </summary>
+	public void AdvanceFacilityConstruction(int daysAdvanced)
+	{
+		for (int day = 0; day < daysAdvanced; day++)
+		{
+			var constructedAtDayStart = new HashSet<string>();
+			foreach (FacilityConstruction facility in facilities)
+			{
+				if (facility.IsConstructed)
+					constructedAtDayStart.Add(facility.Id);
+			}
+
+			var completedToday = new List<FacilityConstruction>();
+			foreach (FacilityConstruction facility in facilities)
+			{
+				bool dependencyReady =
+					string.IsNullOrEmpty(facility.AttachedToId) ||
+					constructedAtDayStart.Contains(facility.AttachedToId);
+				if (!dependencyReady) continue;
+
+				facility.StartConstruction();
+				if (facility.AdvanceOneDay())
+					completedToday.Add(facility);
+			}
+
+			foreach (FacilityConstruction facility in completedToday)
+				CompleteFacility(facility);
+		}
+	}
+
+	public void AddDetectionRadiusBonus(int amount)
+	{
+		if (amount <= 0) return;
+		DetectionRadius += amount;
+		FacilityEffectsChanged?.Invoke(this);
+	}
+
+	public void AddTroopCapacity(int amount)
+	{
+		if (amount <= 0) return;
+		FacilityTroopCapacity += amount;
+		FacilityEffectsChanged?.Invoke(this);
+	}
+
+	private void EnsureHeadquarters()
+	{
+		if (facilities.Count > 0) return;
+
+		FacilityDefinition definition =
+			ResourceLoader.Load<FacilityDefinition>(HeadquartersDefinitionPath);
+		if (definition == null)
+		{
+			GD.PushError(
+				$"Could not load the default HQ definition at {HeadquartersDefinitionPath}.");
+			return;
+		}
+
+		FacilityConstruction headquarters = FacilityConstruction.Create(
+			definition,
+			HeadquartersGridOrigin,
+			HeadquartersScenePath,
+			constructImmediately: true);
+		facilities.Add(headquarters);
+		CompleteFacility(headquarters);
+	}
+
+	private void LoadFacilities(
+		Godot.Collections.Dictionary<string, Variant> data)
+	{
+		if (!data.ContainsKey("facilities"))
+		{
+			EnsureHeadquarters();
+			return;
+		}
+
+		facilities.Clear();
+		var savedFacilities = data["facilities"].AsGodotArray<
+			Godot.Collections.Dictionary<string, Variant>>();
+		foreach (var savedFacility in savedFacilities)
+		{
+			FacilityConstruction facility =
+				FacilityConstruction.Load(savedFacility);
+			if (facility != null)
+				facilities.Add(facility);
+		}
+
+		EnsureHeadquarters();
+		foreach (FacilityConstruction facility in facilities)
+		{
+			if (facility.IsConstructed && !facility.EffectsApplied)
+				ApplyFacilityEffects(facility);
+		}
+	}
+
+	private void CompleteFacility(FacilityConstruction construction)
+	{
+		ApplyFacilityEffects(construction);
+		FacilityCompleted?.Invoke(construction);
+	}
+
+	private bool ApplyFacilityEffects(FacilityConstruction construction)
+	{
+		if (construction == null || construction.EffectsApplied) return true;
+		if (string.IsNullOrEmpty(construction.DefinitionPath)) return false;
+
+		FacilityDefinition definition =
+			ResourceLoader.Load<FacilityDefinition>(construction.DefinitionPath);
+		if (definition == null)
+		{
+			GD.PushError(
+				$"Could not apply facility effects for '{construction.DisplayName}': " +
+				$"definition '{construction.DefinitionPath}' was not found.");
+			return false;
+		}
+
+		definition.OnPlaced(this, construction);
+		construction.MarkEffectsApplied();
+		return true;
+	}
+
+	#endregion
+
 	#region Craft Functions
 
 	private void AddCraft(Enums.CraftStatus status, Craft craftToAdd)
@@ -277,11 +608,14 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	private void RemoveCraft(Enums.CraftStatus status, Craft craftToRemove)
 	{
 		craft[status].Remove(craftToRemove);
+		craftToRemove.CancelActiveTravel();
 
-		if (craftToRemove.visual != null)
+		if (craftToRemove.visual != null &&
+		    GodotObject.IsInstanceValid(craftToRemove.visual))
 		{
 			craftToRemove.visual.QueueFree();
 		}
+		craftToRemove.SetVisual(null);
 	}
 
 	public bool TryRemoveCraft(Enums.CraftStatus status, Craft craftToRemove)
@@ -382,11 +716,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			craft.TargetCellIndex = -1;
 
 			// Clean up the visual
-			if (craft.visual != null)
-			{
+			if (craft.visual != null && GodotObject.IsInstanceValid(craft.visual))
 				craft.visual.QueueFree();
-				craft.SetVisual(null);
-			}
+			craft.SetVisual(null);
 
 			onArrived?.Invoke(craft);
 			return true;
@@ -446,11 +778,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			return false;
 		}
 
-		MeshInstance3D shipNode = craft.visual
-		                          ?? teamManager.shipScene.Instantiate<MeshInstance3D>();
-
-		if (craft.visual == null)
+		MeshInstance3D shipNode = craft.visual;
+		if (shipNode == null || !GodotObject.IsInstanceValid(shipNode))
+		{
+			shipNode = teamManager.shipScene.Instantiate<MeshInstance3D>();
 			craft.SetVisual(shipNode);
+		}
+
 		shipNode.Visible = teamAffiliation == teamManager.ViewingTeam ||
 		                   craft.IsVisibleTo(teamManager.ViewingTeam);
 
@@ -479,7 +813,10 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 		missionManager?.ClearCraftAssignment(craft);
 		craft.TargetCellIndex = targetCellIndex;
-		Tween shipTween = teamManager.GetTree().CreateTween();
+		// Binding the tween to the visual makes Godot stop it when a scene change
+		// frees the ship. An unbound SceneTree tween can otherwise keep invoking
+		// callbacks that captured this disposed MeshInstance3D.
+		Tween shipTween = teamManager.GetTree().CreateTween().BindNode(shipNode);
 		Task<bool> travelCompletion = craft.SetActiveTravelTween(shipTween);
 		List<float> segmentDurations = CalculateFlightSegmentDurations(
 			path,
@@ -522,6 +859,10 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			shipTween.TweenCallback(
 				Callable.From(() =>
 				{
+					if (!GodotObject.IsInstanceValid(shipNode) ||
+					    !shipNode.IsInsideTree())
+						return;
+
 					Vector3 upDir = shipNode.GlobalPosition.Normalized();
 					shipNode.LookAt(targetPos, upDir);
 				})
@@ -536,6 +877,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			shipTween.TweenCallback(
 				Callable.From(() =>
 				{
+					if (!GodotObject.IsInstanceValid(shipNode) ||
+					    !shipNode.IsInsideTree() ||
+					    !GodotObject.IsInstanceValid(teamManager))
+						return;
+
 					craft.CurrentCellIndex = reachedCellIndex;
 					DetectionRadiusVisualizer.AttachOrUpdate(
 						shipNode,
@@ -591,7 +937,8 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 				craft.TargetCellIndex = -1;
 
 				// Hide the visual now that the craft is docked
-				shipNode.QueueFree();
+				if (GodotObject.IsInstanceValid(shipNode))
+					shipNode.QueueFree();
 				craft.SetVisual(null);
 			}
 			else

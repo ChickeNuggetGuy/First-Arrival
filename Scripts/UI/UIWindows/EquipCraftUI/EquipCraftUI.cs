@@ -10,15 +10,21 @@ public partial class EquipCraftUI : UIWindow
 {
 	[Export] private ItemList craftList;
 
+	[Export] private Button renameButton;
 	[Export] private Button equipmentButton;
 	[Export] private Button unitButton;
 	
 	[Export] private EquipCraftItemsUI equipCraftItemsUI;
 	[Export] private EquipCraftUnitsUI equipCraftunitsUI;
+	[Export] private RenameCraftUI renameUI;
 	public Craft currentCraft { get; private set; }
 
 	protected override Task _Setup()
 	{
+		if (renameButton != null)
+		{
+			renameButton.Pressed += RenameButtonOnPressed;
+		}
 		if (equipmentButton != null)
 		{
 			equipmentButton.Pressed += EquipmentButtonOnPressed;
@@ -32,8 +38,21 @@ public partial class EquipCraftUI : UIWindow
 		if (craftList != null)
 			craftList.ItemSelected += CraftListOnItemSelected;
 		UpdateActionButtons();
-		return base._Setup();
-		
+		return Task.CompletedTask;
+	}
+
+	private async void RenameButtonOnPressed()
+	{
+		try
+		{
+			if (currentCraft == null || renameUI == null) return;
+			
+			await renameUI.Toggle();
+		}
+		catch (Exception e)
+		{
+			GD.PrintErr($"Failed to toggle renameUI Panel: {e.Message}\n{e.StackTrace}");
+		}
 	}
 
 	private void CraftListOnItemSelected(long index)
@@ -101,7 +120,7 @@ public partial class EquipCraftUI : UIWindow
 		
 		foreach (Craft craft in stationedCraft)
 		{
-			int index = craftList.AddItem($"{craft.ItemName} (Units: {craft.GetStationedUnits().Count}/{craft.maxUnits}) (Equipment: {craft.CurrentEquipmentWight}/{craft.maxweight})", craft.ItemIcon);
+			int index = craftList.AddItem($"{craft.GetName()} (Units: {craft.GetStationedUnits().Count}/{craft.maxUnits}) (Equipment: {craft.CurrentEquipmentWight}/{craft.maxweight})", craft.ItemIcon);
 			craftList.SetItemMetadata(index, stationedCraft.IndexOf(craft));
 		}
 	}
@@ -109,6 +128,7 @@ public partial class EquipCraftUI : UIWindow
 	private void UpdateActionButtons()
 	{
 		bool disabled = currentCraft == null;
+		if(renameButton != null) renameButton.Disabled = disabled;
 		if (equipmentButton != null) equipmentButton.Disabled = disabled;
 		if (unitButton != null) unitButton.Disabled = disabled;
 	}

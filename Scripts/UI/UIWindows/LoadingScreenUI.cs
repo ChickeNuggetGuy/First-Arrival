@@ -12,9 +12,6 @@ public partial class LoadingScreenUI : UIWindow
 
 	protected override async Task _Setup()
 	{
-		await base._Setup();
-		// Setup may apply startHidden after _Process has already run once.
-		// Re-evaluate the current loading state against the final setup state.
 		wasLoading = false;
 		UpdateUI();
 	}
