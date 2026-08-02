@@ -34,7 +34,10 @@ This catalog uses real military weapons, or military prototypes, that existed by
 
 ## Data conventions
 
-- `ResearchTier`, `RequiredResearch`, and `AvailableAtCampaignStart` are ready for a future research system. They are metadata only until the research tree enforces them.
+- `AvailableAtCampaignStart` is enforced by purchasing and starting-equipment
+  lists. An item with `RequiredResearch` can only be purchased after that exact
+  project is complete and an `UnlockItemsResult` explicitly grants its item ID.
+  `ResearchTier` remains organizational metadata.
 - `damage` is per projectile or shotgun pellet.
 - `accuracy` is added to the unit's ranged-accuracy stat. Snap and automatic modes deliberately carry larger penalties than aimed fire.
 - `attackCount` is the number of projectiles or pellets produced by one action.

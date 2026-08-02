@@ -10,8 +10,11 @@ using Godot.Collections;
 [GlobalClass]
 public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 {
+	private const string DefaultResearchDatabasePath =
+		"res://Data/Research/ResearchDatabase.tres";
 	private PackedScene baseScene;
 	private Node baseContainer;
+	[Export] private ResearchDatabase researchDatabase;
 	
 	public PackedScene shipScene;
 	public Node shipContainer;
@@ -78,6 +81,9 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		baseScene = ResourceLoader.Load<PackedScene>("res://Scenes/base.tscn");
 		shipScene =  ResourceLoader.Load<PackedScene>("res://Scenes/ship.tscn");
 		testCraft = ResourceLoader.Load<Craft>("res://Data/Items/Troop_Transport_Item.tres");
+		researchDatabase ??=
+			ResourceLoader.Load<ResearchDatabase>(DefaultResearchDatabasePath);
+		researchDatabase?.ValidateAndReport();
 		teamsConfig = Enums.UnitTeam.Player | Enums.UnitTeam.Enemy;
 		ShouldExecuteOnlyOnce = true;
 		base._Ready();
@@ -86,6 +92,8 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	protected override async Task _Setup(bool loadingData)
 	{
 		teamData ??= new Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
+		foreach (GlobeTeamHolder existingHolder in teamData.Values)
+			existingHolder?.ConfigureResearchDatabase(researchDatabase);
 		
 		// Only run default setup if we aren't loading existing data.
 		if (loadingData && teamData.Count != 0) return;
@@ -101,6 +109,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 				if(teamData.ContainsKey((Enums.UnitTeam)team)) continue;
 				
 				var holder = new GlobeTeamHolder((Enums.UnitTeam)team, new List<TeamBaseCellDefinition>());
+				holder.ConfigureResearchDatabase(researchDatabase);
 				teamData[(Enums.UnitTeam)team] = holder;
 				AddChild(holder);
 			}
@@ -347,10 +356,12 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 				{
 					GlobeTeamHolder newTeam = new GlobeTeamHolder();
 					newTeam.Team = teamType;
+					newTeam.ConfigureResearchDatabase(researchDatabase);
 					AddChild(newTeam);
 					teamData.Add(teamType, newTeam);
 				}
 
+				teamData[teamType].ConfigureResearchDatabase(researchDatabase);
 				await teamData[teamType].LoadAsync(specificTeamSaveData, shipContainer ?? this);
 			}
 		}
@@ -477,7 +488,12 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 
 		if (!teamData.ContainsKey(team))
 		{
-			teamData.Add(team, new GlobeTeamHolder(team, new List<TeamBaseCellDefinition>()));
+			var holder = new GlobeTeamHolder(
+				team,
+				new List<TeamBaseCellDefinition>());
+			holder.ConfigureResearchDatabase(researchDatabase);
+			AddChild(holder);
+			teamData.Add(team, holder);
 		}
 		
 		if(!teamData[team].CanAffordCost(cost)) return false;
@@ -707,7 +723,9 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	{
 		foreach (GlobeTeamHolder holder in teamData.Values)
 		{
-			if (holder?.Bases == null) continue;
+			if (holder == null) continue;
+			holder.AdvanceResearch(daysAdvanced);
+			if (holder.Bases == null) continue;
 			foreach (TeamBaseCellDefinition baseDefinition in holder.Bases)
 				baseDefinition?.AdvanceFacilityConstruction(daysAdvanced);
 		}
@@ -915,6 +933,8 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	public Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder> GetAllTeamData() => teamData;
 
 	public GlobeTeamHolder GetTeamData(Enums.UnitTeam team) => teamData.GetValueOrDefault(team, null);
+
+	public ResearchDatabase GetResearchDatabase() => researchDatabase;
 	
 	public void SetSendCraftMode(bool value, GlobeTeamHolder teamHolder, Craft craft)
 	{

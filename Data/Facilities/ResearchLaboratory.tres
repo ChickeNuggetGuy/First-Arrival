@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="FacilityDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Base Scripts/FacilityDefinition.cs" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+FacilityId = "research_laboratory"
+DisplayName = "Research Laboratory"
+Purpose = "Provides workspace for hiring and assigning up to five scientists."
+InitialCost = 150000
+MonthlyCost = 25000
+ScientistCapacity = 5
+GridSize = Vector2i(2, 2)
+BuildTimeDays = 21

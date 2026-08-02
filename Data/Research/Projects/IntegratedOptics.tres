@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ResearchProject" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
+[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
+[ext_resource type="Resource" path="res://Data/Items/G36K_Item.tres" id="3_item"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/ModularCarbines.tres" id="4_prerequisite"]
+
+[sub_resource type="Resource" id="Unlock"]
+script = ExtResource("2_unlock")
+UnlockedItems = Array[Object]([ExtResource("3_item")])
+
+[resource]
+script = ExtResource("1_project")
+ProjectId = "integrated_optics"
+DisplayName = "Integrated Optics"
+Description = "Integrate modern sighting systems directly into carbine platforms."
+TotalResearchPoints = 120
+Prerequisites = Array[Object]([ExtResource("4_prerequisite")])
+ResearchResults = Array[Object]([SubResource("Unlock")])

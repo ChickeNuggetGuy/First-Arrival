@@ -128,6 +128,7 @@ public partial class GameManager : Manager<GameManager>
 		SavesManager.LoadFromAutosave = false;
 		SavesManager.PendingSaveData = null;
 		SavesManager.Instance.currentSavename = tempSaveName;
+		SetCurrentTeamResearchState(null, null);
 
 		await ChangeSceneAsync(scene, false);
 		return true;
@@ -563,6 +564,8 @@ public partial class GameManager : Manager<GameManager>
 			["currentScene"] = (int)currentScene,
 			["currentBase"] = currentBase?.Save(),
 			["currentBaseFunds"] = currentBaseFunds,
+			["currentTeamUnlockedItemIds"] = SaveCurrentTeamUnlockedItems(),
+			["currentTeamCompletedResearchIds"] = SaveCurrentTeamCompletedResearch(),
 		};
 	}
 
@@ -573,6 +576,8 @@ public partial class GameManager : Manager<GameManager>
 		if (data.ContainsKey("unitCounts")) unitCounts = (Vector2I)data["unitCounts"];
 		if (data.ContainsKey("currentScene")) currentScene = (GameScene)(int)data["currentScene"];
 		if (data.ContainsKey("currentBaseFunds")) currentBaseFunds = data["currentBaseFunds"].AsInt64();
+		LoadCurrentTeamUnlockedItems(data);
+		LoadCurrentTeamCompletedResearch(data);
 		if (data.ContainsKey("currentBase") && data["currentBase"].VariantType != Variant.Type.Nil)
 		{
 			currentBase = new TeamBaseCellDefinition(-1, "", Enums.UnitTeam.None, null);

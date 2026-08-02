@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System;
 using Godot;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Utility;
 
 public sealed class MonthlyFinanceSnapshot
@@ -29,7 +30,7 @@ public partial class GlobeTeamHolder : Node
 	public Enums.UnitTeam Team;
 	public long funds;
 	public int newbaseCost = 200000;
-	public List<TeamBaseCellDefinition> Bases = new List<TeamBaseCellDefinition>();
+	public List<TeamBaseCellDefinition> Bases = new();
 	
 	public Craft SelectedCraft { get; protected set; }
 	
@@ -46,6 +47,8 @@ public partial class GlobeTeamHolder : Node
 			return total;
 		}
 	}
+
+	public List<int> unlockeditemIDArray = new();
 	[Signal] public delegate void FundsChangedEventHandler(GlobeTeamHolder teamHolder, long currentFunds);
 	[Signal] public delegate void BaseAddedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
 	[Signal] public delegate void BaseRemovedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
@@ -207,6 +210,8 @@ public partial class GlobeTeamHolder : Node
 			["monthlyScore"] = monthlyScoreData,
 			["monthlyIncome"] = SaveFinanceLedger(monthlyIncome),
 			["monthlyExpenditure"] = SaveFinanceLedger(monthlyExpenditure),
+			["unlockedItemIds"] = SaveUnlockedItemIds(),
+			["research"] = SaveResearchState(),
 			["bases"] = basesData
 		};
 	}
@@ -246,6 +251,9 @@ public partial class GlobeTeamHolder : Node
 				Bases.Add(newBase);
 			}
 		}
+
+		LoadUnlockedItemIds(data);
+		LoadResearchState(data);
 	}
 
 	private static Godot.Collections.Dictionary<string, Variant> SaveFinanceLedger(
@@ -345,6 +353,27 @@ public partial class GlobeTeamHolder : Node
 
 		return false;
 	}
+
+	#region Item Unlocks
+
+	public void AddUnlockedItem(int itemId)
+	{
+		if (itemId < 0) return;
+		if (unlockeditemIDArray.Contains(itemId)) return;
+		unlockeditemIDArray.Add(itemId);
+		EmitSignal(SignalName.ItemUnlocked, this, itemId);
+	}
+
+	public void AddUnlockedItems(IEnumerable<ItemData> items)
+	{
+		if (items == null) return;
+		foreach (ItemData item in items)
+		{
+			if (item == null) continue;
+			AddUnlockedItem(item.ItemID);
+		}
+	}
+	#endregion
 
 	#region Get/Set Functions
 

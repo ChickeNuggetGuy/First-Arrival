@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="ResearchDatabase" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchDatabase.cs" id="1_database"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/FieldBlades.tres" id="2_field_blades"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/StandardSidearms.tres" id="3_sidearms"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/CloseQuartersWeapons.tres" id="4_close_quarters"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/CombatShotguns.tres" id="5_shotguns"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/DesignatedMarksmanWeapons.tres" id="6_marksman"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/SquadAutomaticWeapons.tres" id="7_saw"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/TacticalBreaching.tres" id="8_breaching"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/PolymerSidearms.tres" id="9_polymer"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/ModernCloseQuartersWeapons.tres" id="10_modern_cqw"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/SelfLoadingCombatShotguns.tres" id="11_self_loading"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/ModularCarbines.tres" id="12_carbines"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/IntegratedOptics.tres" id="13_optics"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/PrecisionRifles.tres" id="14_precision"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/GeneralPurposeMachineGuns.tres" id="15_gpmg"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/SpecialOperationsWeapons.tres" id="16_special_ops"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/PersonalDefenseWeapons.tres" id="17_pdw"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/AdvancedBullpupSystems.tres" id="18_bullpup"]
+[ext_resource type="Resource" path="res://Data/Research/Projects/SemiautomaticPrecisionRifles.tres" id="19_semiauto_precision"]
+
+[resource]
+script = ExtResource("1_database")
+Projects = Array[Object]([ExtResource("2_field_blades"), ExtResource("3_sidearms"), ExtResource("4_close_quarters"), ExtResource("5_shotguns"), ExtResource("6_marksman"), ExtResource("7_saw"), ExtResource("8_breaching"), ExtResource("9_polymer"), ExtResource("10_modern_cqw"), ExtResource("11_self_loading"), ExtResource("12_carbines"), ExtResource("13_optics"), ExtResource("14_precision"), ExtResource("15_gpmg"), ExtResource("16_special_ops"), ExtResource("17_pdw"), ExtResource("18_bullpup"), ExtResource("19_semiauto_precision")])

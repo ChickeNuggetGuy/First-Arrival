@@ -14,6 +14,8 @@ public partial class FacilityDefinition : Resource
 	public int InitialCost { get; set; }
 	[Export(PropertyHint.Range, "0,10000000,1,or_greater")]
 	public int MonthlyCost { get; set; }
+	[Export(PropertyHint.Range, "0,1000,1,or_greater")]
+	public int ScientistCapacity { get; set; }
 	[Export] public Vector2I GridSize { get; set; } = Vector2I.One;
 	[Export(PropertyHint.Range, "0,3650,1,or_greater")]
 	public int BuildTimeDays { get; set; } = 1;

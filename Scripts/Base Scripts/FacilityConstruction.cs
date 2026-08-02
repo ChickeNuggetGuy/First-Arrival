@@ -24,6 +24,7 @@ public sealed class FacilityConstruction
 	public Vector2I GridSize { get; private set; } = Vector2I.One;
 	public int InitialCost { get; private set; }
 	public int MonthlyCost { get; private set; }
+	public int ScientistCapacity { get; private set; }
 	public int BuildTimeDays { get; private set; }
 	public int RemainingBuildDays { get; private set; }
 	public string AttachedToId { get; private set; } = string.Empty;
@@ -58,10 +59,11 @@ public sealed class FacilityConstruction
 			Purpose = definition.Purpose,
 			DefinitionPath = definition.ResourcePath,
 			ScenePath = scenePath ?? string.Empty,
-				Origin = origin,
-				GridSize = definition.GetValidatedGridSize(),
-				InitialCost = Mathf.Max(0, definition.InitialCost),
-				MonthlyCost = Mathf.Max(0, definition.MonthlyCost),
+			Origin = origin,
+			GridSize = definition.GetValidatedGridSize(),
+			InitialCost = Mathf.Max(0, definition.InitialCost),
+			MonthlyCost = Mathf.Max(0, definition.MonthlyCost),
+			ScientistCapacity = Mathf.Max(0, definition.ScientistCapacity),
 			BuildTimeDays = buildDays,
 			RemainingBuildDays = constructImmediately ? 0 : buildDays,
 			AttachedToId = attachedToId ?? string.Empty,
@@ -115,6 +117,7 @@ public sealed class FacilityConstruction
 		["gridSize"] = GridSize,
 		["initialCost"] = InitialCost,
 		["monthlyCost"] = MonthlyCost,
+		["scientistCapacity"] = ScientistCapacity,
 		["buildTimeDays"] = BuildTimeDays,
 		["remainingBuildDays"] = RemainingBuildDays,
 		["attachedToId"] = AttachedToId,
@@ -126,6 +129,7 @@ public sealed class FacilityConstruction
 		Godot.Collections.Dictionary<string, Variant> data)
 	{
 		if (data == null) return null;
+		bool hasSavedScientistCapacity = data.ContainsKey("scientistCapacity");
 
 		var construction = new FacilityConstruction
 		{
@@ -138,11 +142,12 @@ public sealed class FacilityConstruction
 			Origin = data.TryGetValue("origin", out Variant origin)
 				? origin.AsVector2I()
 				: Vector2I.Zero,
-				GridSize = data.TryGetValue("gridSize", out Variant size)
-					? size.AsVector2I()
-					: Vector2I.One,
-				InitialCost = GetInt(data, "initialCost"),
-				MonthlyCost = GetInt(data, "monthlyCost"),
+			GridSize = data.TryGetValue("gridSize", out Variant size)
+				? size.AsVector2I()
+				: Vector2I.One,
+			InitialCost = GetInt(data, "initialCost"),
+			MonthlyCost = GetInt(data, "monthlyCost"),
+			ScientistCapacity = GetInt(data, "scientistCapacity"),
 			BuildTimeDays = GetInt(data, "buildTimeDays"),
 			RemainingBuildDays = GetInt(data, "remainingBuildDays"),
 			AttachedToId = GetString(data, "attachedToId"),
@@ -151,11 +156,24 @@ public sealed class FacilityConstruction
 				&& applied.AsBool()
 		};
 
+		if (!hasSavedScientistCapacity &&
+			!string.IsNullOrWhiteSpace(construction.DefinitionPath) &&
+			ResourceLoader.Exists(construction.DefinitionPath))
+		{
+			FacilityDefinition definition =
+				ResourceLoader.Load<FacilityDefinition>(construction.DefinitionPath);
+			if (definition != null)
+				construction.ScientistCapacity = definition.ScientistCapacity;
+		}
+
 		construction.GridSize = new Vector2I(
 			Mathf.Max(1, construction.GridSize.X),
 			Mathf.Max(1, construction.GridSize.Y));
 		construction.InitialCost = Mathf.Max(0, construction.InitialCost);
 		construction.MonthlyCost = Mathf.Max(0, construction.MonthlyCost);
+		construction.ScientistCapacity = Mathf.Max(
+			0,
+			construction.ScientistCapacity);
 		construction.BuildTimeDays = Mathf.Max(0, construction.BuildTimeDays);
 		construction.RemainingBuildDays = Mathf.Max(
 			0,

@@ -72,6 +72,20 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 	public int MaxCraft => maxCraft;
 	public IReadOnlyList<FacilityConstruction> Facilities => facilities;
+	public int ScientistCapacity
+	{
+		get
+		{
+			long total = 0;
+			foreach (FacilityConstruction facility in facilities)
+			{
+				if (!facility.IsConstructed) continue;
+				total += facility.ScientistCapacity;
+				if (total >= int.MaxValue) return int.MaxValue;
+			}
+			return (int)total;
+		}
+	}
 	public int MonthlyFacilityCost
 	{
 		get
@@ -585,8 +599,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (!craft.ContainsKey(status)) return false;
 		if (craft[status].Contains(craftToAdd)) return false;
 
-		GlobeTeamHolder team = GlobeTeamManager.Instance.GetTeamData(teamAffiliation);
+		GlobeTeamHolder team = GlobeTeamManager.Instance?.GetTeamData(teamAffiliation);
 		if (team == null) return false;
+		if (!team.IsItemUnlocked(craftToAdd)) return false;
 		if (CraftCount >= maxCraft) return false;
 
 		if (!team.TryRemoveFunds(craftToAdd.buyPrice)) return false;

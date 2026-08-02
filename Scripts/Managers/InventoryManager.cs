@@ -156,8 +156,12 @@ public partial class InventoryManager : Manager<InventoryManager>
 
 		foreach (ItemData itemData in Database.GetAllItems())
 		{
-			if (itemData != null && itemData is not Craft)
+			if (itemData != null &&
+				itemData is not Craft &&
+				itemData.AvailableAtCampaignStart)
+			{
 				startingItems[itemData] = 4;
+			}
 		}
 	}
 	

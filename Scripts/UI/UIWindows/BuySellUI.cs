@@ -26,6 +26,10 @@ public partial class BuySellUI : UIWindow
 	private Texture2D scaledBuyTexture;
 	private Texture2D scaledSellTexture;
 
+	internal static bool IsItemAvailableForPurchase(ItemData itemData) =>
+		itemData != null &&
+		GameManager.Instance?.IsItemUnlocked(itemData) == true;
+
 	protected override Task _Setup()
 	{
 		itemTreeUI.HideRoot = true;
@@ -107,6 +111,8 @@ public partial class BuySellUI : UIWindow
 
 		ItemData itemData = InventoryManager.Instance?.GetItemData(itemId);
 		if (itemData == null) return;
+		if (amount > 0 && !IsItemAvailableForPurchase(itemData))
+			return;
 
 		int oldChange = currentItemChange.GetValueOrDefault(itemId, 0);
 		int newChange = oldChange + amount;
@@ -253,6 +259,8 @@ public partial class BuySellUI : UIWindow
 			ItemData itemData = InventoryManager.Instance.GetItemData(pair.Key);
 			if (itemData == null || GetOwnedCount(teamBase, itemData) + pair.Value < 0)
 				return false;
+			if (pair.Value > 0 && !IsItemAvailableForPurchase(itemData))
+				return false;
 			if (itemData is Craft && pair.Value < 0 &&
 			    teamBase.GetSellableCraftCountForItem(pair.Key) < -pair.Value)
 				return false;
@@ -295,14 +303,22 @@ public partial class BuySellUI : UIWindow
 		foreach (ItemData itemData in inventoryManager.Database.GetAllItems())
 		{
 			if (itemData == null || !itemData.ShowInBuySellWindow) continue;
+			bool isUnlocked = IsItemAvailableForPurchase(itemData);
+			if (!isUnlocked) continue;
+			int ownedCount = GetOwnedCount(teamBase, itemData);
 
 			TreeItem itemNode = itemTreeUI.CreateItem(root);
 			treeItems[itemData.ItemID] = itemNode;
 
 			itemNode.SetText(0, $"{itemData.ItemName}");
-			itemNode.SetText(2, GetOwnedCount(teamBase, itemData).ToString());
+			itemNode.SetText(2, ownedCount.ToString());
 
-			itemNode.AddButton(1, scaledBuyTexture, itemData.ItemID, false, $"Buy {itemData.ItemName}");
+			itemNode.AddButton(
+				1,
+				scaledBuyTexture,
+				itemData.ItemID,
+				false,
+				$"Buy {itemData.ItemName}");
 
 			itemNode.AddButton(3, scaledSellTexture, itemData.ItemID, false, $"Sell {itemData.ItemName}");
 		}

@@ -22,6 +22,7 @@ public partial class GlobeUI : UIWindow
 	[ExportGroup("Bases"), Export] private Control baseButtonHolder;
 	[ExportGroup("Bases"), Export] private Texture2D focusButtonTexture;
 	private Dictionary<int, HBoxContainer> baseButtons = new Dictionary<int, HBoxContainer>();
+	private ResearchWindowUI researchWindow;
 	protected override Task _Setup()
 	{
 		
@@ -42,6 +43,13 @@ public partial class GlobeUI : UIWindow
 		
 		if(!buyCraftButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(BuyCraftButtonOnPressed)))
 			buyCraftButton.Pressed += BuyCraftButtonOnPressed;
+
+		if (researchButton != null && !researchButton.IsConnected(
+			Button.SignalName.Pressed,
+			Callable.From(ResearchButtonOnPressed)))
+		{
+			researchButton.Pressed += ResearchButtonOnPressed;
+		}
 		
 	
 		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
@@ -81,8 +89,16 @@ public partial class GlobeUI : UIWindow
 		{
 			GD.Print("not found!");
 		}
-		DrawUI();
+		_ = DrawUI();
+		if (GameManager.Instance?.ConsumeResearchWindowRequest() == true)
+			_ = OpenRequestedResearchWindow();
 		return Task.CompletedTask;
+	}
+
+	private async Task OpenRequestedResearchWindow()
+	{
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		if (IsInsideTree()) ResearchButtonOnPressed();
 	}
 
 	private void TeamHolderOnMonthlyScoreChanged(
@@ -100,9 +116,10 @@ public partial class GlobeUI : UIWindow
 			monthlyScoreLabel.Text = $"Monthly Score: {score:N0}";
 	}
 
-	protected override async Task DrawUI()
+	protected override Task DrawUI()
 	{
 		RefreshBaseButtons(GlobeTeamManager.Instance.GetTeamData(Enums.UnitTeam.Player));
+		return Task.CompletedTask;
 	}
 
 	private void RefreshBaseButtons( GlobeTeamHolder teamHolder)
@@ -141,6 +158,9 @@ public partial class GlobeUI : UIWindow
 					await OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
 					GameManager.Instance.currentBase = baseCellDefinition;
 					GameManager.Instance.currentBaseFunds = teamHolder.funds;
+					GameManager.Instance.SetCurrentTeamResearchState(
+						teamHolder.GetUnlockedItemIdsSnapshot(),
+						teamHolder.GetCompletedResearchProjectIdsSnapshot());
                 
 					SavesManager.Instance.StashSceneState("GlobeState");
 
@@ -201,6 +221,22 @@ public partial class GlobeUI : UIWindow
 		}
 		
 		baseManager.buyCraftMode = !baseManager.buyCraftMode;
+	}
+
+	private void ResearchButtonOnPressed()
+	{
+		GlobeTeamHolder teamHolder = GlobeTeamManager.Instance?.GetTeamData(
+			Enums.UnitTeam.Player);
+		if (teamHolder == null) return;
+
+		if (researchWindow == null || !GodotObject.IsInstanceValid(researchWindow))
+		{
+			researchWindow = new ResearchWindowUI { Name = "ResearchWindow" };
+			Control windowParent = GetParent() as Control ?? this;
+			windowParent.AddChild(researchWindow);
+		}
+
+		researchWindow.ShowFor(teamHolder);
 	}
 	
 	private void TimeManagerOnDateChanged(int year, Enums.Month month, int date, Enums.Day day)

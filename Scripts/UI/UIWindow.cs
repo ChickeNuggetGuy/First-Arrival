@@ -29,9 +29,6 @@ public abstract partial class UIWindow : UIElement
 	#endregion
 	public override async Task SetupCall()
 	{
-		// Enforce the startup state before any asynchronous child setup. If a
-		// different manager fails during scene loading, start-hidden windows must
-		// not remain visible over the main window.
 		ApplyInitialVisibility();
 
 		// Find all UIElements that belong to this window
@@ -49,9 +46,6 @@ public abstract partial class UIWindow : UIElement
 		}
 		else
 		{
-			// The scene may be hidden in the editor to make it easier to work on
-			// other full-screen UI. Keep our runtime state in sync with the node
-			// instead of assuming that startHidden == false means it is visible.
 			IsShown = Visible && (Visual == null || Visual.Visible);
 		}
 		await base.SetupCall();

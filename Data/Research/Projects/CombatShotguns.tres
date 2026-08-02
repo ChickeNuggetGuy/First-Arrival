@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ResearchProject" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
+[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
+[ext_resource type="Resource" path="res://Data/Items/Mossberg_500_Item.tres" id="3_item"]
+
+[sub_resource type="Resource" id="Unlock"]
+script = ExtResource("2_unlock")
+UnlockedItems = Array[Object]([ExtResource("3_item")])
+
+[resource]
+script = ExtResource("1_project")
+ProjectId = "combat_shotguns"
+DisplayName = "Combat Shotguns"
+Description = "Adapt pump-action shotguns for tactical deployments."
+TotalResearchPoints = 60
+ResearchResults = Array[Object]([SubResource("Unlock")])

@@ -11,6 +11,7 @@ public partial class MainBaseUI : UIWindow
 	[Export] private Button _buySellButton;
 	[Export] private Button _craftUiButton;
 	[Export] private Button _buildFacilityButton;
+	private Button _researchButton;
 	
 	[Export] private UnitsPanelUI _unitsPanelUi;
 	[Export] private BuySellUI _buySellUi;
@@ -28,12 +29,18 @@ public partial class MainBaseUI : UIWindow
 	protected override Task _Setup()
 	{
 		ConnectSignals();
+		if (GameManager.Instance != null && GameManager.Instance.currentBase != null)
+		{
+			baseNameEdit.Text = GameManager.Instance.currentBase.definitionName;
+		}
 		return Task.CompletedTask;
 	}
 
 	private void ConnectSignals()
 	{
 		if (signalsConnected) return;
+		_researchButton ??= GetNodeOrNull<Button>(
+			"Panel/VBoxContainer/ResearchButton");
 
 		if (baseNameEdit != null)
 		{
@@ -65,6 +72,13 @@ public partial class MainBaseUI : UIWindow
 			_buildFacilityButton.Pressed += BuildFacilityButtonOnPressed;
 		}
 
+		if (_researchButton != null)
+		{
+			_researchButton.TooltipText =
+				"Return to the globe and manage team research.";
+			_researchButton.Pressed += ResearchButtonOnPressed;
+		}
+
 		signalsConnected = true;
 	}
 
@@ -83,8 +97,10 @@ public partial class MainBaseUI : UIWindow
 		gridManager.SetBuildFacilityMode(!gridManager.BuildFacilityMode);
 	}
 
-	protected override async Task DrawUI()
+	protected override Task DrawUI()
 	{
+
+		return Task.CompletedTask;
 	}
 
 	private async void CraftUiButtonOnPressed()
@@ -136,6 +152,16 @@ public partial class MainBaseUI : UIWindow
 	{
 		await GameManager.Instance.ReturnToGlobe();
 	}
+
+	private async void ResearchButtonOnPressed()
+	{
+		GameManager gameManager = GameManager.Instance;
+		if (gameManager == null) return;
+		gameManager.RequestResearchWindowOnGlobe();
+		await gameManager.ReturnToGlobe();
+		if (gameManager.currentScene != GameManager.GameScene.GlobeScene)
+			gameManager.CancelResearchWindowRequest();
+	}
 	
 	
 	private async void BuySellButtonOnPressed()
@@ -177,6 +203,8 @@ public partial class MainBaseUI : UIWindow
 				_craftUiButton.Pressed -= CraftUiButtonOnPressed;
 			if (_buildFacilityButton != null)
 				_buildFacilityButton.Pressed -= BuildFacilityButtonOnPressed;
+			if (_researchButton != null)
+				_researchButton.Pressed -= ResearchButtonOnPressed;
 			signalsConnected = false;
 		}
 
