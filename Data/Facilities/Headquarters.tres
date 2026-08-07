@@ -1,12 +1,11 @@
-[gd_resource type="Resource" script_class="FacilityDefinition" format=3 uid="uid://cha5kyaqhvqwd"]
+[gd_resource type="Resource" format=3 uid="uid://cha5kyaqhvqwd"]
 
-[ext_resource type="Script" uid="uid://dyl6xoqrqx24g" path="res://Scripts/Base Scripts/FacilityDefinition.cs" id="1_definition"]
+[ext_resource type="Script" uid="uid://bat65oq4yndbb" path="res://Scripts/Base Scripts/HeadquartersDefinition.cs" id="1_mcbut"]
 
 [resource]
-script = ExtResource("1_definition")
-FacilityId = "headquarters"
-DisplayName = "Headquarters"
-Purpose = "The command center and required starting point for every base."
-MonthlyCost = 5000
-BuildTimeDays = 0
+script = ExtResource("1_mcbut")
+DetectionRadiusBonus = 10
+ScientistCapacityBonus = 5
+FacilityId = "HeadQuaters"
+DisplayName = "HQ"
 UniquePerBase = true

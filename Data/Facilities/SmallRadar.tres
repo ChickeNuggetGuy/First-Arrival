@@ -1,13 +1,14 @@
 [gd_resource type="Resource" script_class="RadarFacilityDefinition" format=3 uid="uid://3a7o4l1k3r0r"]
 
-[ext_resource type="Script" uid="uid://dj0gi0sa46kfr" path="res://Scripts/Base Scripts/RadarFacilityDefinition.cs" id="1_definition"]
+[ext_resource type="Script" uid="uid://dj0gi0sa46kfr" path="res://Scripts/Base Scripts/RadarFacilityDefinition.cs" id="1_83gye"]
 
 [resource]
-script = ExtResource("1_definition")
-DetectionRadiusBonus = 4
+script = ExtResource("1_83gye")
 FacilityId = "radar"
 DisplayName = "Radar Facility"
 Purpose = "Expands this base's detection radius on the globe."
+InitialCost = 250000
 MonthlyCost = 7500
+ScientistCapacity = null
 GridSize = Vector2i(2, 2)
 BuildTimeDays = 14

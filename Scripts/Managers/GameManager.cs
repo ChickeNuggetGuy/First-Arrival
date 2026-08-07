@@ -49,7 +49,21 @@ public partial class GameManager : Manager<GameManager>
 	public Vector2I unitCounts = new Vector2I(2, 2);
 	public MissionCellDefinition currentMission;
 	public TeamBaseCellDefinition currentBase;
-	public long currentBaseFunds;
+	private GlobeTeamHolder currentBaseTeamContext;
+	private long _currentBaseFunds;
+	public long currentBaseFunds
+	{
+		get => _currentBaseFunds;
+		set
+		{
+			_currentBaseFunds = value;
+			if (currentBaseTeamContext != null &&
+			    GodotObject.IsInstanceValid(currentBaseTeamContext))
+			{
+				currentBaseTeamContext.funds = value;
+			}
+		}
+	}
 	public PackedScene unitScene;
 	private Godot.Collections.Array<
 		Godot.Collections.Dictionary<string, Variant>> _pendingBattlePlayerUnits;
@@ -328,13 +342,59 @@ public partial class GameManager : Manager<GameManager>
 		loadingManagerName = "";
 		loadingState = LoadingState.NONE;
 		loadingPercent = 1.0f;
-		EmitSignal(SignalName.CoreManagersLoaded);
 		SavesManager.PendingSaveData = null;
+
+		// Modal windows can pause the scene tree, so make loading-screen removal
+		// part of the transition contract instead of waiting for its next _Process.
+		if (UIManager.Instance != null &&
+		    GodotObject.IsInstanceValid(UIManager.Instance))
+		{
+			await UIManager.Instance.HideLoadingScreen();
+		}
+
+		EmitSignal(SignalName.CoreManagersLoaded);
 	}
 
 	#endregion
 
 	#region Game Logic & Rules
+
+	public void SetCurrentBase(
+		TeamBaseCellDefinition baseDefinition,
+		GlobeTeamHolder sourceTeam)
+	{
+		if (baseDefinition == null)
+			throw new ArgumentNullException(nameof(baseDefinition));
+		if (sourceTeam == null || !GodotObject.IsInstanceValid(sourceTeam))
+			throw new ArgumentException(
+				"The selected base must have a valid source team.",
+				nameof(sourceTeam));
+
+		currentBase = baseDefinition;
+		currentBaseFunds = sourceTeam.funds;
+		AttachCurrentBaseTeamContext(new GlobeTeamHolder(
+			sourceTeam.Team,
+			new List<TeamBaseCellDefinition> { currentBase },
+			currentBaseFunds));
+	}
+
+	private void AttachCurrentBaseTeamContext(GlobeTeamHolder teamContext)
+	{
+		if (teamContext == null)
+			throw new ArgumentNullException(nameof(teamContext));
+
+		if (currentBaseTeamContext != null &&
+		    GodotObject.IsInstanceValid(currentBaseTeamContext) &&
+		    currentBaseTeamContext.GetParent() == this)
+		{
+			currentBaseTeamContext.QueueFree();
+		}
+
+		currentBaseTeamContext = teamContext;
+		currentBaseTeamContext.funds = currentBaseFunds;
+		AddChild(currentBaseTeamContext);
+		currentBase.SetParentTeamHolder(currentBaseTeamContext);
+	}
 
 	public bool CanHireUnits(int count = 1)
 	{
@@ -580,8 +640,26 @@ public partial class GameManager : Manager<GameManager>
 		LoadCurrentTeamCompletedResearch(data);
 		if (data.ContainsKey("currentBase") && data["currentBase"].VariantType != Variant.Type.Nil)
 		{
-			currentBase = new TeamBaseCellDefinition(-1, "", Enums.UnitTeam.None, null);
-			currentBase.Load(data["currentBase"].AsGodotDictionary<string, Variant>());
+			var baseData =
+				data["currentBase"].AsGodotDictionary<string, Variant>();
+			Enums.UnitTeam team = baseData.TryGetValue(
+				"teamAffiliation",
+				out Variant savedTeam)
+				? (Enums.UnitTeam)savedTeam.AsInt32()
+				: Enums.UnitTeam.None;
+			var teamContext = new GlobeTeamHolder(
+				team,
+				new List<TeamBaseCellDefinition>(),
+				currentBaseFunds);
+			currentBase = new TeamBaseCellDefinition(
+				-1,
+				"",
+				team,
+				null,
+				teamContext);
+			teamContext.Bases.Add(currentBase);
+			currentBase.Load(baseData);
+			AttachCurrentBaseTeamContext(teamContext);
 		}
 		return Task.CompletedTask;
 	}

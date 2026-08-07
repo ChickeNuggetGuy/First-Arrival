@@ -19,6 +19,8 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 		AttackCity,
 		BuildBase,
 		Scan,
+		// Append goals because their numeric values are stored in save files.
+		Abduction,
 	}
 
 	public enum AlienOperationStage
@@ -130,7 +132,9 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 	[Export(PropertyHint.Range, "1,3,1")] private int startingCraftPerBase = 2;
 	[Export(PropertyHint.Range, "1,8,1")] private int scanWaypointCount = 4;
 	[Export(PropertyHint.Range, "2,64,1")] private int scanRangeSteps = 24;
-	[Export(PropertyHint.Range, "0,100,1")] private float scanUtility = 45f;
+	[Export(PropertyHint.Range, "0,100,1")] private float scanUtility = 65f;
+	[Export(PropertyHint.Range, "0,100,1")] private float abductionUtility = 60f;
+	[Export(PropertyHint.Range, "0,1,0.01")] private float cityAttackDecisionChance = 0.08f;
 
 	private readonly List<AlienOperation> _operations = new();
 	private int _nextOperationId = 1;
@@ -253,9 +257,11 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 		}
 
 		List<GoalCandidate> candidates = new();
-		AddCityAttackCandidates(candidates, alienTeam);
+		if (GD.Randf() < Mathf.Clamp(cityAttackDecisionChance, 0.0f, 1.0f))
+			AddCityAttackCandidates(candidates, alienTeam);
 		AddExpansionCandidate(candidates, alienTeam);
 		AddScanCandidate(candidates, alienTeam);
+		AddAbductionCandidate(candidates, alienTeam);
 
 		if (candidates.Count == 0)
 		{
@@ -274,7 +280,9 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 			HoursRemaining = Math.Max(1, preparationHours),
 			Difficulty = Math.Clamp(
 				(GlobeMissionManager.Instance?.GlobalDifficulty ?? 1)
-				+ (_strategicProgress / 20),
+				+ (_strategicProgress / 20)
+				+ (selected.Goal == AlienGoalType.AttackCity ? 2 : 0)
+				- (selected.Goal == AlienGoalType.Scan ? 1 : 0),
 				1,
 				10),
 			CraftHomeBaseIndex = selected.SourceBaseCellIndex,
@@ -324,9 +332,12 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 			int travelHours = CalculateTravelHours(
 				assignment.Value.Base.cellIndex,
 				targetCellIndex);
-			float utility = 55f + (aggression * 0.35f)
+			// The rarity gate controls attack frequency; high utility makes an
+			// eligible attack actually win the decision instead of silently losing
+			// to routine landing candidates.
+			float utility = 70f + (aggression * 0.15f)
 			                + (_strategicProgress * 0.15f)
-			                - (travelHours * 1.25f)
+			                - (travelHours * 0.75f)
 			                - (GetActiveGoalCount(AlienGoalType.AttackCity) * 20f)
 			                + (float)GD.RandRange(-8.0, 8.0);
 
@@ -399,16 +410,58 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 			waypoints));
 	}
 
+	private void AddAbductionCandidate(
+		List<GoalCandidate> candidates,
+		GlobeTeamHolder alienTeam)
+	{
+		List<CraftAssignment> available = GetAvailableCraftAssignments(alienTeam.Bases);
+		if (available.Count == 0) return;
+
+		CraftAssignment assignment = available[GD.RandRange(0, available.Count - 1)];
+		int[] waypoints = GenerateReportedLandingWaypoints(
+			assignment.Base.cellIndex,
+			preferCity: true);
+		if (waypoints.Length == 0) return;
+
+		float utility = abductionUtility
+		                - (GetActiveGoalCount(AlienGoalType.Abduction) * 18f)
+		                + (float)GD.RandRange(-8.0, 8.0);
+		candidates.Add(new GoalCandidate(
+			AlienGoalType.Abduction,
+			assignment.Base.cellIndex,
+			waypoints[0],
+			CalculateTravelHours(assignment.Base.cellIndex, waypoints[0]),
+			utility,
+			assignment.Craft.Index,
+			waypoints));
+	}
+
 	private int[] GenerateScanWaypoints(int sourceCellIndex)
+		=> GenerateReportedLandingWaypoints(sourceCellIndex, preferCity: false);
+
+	private int[] GenerateReportedLandingWaypoints(
+		int sourceCellIndex,
+		bool preferCity)
 	{
 		int anchorCellIndex = sourceCellIndex;
-		GlobeTeamHolder playerTeam = GlobeTeamManager.Instance?.GetTeamData(
-			Enums.UnitTeam.Player);
-		if (playerTeam?.Bases != null && playerTeam.Bases.Count > 0)
+		int rangeSteps = scanRangeSteps;
+		if (preferCity)
 		{
-			TeamBaseCellDefinition playerBase = playerTeam.Bases[
-				GD.RandRange(0, playerTeam.Bases.Count - 1)];
-			anchorCellIndex = playerBase.cellIndex;
+			int[] cityCells = GlobeCityManager.Instance?.GetCityCellIndices();
+			if (cityCells != null && cityCells.Length > 0)
+				anchorCellIndex = cityCells[GD.RandRange(0, cityCells.Length - 1)];
+			rangeSteps = Math.Max(2, scanRangeSteps / 3);
+		}
+		else
+		{
+			GlobeTeamHolder playerTeam = GlobeTeamManager.Instance?.GetTeamData(
+				Enums.UnitTeam.Player);
+			if (playerTeam?.Bases != null && playerTeam.Bases.Count > 0)
+			{
+				TeamBaseCellDefinition playerBase = playerTeam.Bases[
+					GD.RandRange(0, playerTeam.Bases.Count - 1)];
+				anchorCellIndex = playerBase.cellIndex;
+			}
 		}
 
 		HexCellData? anchor = GlobeHexGridManager.Instance?.GetCellFromIndex(
@@ -417,9 +470,25 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 
 		List<HexCellData> cells = GlobeHexGridManager.Instance.GetCellsInStepRange(
 			anchor.Value,
-			scanRangeSteps,
+			rangeSteps,
 			excludeWater: true);
-		cells.RemoveAll(cell => cell.Index == sourceCellIndex);
+		HashSet<int> reservedTargets = _operations
+			.Select(operation => operation.TargetCellIndex)
+			.ToHashSet();
+		var activeMissions = GlobeMissionManager.Instance?.GetActiveMissions();
+		cells.RemoveAll(cell =>
+			cell.Index == sourceCellIndex ||
+			reservedTargets.Contains(cell.Index) ||
+			activeMissions?.ContainsKey(cell.Index) == true ||
+			(preferCity && cell.Index == anchorCellIndex));
+
+		// Prefer sites in recognized countries so the mission can name its
+		// reporter. Fall back to any valid land site if map metadata is absent.
+		List<HexCellData> countryCells = cells.Where(cell =>
+			GlobeHexGridManager.Instance.GetCountryStateForIndex(cell.Index) != null)
+			.ToList();
+		if (countryCells.Count > 0)
+			cells = countryCells;
 
 		List<int> waypoints = new();
 		while (cells.Count > 0 && waypoints.Count < scanWaypointCount)
@@ -610,7 +679,7 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 				bool missionCreated = GlobeMissionManager.Instance?.TryCreateAlienMission(
 					operation.Id,
 					operation.TargetCellIndex,
-					Enums.MissionType.Eliminate,
+					Enums.MissionType.CityDefense,
 					operation.Difficulty) == true;
 
 				if (missionCreated)
@@ -646,17 +715,48 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 				break;
 
 			case AlienGoalType.Scan:
-				operation.WaypointIndex++;
-				if (operation.WaypointIndex < operation.Waypoints.Length)
-				{
-					operation.TargetCellIndex = operation.Waypoints[operation.WaypointIndex];
-					_ = SendOperationCraft(operation, operation.TargetCellIndex);
-					return;
-				}
+				if (!TryStartReportedLanding(
+					operation,
+					Enums.MissionType.ScoutLanding))
+					AdvanceToNextLandingSite(operation);
+				break;
 
-				BeginReturn(operation, alienSucceeded: true);
+			case AlienGoalType.Abduction:
+				if (!TryStartReportedLanding(
+					operation,
+					Enums.MissionType.Abduction))
+					AdvanceToNextLandingSite(operation);
 				break;
 		}
+	}
+
+	private bool TryStartReportedLanding(
+		AlienOperation operation,
+		Enums.MissionType missionType)
+	{
+		bool missionCreated = GlobeMissionManager.Instance
+			?.TryCreateReportedLandingMission(
+				operation.Id,
+				operation.TargetCellIndex,
+				missionType,
+				operation.Difficulty) == true;
+		if (!missionCreated) return false;
+
+		operation.Stage = AlienOperationStage.MissionActive;
+		return true;
+	}
+
+	private void AdvanceToNextLandingSite(AlienOperation operation)
+	{
+		operation.WaypointIndex++;
+		if (operation.WaypointIndex < operation.Waypoints.Length)
+		{
+			operation.TargetCellIndex = operation.Waypoints[operation.WaypointIndex];
+			_ = SendOperationCraft(operation, operation.TargetCellIndex);
+			return;
+		}
+
+		BeginReturn(operation, alienSucceeded: true);
 	}
 
 	private void BeginReturn(AlienOperation operation, bool alienSucceeded)

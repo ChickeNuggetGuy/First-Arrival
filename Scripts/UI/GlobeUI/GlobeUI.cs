@@ -11,8 +11,9 @@ public partial class GlobeUI : UIWindow
 	[Export] private Label currentFundsUI;
 	[Export] private Button buildBaseButton;
 	[Export] private Button sendMissionButton;
-	[Export] private Button buyCraftButton;
 	[Export] private Button researchButton;
+	[Export] private Button monthlyReportButton;
+	[Export] private MonthlyReportUI monthlyReportUI;
 	[Export] private SelectCraftUI selectCraftUI;
 	[Export] private Label monthlyScoreLabel;
 	
@@ -23,6 +24,7 @@ public partial class GlobeUI : UIWindow
 	[ExportGroup("Bases"), Export] private Texture2D focusButtonTexture;
 	private Dictionary<int, HBoxContainer> baseButtons = new Dictionary<int, HBoxContainer>();
 	private ResearchWindowUI researchWindow;
+	private GameManager researchRequestManager;
 	protected override Task _Setup()
 	{
 		
@@ -40,15 +42,19 @@ public partial class GlobeUI : UIWindow
 		GlobeTimeManager.Instance.DateChanged += TimeManagerOnDateChanged;
 		
 		
-		
-		if(!buyCraftButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(BuyCraftButtonOnPressed)))
-			buyCraftButton.Pressed += BuyCraftButtonOnPressed;
 
 		if (researchButton != null && !researchButton.IsConnected(
 			Button.SignalName.Pressed,
 			Callable.From(ResearchButtonOnPressed)))
 		{
 			researchButton.Pressed += ResearchButtonOnPressed;
+		}
+
+		if (monthlyReportButton != null && !monthlyReportButton.IsConnected(
+			Button.SignalName.Pressed,
+			Callable.From(MonthlyReportButtonOnPressed)))
+		{
+			monthlyReportButton.Pressed += MonthlyReportButtonOnPressed;
 		}
 		
 	
@@ -74,13 +80,11 @@ public partial class GlobeUI : UIWindow
 			if(teamHolder.Bases.Count == 0)
 			{
 				if (sendMissionButton != null) sendMissionButton.Disabled = true;
-				buyCraftButton.Disabled = true;
 				researchButton.Disabled = true;
 			}
 			else
 			{
 				if (sendMissionButton != null) sendMissionButton.Disabled = false;
-				buyCraftButton.Disabled = false;
 				researchButton.Disabled = false;
 			}
 
@@ -90,15 +94,60 @@ public partial class GlobeUI : UIWindow
 			GD.Print("not found!");
 		}
 		_ = DrawUI();
-		if (GameManager.Instance?.ConsumeResearchWindowRequest() == true)
-			_ = OpenRequestedResearchWindow();
+		GameManager gameManager = GameManager.Instance;
+		if (gameManager?.ConsumeResearchWindowRequest() == true)
+			QueueRequestedResearchWindow(gameManager);
 		return Task.CompletedTask;
 	}
 
-	private async Task OpenRequestedResearchWindow()
+	private void QueueRequestedResearchWindow(GameManager gameManager)
+	{
+		if (gameManager.loadingState == GameManager.LoadingState.NONE)
+		{
+			_ = OpenRequestedResearchWindowAfterLoading();
+			return;
+		}
+
+		if (researchRequestManager == gameManager)
+			return;
+
+		DisconnectResearchLoadSignal();
+		researchRequestManager = gameManager;
+		researchRequestManager.CoreManagersLoaded +=
+			GameManagerOnCoreManagersLoaded;
+	}
+
+	private void GameManagerOnCoreManagersLoaded()
+	{
+		DisconnectResearchLoadSignal();
+		_ = OpenRequestedResearchWindowAfterLoading();
+	}
+
+	private async Task OpenRequestedResearchWindowAfterLoading()
 	{
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-		if (IsInsideTree()) ResearchButtonOnPressed();
+		if (IsInsideTree() &&
+		    GameManager.Instance?.loadingState == GameManager.LoadingState.NONE)
+		{
+			ResearchButtonOnPressed();
+		}
+	}
+
+	private void DisconnectResearchLoadSignal()
+	{
+		if (researchRequestManager != null &&
+		    GodotObject.IsInstanceValid(researchRequestManager))
+		{
+			researchRequestManager.CoreManagersLoaded -=
+				GameManagerOnCoreManagersLoaded;
+		}
+		researchRequestManager = null;
+	}
+
+	public override void _ExitTree()
+	{
+		DisconnectResearchLoadSignal();
+		base._ExitTree();
 	}
 
 	private void TeamHolderOnMonthlyScoreChanged(
@@ -156,8 +205,9 @@ public partial class GlobeUI : UIWindow
 				baseButton.Pressed += async () => 
 				{
 					await OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
-					GameManager.Instance.currentBase = baseCellDefinition;
-					GameManager.Instance.currentBaseFunds = teamHolder.funds;
+					GameManager.Instance.SetCurrentBase(
+						baseCellDefinition,
+						teamHolder);
 					GameManager.Instance.SetCurrentTeamResearchState(
 						teamHolder.GetUnlockedItemIdsSnapshot(),
 						teamHolder.GetCompletedResearchProjectIdsSnapshot());
@@ -195,13 +245,11 @@ public partial class GlobeUI : UIWindow
 		if (teamHolder.Bases.Count > 0)
 		{
 			sendMissionButton.Disabled = false;
-			buyCraftButton.Disabled = false;
 			researchButton.Disabled = false;
 		}
 		else
 		{
 			sendMissionButton.Disabled = true;
-			buyCraftButton.Disabled = true;
 			researchButton.Disabled = true;
 		}
 	}
@@ -211,18 +259,6 @@ public partial class GlobeUI : UIWindow
 		selectCraftUI.ShowCall();
 	}
 	
-	private void BuyCraftButtonOnPressed()
-	{
-		GlobeTeamManager baseManager = GlobeTeamManager.Instance;
-		if (baseManager == null)
-		{
-			GD.Print($"Base Manager not found");
-			return;
-		}
-		
-		baseManager.buyCraftMode = !baseManager.buyCraftMode;
-	}
-
 	private void ResearchButtonOnPressed()
 	{
 		GlobeTeamHolder teamHolder = GlobeTeamManager.Instance?.GetTeamData(
@@ -237,6 +273,12 @@ public partial class GlobeUI : UIWindow
 		}
 
 		researchWindow.ShowFor(teamHolder);
+	}
+
+	private void MonthlyReportButtonOnPressed()
+	{
+		if (monthlyReportUI != null)
+			_ = monthlyReportUI.ShowLatestReport();
 	}
 	
 	private void TimeManagerOnDateChanged(int year, Enums.Month month, int date, Enums.Day day)

@@ -15,11 +15,14 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	public static readonly Vector2I HeadquartersGridOrigin = new(4, 4);
 
 	public Enums.UnitTeam teamAffiliation = Enums.UnitTeam.None;
-	public int DetectionRadius { get; set; } = 10;
+	public GlobeTeamHolder parentTeamHolder;
+	public int DetectionRadius { get; set; } = 0;
 	public float DetectionChance { get; set; } = 0.35f;
 	public bool ShowDetectionRadius { get; set; } = true;
-	public int BaseTroopCapacity { get; private set; } = 8;
+	public int BaseTroopCapacity { get; private set; } = 0;
 	public int FacilityTroopCapacity { get; private set; }
+	
+	public int ScientistCapacity = 0;
 	public int MaxStationedUnits => BaseTroopCapacity + FacilityTroopCapacity;
 
 	private Godot.Collections.Array<GridObject> stationedGridObjects = new Godot.Collections.Array<GridObject>();
@@ -72,20 +75,8 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 	public int MaxCraft => maxCraft;
 	public IReadOnlyList<FacilityConstruction> Facilities => facilities;
-	public int ScientistCapacity
-	{
-		get
-		{
-			long total = 0;
-			foreach (FacilityConstruction facility in facilities)
-			{
-				if (!facility.IsConstructed) continue;
-				total += facility.ScientistCapacity;
-				if (total >= int.MaxValue) return int.MaxValue;
-			}
-			return (int)total;
-		}
-	}
+
+	
 	public int MonthlyFacilityCost
 	{
 		get
@@ -104,10 +95,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	public event Action<FacilityConstruction> FacilityCompleted;
 	public event Action<TeamBaseCellDefinition> FacilityEffectsChanged;
 
-	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList) : base(
+	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList, GlobeTeamHolder parentTeam) : base(
 		cellIndex, name, true)
 	{
 		this.teamAffiliation = team;
+		SetParentTeamHolder(parentTeam);
 		RevealForTeam(team);
 		EnsureHeadquarters();
 		if (craftList != null)
@@ -126,6 +118,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			craft.Add(Enums.CraftStatus.EnRoute, new Godot.Collections.Array<Craft>());
 			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 		}
+	}
+
+	public void SetParentTeamHolder(GlobeTeamHolder parentTeam)
+	{
+		parentTeamHolder = parentTeam ?? throw new ArgumentNullException(
+			nameof(parentTeam),
+			"A team base must always belong to a GlobeTeamHolder.");
 	}
 
 
@@ -507,6 +506,13 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		FacilityEffectsChanged?.Invoke(this);
 	}
 
+	public void AddScientistCapacity(int amount)
+	{
+		if (amount <= 0) return;
+		ScientistCapacity += amount;
+		FacilityEffectsChanged?.Invoke(this);
+	}
+
 	private void EnsureHeadquarters()
 	{
 		if (facilities.Count > 0) return;
@@ -707,6 +713,10 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		this.craft[craft.Status].Remove(craft);
 		this.craft[newStatus].Add(craft);
 		craft.Status = newStatus;
+		parentTeamHolder.EmitSignal(
+			GlobeTeamHolder.SignalName.CraftStateChanged,
+			parentTeamHolder);
+		
 
 		return true;
 	}

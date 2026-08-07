@@ -53,6 +53,8 @@ public partial class GlobeTeamHolder : Node
 	[Signal] public delegate void BaseAddedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
 	[Signal] public delegate void BaseRemovedEventHandler(int hexCellIndex, GlobeTeamHolder teamHolder);
 	[Signal] public delegate void MonthlyScoreChangedEventHandler(Godot.Collections.Dictionary<Enums.MonthlyScoreReason, int> score);
+	[Signal] public delegate void CraftStateChangedEventHandler(GlobeTeamHolder teamHolder);
+	
 	
 	public GlobeTeamHolder(Enums.UnitTeam affiliation, List<TeamBaseCellDefinition> bases, long startingFunds = 1000000)
 	{
@@ -187,7 +189,7 @@ public partial class GlobeTeamHolder : Node
 
 		TryRemoveFunds(cost, "Base construction");
 		TeamBaseCellDefinition baseCellDefinition =
-			new TeamBaseCellDefinition(cell.Index, "Base " + Bases.Count + 1, Team, null);
+			new TeamBaseCellDefinition(cell.Index, "Base " + Bases.Count + 1, Team, null, this);
 		Bases.Add(baseCellDefinition);
 		EmitSignal(SignalName.BaseAdded, cell.Index, this);
 		return true;
@@ -243,8 +245,7 @@ public partial class GlobeTeamHolder : Node
 					: "Loaded Base";
 
 				TeamBaseCellDefinition newBase = new TeamBaseCellDefinition(
-					cellIndex, baseName, Team, null
-				);
+					cellIndex, baseName, Team, null, this);
 
 				await newBase.LoadAsync(baseData, unitParent); // <-- the actual fix
 				GD.Print("Loaded Base: " + baseName);

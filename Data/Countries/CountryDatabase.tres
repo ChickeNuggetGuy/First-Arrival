@@ -143,10 +143,11 @@ MapColor = Color(0.6509804, 0.33333334, 0.15294118, 1)
 CountryName = "Unnamed #A65527"
 
 [sub_resource type="Resource" id="Resource_1kpsh"]
-resource_name = "Unnamed #A65628"
+resource_name = "Greenland"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.6509804, 0.3372549, 0.15686275, 1)
-CountryName = "Unnamed #A65628"
+CountryName = "Greenland"
+GrossDomesticProduct = 1086170703.0
 
 [sub_resource type="Resource" id="Resource_ktm1o"]
 resource_name = "Unnamed #FC4D29"
@@ -216,7 +217,6 @@ MapColor = Color(0.8, 0.2, 0.2, 1)
 CountryName = "United States"
 CountryCode = "0"
 GrossDomesticProduct = 10581929774000.0
-PlayerOpinion = 100.0
 
 [sub_resource type="Resource" id="Resource_tf5av"]
 resource_name = "Unnamed #FFFF33"
@@ -231,10 +231,11 @@ MapColor = Color(0.105882354, 0.47058824, 0.21568628, 1)
 CountryName = "Unnamed #1B7837"
 
 [sub_resource type="Resource" id="Resource_qq6ly"]
-resource_name = "Unnamed #FD8D3C"
+resource_name = "Mongolia"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.99215686, 0.5529412, 0.23529412, 1)
-CountryName = "Unnamed #FD8D3C"
+CountryName = "Mongolia"
+GrossDomesticProduct = 1267997934.0
 
 [sub_resource type="Resource" id="Resource_g83xs"]
 resource_name = "Unnamed #003E3E"
@@ -286,10 +287,11 @@ CountryName = "France"
 CountryCode = "1370376677298"
 
 [sub_resource type="Resource" id="Resource_axiag"]
-resource_name = "Unnamed #4D004B"
+resource_name = "Saudi Arabia"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.3019608, 0, 0.29411766, 1)
-CountryName = "Unnamed #4D004B"
+CountryName = "Saudi Arabia"
+GrossDomesticProduct = 184137600000.0
 
 [sub_resource type="Resource" id="Resource_qkk71"]
 resource_name = "Unnamed #AA1F4B"
@@ -341,10 +343,11 @@ MapColor = Color(0.02745098, 0.10980392, 0.34117648, 1)
 CountryName = "Unnamed #071C57"
 
 [sub_resource type="Resource" id="Resource_hpe3s"]
-resource_name = "Unnamed #081D58"
+resource_name = "Japan"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.03137255, 0.11372549, 0.34509805, 1)
-CountryName = "Unnamed #081D58"
+CountryName = "Japan"
+GrossDomesticProduct = 4374711694090.0
 
 [sub_resource type="Resource" id="Resource_hcsw7"]
 resource_name = "Unnamed #FC8D59"
@@ -389,10 +392,11 @@ MapColor = Color(0.99215686, 0.7058824, 0.38431373, 1)
 CountryName = "Unnamed #FDB462"
 
 [sub_resource type="Resource" id="Resource_8fppa"]
-resource_name = "Unnamed #B3DE69"
+resource_name = "Bolivia"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.7019608, 0.87058824, 0.4117647, 1)
-CountryName = "Unnamed #B3DE69"
+CountryName = "Bolivia"
+GrossDomesticProduct = 8141516928.0
 
 [sub_resource type="Resource" id="Resource_r7jnc"]
 resource_name = "Unnamed #94346E"
@@ -619,10 +623,11 @@ MapColor = Color(0.99215686, 0.83137256, 0.61960787, 1)
 CountryName = "Unnamed #FDD49E"
 
 [sub_resource type="Resource" id="Resource_g7j5d"]
-resource_name = "Unnamed #A6DBA0"
+resource_name = "South Africa"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.6509804, 0.85882354, 0.627451, 1)
-CountryName = "Unnamed #A6DBA0"
+CountryName = "South Africa"
+GrossDomesticProduct = 135429905922.0
 
 [sub_resource type="Resource" id="Resource_47y11"]
 resource_name = "Unnamed #FFEDA0"
@@ -721,10 +726,11 @@ MapColor = Color(1, 1, 0.69803923, 1)
 CountryName = "Unnamed #FFFFB2"
 
 [sub_resource type="Resource" id="Resource_oud52"]
-resource_name = "Unnamed #FFFFB3"
+resource_name = "Chile"
 script = ExtResource("1_4bt58")
 MapColor = Color(1, 1, 0.7019608, 1)
-CountryName = "Unnamed #FFFFB3"
+CountryName = "Chile"
+GrossDomesticProduct = 71574739561.0
 
 [sub_resource type="Resource" id="Resource_6oqyj"]
 resource_name = "Unnamed #4575B4"
@@ -770,10 +776,11 @@ MapColor = Color(0.96862745, 0.5058824, 0.7490196, 1)
 CountryName = "Unnamed #F781BF"
 
 [sub_resource type="Resource" id="Resource_78ou1"]
-resource_name = "Unnamed #4C91BF"
+resource_name = "Mexico"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.29803923, 0.5686275, 0.7490196, 1)
-CountryName = "Unnamed #4C91BF"
+CountryName = "Mexico"
+GrossDomesticProduct = 796064590549.0
 
 [sub_resource type="Resource" id="Resource_urgs7"]
 resource_name = "Unnamed #FFFFBF"
@@ -884,10 +891,11 @@ MapColor = Color(0.45490196, 0.6784314, 0.81960785, 1)
 CountryName = "Unnamed #74ADD1"
 
 [sub_resource type="Resource" id="Resource_2mhhn"]
-resource_name = "Unnamed #80B1D3"
+resource_name = "Argentina"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.5019608, 0.69411767, 0.827451, 1)
-CountryName = "Unnamed #80B1D3"
+CountryName = "Argentina"
+GrossDomesticProduct = 268696750000.0
 
 [sub_resource type="Resource" id="Resource_q28su"]
 resource_name = "Unnamed #4EB3D3"
@@ -914,10 +922,11 @@ MapColor = Color(0.74509805, 0.7294118, 0.85490197, 1)
 CountryName = "Unnamed #BEBADA"
 
 [sub_resource type="Resource" id="Resource_7n5ma"]
-resource_name = "Unnamed #9EBCDA"
+resource_name = "Australia"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.61960787, 0.7372549, 0.85490197, 1)
-CountryName = "Unnamed #9EBCDA"
+CountryName = "Australia"
+GrossDomesticProduct = 380360222861.0
 
 [sub_resource type="Resource" id="Resource_ussmk"]
 resource_name = "Unnamed #D1DBDD"
@@ -944,16 +953,18 @@ MapColor = Color(0.6509804, 0.80784315, 0.8901961, 1)
 CountryName = "Unnamed #A6CEE3"
 
 [sub_resource type="Resource" id="Resource_1dlei"]
-resource_name = "Unnamed #DECBE4"
+resource_name = "Peru"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.87058824, 0.79607844, 0.89411765, 1)
-CountryName = "Unnamed #DECBE4"
+CountryName = "Peru"
+GrossDomesticProduct = 52030158775.0
 
 [sub_resource type="Resource" id="Resource_jomya"]
-resource_name = "Unnamed #FCCDE5"
+resource_name = "Brazil"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.9882353, 0.8039216, 0.8980392, 1)
-CountryName = "Unnamed #FCCDE5"
+CountryName = "Brazil"
+GrossDomesticProduct = 559983704094.0
 
 [sub_resource type="Resource" id="Resource_6y18m"]
 resource_name = "Unnamed #C7EAE5"
@@ -1022,10 +1033,10 @@ MapColor = Color(0.8784314, 0.9529412, 0.972549, 1)
 CountryName = "Unnamed #E0F3F8"
 
 [sub_resource type="Resource" id="Resource_6xv65"]
-resource_name = "Unnamed #F7FCFD"
+resource_name = "Antartica"
 script = ExtResource("1_4bt58")
 MapColor = Color(0.96862745, 0.9882353, 0.99215686, 1)
-CountryName = "Unnamed #F7FCFD"
+CountryName = "Antartica"
 
 [sub_resource type="Resource" id="Resource_v4qy0"]
 resource_name = "Unnamed #FFFFFF"

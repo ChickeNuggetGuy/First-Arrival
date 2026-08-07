@@ -7,352 +7,361 @@ using FirstArrival.Scripts.Utility;
 
 public abstract partial class ActionBase
 {
-  protected GridObject parentGridObject;
-  protected GridCell startingGridCell;
-  protected GridCell targetGridCell;
-  protected ActionDefinition parentActionDefinition;
-  public ActionBase NextActionBase {get; protected set;}
+	protected GridObject parentGridObject;
+	protected GridCell startingGridCell;
+	protected GridCell targetGridCell;
+	protected ActionDefinition parentActionDefinition;
+	public ActionBase NextActionBase { get; protected set; }
 
-  protected Godot.Collections.Dictionary<Enums.Stat, int> costs = new();
-  public ActionBase Parent { get; private set; } = null;
-  private bool costsDeducted = false;
-  private ActionBase activeSubAction;
-  private Task cancellationTask;
-  private bool visibilityInterruptRequested;
+	protected Dictionary<Enums.Stat, int> costs = new();
+	public ActionBase Parent { get; private set; } = null;
+	private bool costsDeducted = false;
+	private ActionBase activeSubAction;
+	private Task cancellationTask;
+	private bool visibilityInterruptRequested;
 
-  public bool IsCancellationRequested { get; private set; }
-  public bool WasInterruptedByNewEnemy { get; private set; }
-  public GridObject ActingGridObject => parentGridObject;
+	public bool IsCancellationRequested { get; private set; }
+	public bool WasInterruptedByNewEnemy { get; private set; }
+	public GridObject ActingGridObject => parentGridObject;
 
-  protected void SetParent(ActionBase parent) => Parent = parent;
+	protected void SetParent(ActionBase parent) => Parent = parent;
 
-  protected void AddSubAction(ActionBase child)
-  {
-    if (child == null) return;
-    child.SetParent(this);
-    if (this is ICompositeAction composite)
-    {
-      composite.SubActions ??= new List<ActionBase>();
-      composite.SubActions.Add(child);
-    }
-  }
+	protected void AddSubAction(ActionBase child)
+	{
+		if (child == null) return;
+		child.SetParent(this);
+		if (this is ICompositeAction composite)
+		{
+			composite.SubActions ??= new List<ActionBase>();
+			composite.SubActions.Add(child);
+		}
+	}
 
-  // Validation charges the parent action for a required turn. This queues the
-  // matching child action with zero additional cost so execution always turns
-  // before an attack, throw, or interaction is performed.
-  protected bool AddRotateSubActionIfNeeded(
-    GridCell facingFromCell,
-    GridCell facingToCell,
-    Enums.Direction assumedCurrentDirection = Enums.Direction.None,
-    bool force = false
-  )
-  {
-    if (
-      this is not ICompositeAction
-      || parentGridObject == null
-      || facingFromCell == null
-      || facingToCell == null
-      || !parentGridObject.TryGetGridObjectNode<GridObjectActions>(
-        out var gridObjectActions
-      )
-    )
-      return false;
+	// Validation charges the parent action for a required turn. This queues the
+	// matching child action with zero additional cost so execution always turns
+	// before an attack, throw, or interaction is performed.
+	protected bool AddRotateSubActionIfNeeded(
+		GridCell facingFromCell,
+		GridCell facingToCell,
+		Enums.Direction assumedCurrentDirection = Enums.Direction.None,
+		bool force = false
+	)
+	{
+		if (
+			this is not ICompositeAction
+			|| parentGridObject == null
+			|| facingFromCell == null
+			|| facingToCell == null
+			|| !parentGridObject.TryGetGridObjectNode<GridObjectActions>(
+				out var gridObjectActions
+			)
+		)
+			return false;
 
-    var targetDirection = RotationHelperFunctions.GetDirectionBetweenCells(
-      facingFromCell,
-      facingToCell
-    );
-    if (targetDirection == Enums.Direction.None)
-      return false;
+		var targetDirection = RotationHelperFunctions.GetDirectionBetweenCells(
+			facingFromCell,
+			facingToCell
+		);
+		if (targetDirection == Enums.Direction.None)
+			return false;
 
-    var currentDirection = assumedCurrentDirection == Enums.Direction.None
-      ? parentGridObject.GridPositionData.Direction
-      : assumedCurrentDirection;
-    if (!force && currentDirection == targetDirection)
-      return false;
+		var currentDirection = assumedCurrentDirection == Enums.Direction.None
+			? parentGridObject.GridPositionData.Direction
+			: assumedCurrentDirection;
+		if (!force && currentDirection == targetDirection)
+			return false;
 
-    var rotateActionDefinition = gridObjectActions.ActionDefinitions?
-      .FirstOrDefault(action => action is RotateActionDefinition)
-      as RotateActionDefinition;
-    if (rotateActionDefinition == null)
-      return false;
+		var rotateActionDefinition = gridObjectActions.ActionDefinitions?
+				.FirstOrDefault(action => action is RotateActionDefinition)
+			as RotateActionDefinition;
+		if (rotateActionDefinition == null)
+			return false;
 
-    var rotateAction = rotateActionDefinition.InstantiateAction(
-      parentGridObject,
-      facingFromCell,
-      facingToCell,
-      new Godot.Collections.Dictionary<Enums.Stat, int>()
-    );
-    AddSubAction(rotateAction);
-    return true;
-  }
+		var rotateAction = rotateActionDefinition.InstantiateAction(
+			parentGridObject,
+			facingFromCell,
+			facingToCell,
+			new Godot.Collections.Dictionary<Enums.Stat, int>()
+		);
+		AddSubAction(rotateAction);
+		return true;
+	}
 
-  public ActionBase() { }
+	public ActionBase()
+	{
+	}
 
-  public ActionBase(
-    GridObject parentGridObject,
-    GridCell startingGridCell,
-    GridCell targetGridCell,
-    ActionDefinition parent,
-    Godot.Collections.Dictionary<Enums.Stat, int> costs
-  )
-  {
-    this.parentActionDefinition = parent;
-    this.parentGridObject = parentGridObject;
-    this.startingGridCell = startingGridCell;
-    this.targetGridCell = targetGridCell;
-    this.costs = costs != null
-      ? new Godot.Collections.Dictionary<Enums.Stat, int>(costs)
-      : new Godot.Collections.Dictionary<Enums.Stat, int>();
-  }
+	public ActionBase(
+		GridObject parentGridObject,
+		GridCell startingGridCell,
+		GridCell targetGridCell,
+		ActionDefinition parent,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
+	)
+	{
+		this.parentActionDefinition = parent;
+		this.parentGridObject = parentGridObject;
+		this.startingGridCell = startingGridCell;
+		this.targetGridCell = targetGridCell;
+		this.costs = costs != null
+			? new Dictionary<Enums.Stat, int>(costs)
+			: new Dictionary<Enums.Stat, int>();
+	}
 
-  public virtual async Task SetupCall()
-  {
-    if (this is ICompositeAction compositeAction)
-    {
-      compositeAction.SubActions ??= new List<ActionBase>();
-      compositeAction.SubActions.Clear();
-    }
-    await Setup();
-  }
+	public virtual async Task SetupCall()
+	{
+		if (this is ICompositeAction compositeAction)
+		{
+			compositeAction.SubActions ??= new List<ActionBase>();
+			compositeAction.SubActions.Clear();
+		}
 
-  protected abstract Task Setup();
+		await Setup();
+	}
 
-  public virtual async Task ExecuteCall()
-  {
-    try
-    {
-      await SetupCall();
-      if (IsCancellationRequested) return;
+	protected abstract Task Setup();
 
-      if (this is ICompositeAction compositeAction)
-      {
-	      for (int i = 0; i < compositeAction.SubActions.Count; i++)
-	      {
-		      if (i + 1 < compositeAction.SubActions.Count)
-		      {
-			      var action = compositeAction.SubActions[i];
-			      action.SetNextAction(compositeAction.SubActions[i + 1]);
-		      }
-	      }
+	public virtual async Task ExecuteCall()
+	{
+		try
+		{
+			await SetupCall();
+			if (IsCancellationRequested) return;
 
-	      for (var index = 0; index < compositeAction.SubActions.Count; index++)
-	      {
-		      if (IsCancellationRequested) return;
+			if (this is ICompositeAction compositeAction)
+			{
+				for (int i = 0; i < compositeAction.SubActions.Count; i++)
+				{
+					if (i + 1 < compositeAction.SubActions.Count)
+					{
+						var action = compositeAction.SubActions[i];
+						action.SetNextAction(compositeAction.SubActions[i + 1]);
+					}
+				}
 
-		      var action = compositeAction.SubActions[index];
-          activeSubAction = action;
-          try
-          {
-		        await action.ExecuteCall();
-          }
-          finally
-          {
-            if (ReferenceEquals(activeSubAction, action))
-              activeSubAction = null;
-          }
+				for (var index = 0; index < compositeAction.SubActions.Count; index++)
+				{
+					if (IsCancellationRequested) return;
 
-          if (IsCancellationRequested) return;
-          if (visibilityInterruptRequested)
-          {
-            // The completed child has already committed its state (for
-            // example, a movement step has entered its new cell). Cancel only
-            // after it returns so cancellation cannot roll that state back.
-            await CancelCall();
-            return;
-          }
-          if (!ShouldContinueAfterSubAction(action))
-            break;
-	      }
-      }
+					var action = compositeAction.SubActions[index];
+					activeSubAction = action;
+					try
+					{
+						await action.ExecuteCall();
+					}
+					finally
+					{
+						if (ReferenceEquals(activeSubAction, action))
+							activeSubAction = null;
+					}
 
-      if (IsCancellationRequested) return;
-      if (visibilityInterruptRequested)
-      {
-        await CancelCall();
-        return;
-      }
-      await Execute();
-      if (IsCancellationRequested) return;
-      await ActionCompleteCall();
-    }
-    finally
-    {
-      if (Parent == null && IsCancellationRequested)
-      {
-        try
-        {
-          await (cancellationTask ?? CancelCall());
-        }
-        finally
-        {
-          ActionManager.Instance?.ActionCanceledCall(parentActionDefinition, this);
-        }
-      }
-    }
-  }
+					if (IsCancellationRequested) return;
+					if (visibilityInterruptRequested)
+					{
+						// The completed child has already committed its state (for
+						// example, a movement step has entered its new cell). Cancel only
+						// after it returns so cancellation cannot roll that state back.
+						await CancelCall();
+						return;
+					}
 
-  protected abstract Task Execute();
+					if (!ShouldContinueAfterSubAction(action))
+						break;
+				}
+			}
 
-  /// <summary>
-  /// Lets a composite action stop its remaining children after inspecting the
-  /// child that just completed.
-  /// </summary>
-  protected virtual bool ShouldContinueAfterSubAction(ActionBase completedSubAction)
-  {
-    return true;
-  }
+			if (IsCancellationRequested) return;
+			if (visibilityInterruptRequested)
+			{
+				await CancelCall();
+				return;
+			}
 
-  /// <summary>
-  /// Requests cancellation for this action and its currently executing child.
-  /// Override ActionCanceled to restore any action-specific transient state.
-  /// </summary>
-  public Task CancelCall()
-  {
-    if (cancellationTask != null)
-      return cancellationTask;
+			await Execute();
+			if (IsCancellationRequested) return;
+			await ActionCompleteCall();
+		}
+		finally
+		{
+			if (Parent == null && IsCancellationRequested)
+			{
+				try
+				{
+					await (cancellationTask ?? CancelCall());
+				}
+				finally
+				{
+					ActionManager.Instance?.ActionCanceledCall(parentActionDefinition, this);
+				}
+			}
+		}
+	}
 
-    IsCancellationRequested = true;
-    cancellationTask = CancelInternal();
-    return cancellationTask;
-  }
+	protected abstract Task Execute();
 
-  /// <summary>
-  /// Stops a composite action at its next safe child boundary when the action
-  /// reveals a previously unseen hostile. The current child is allowed to
-  /// finish first, so a completed movement step is never rolled back.
-  /// </summary>
-  public void RequestVisibilityInterrupt()
-  {
-    WasInterruptedByNewEnemy = true;
-    visibilityInterruptRequested = true;
+	/// <summary>
+	/// Lets a composite action stop its remaining children after inspecting the
+	/// child that just completed.
+	/// </summary>
+	protected virtual bool ShouldContinueAfterSubAction(ActionBase completedSubAction)
+	{
+		return true;
+	}
 
-    if (this is ICompositeAction)
-      activeSubAction?.RequestVisibilityInterrupt();
-  }
+	/// <summary>
+	/// Requests cancellation for this action and its currently executing child.
+	/// Override ActionCanceled to restore any action-specific transient state.
+	/// </summary>
+	public Task CancelCall()
+	{
+		if (cancellationTask != null)
+			return cancellationTask;
 
-  private async Task CancelInternal()
-  {
-    ActionBase child = activeSubAction;
-    if (child != null)
-      await child.CancelCall();
+		IsCancellationRequested = true;
+		cancellationTask = CancelInternal();
+		return cancellationTask;
+	}
 
-    await ActionCanceled();
-  }
+	/// <summary>
+	/// Stops a composite action at its next safe child boundary when the action
+	/// reveals a previously unseen hostile. The current child is allowed to
+	/// finish first, so a completed movement step is never rolled back.
+	/// </summary>
+	public void RequestVisibilityInterrupt()
+	{
+		WasInterruptedByNewEnemy = true;
+		visibilityInterruptRequested = true;
 
-  protected virtual Task ActionCanceled() => Task.CompletedTask;
+		if (this is ICompositeAction)
+			activeSubAction?.RequestVisibilityInterrupt();
+	}
 
-  /// <summary>
-  /// Waits for a tween while allowing a cancellation-aware action to stop it.
-  /// Returns false when cancellation interrupted the tween.
-  /// </summary>
-  protected async Task<bool> WaitForTween(Tween tween)
-  {
-    if (tween == null) return false;
+	private async Task CancelInternal()
+	{
+		ActionBase child = activeSubAction;
+		if (child != null)
+			await child.CancelCall();
 
-    while (GodotObject.IsInstanceValid(tween) && tween.IsRunning())
-    {
-      if (IsCancellationRequested)
-      {
-        tween.Kill();
-        return false;
-      }
+		await ActionCanceled();
+	}
 
-      SceneTree tree = parentGridObject?.GetTree();
-      if (tree == null) return false;
+	protected virtual Task ActionCanceled() => Task.CompletedTask;
 
-      await parentGridObject.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
-    }
+	/// <summary>
+	/// Waits for a tween while allowing a cancellation-aware action to stop it.
+	/// Returns false when cancellation interrupted the tween.
+	/// </summary>
+	protected async Task<bool> WaitForTween(Tween tween)
+	{
+		if (tween == null) return false;
 
-    return !IsCancellationRequested;
-  }
+		while (GodotObject.IsInstanceValid(tween) && tween.IsRunning())
+		{
+			if (IsCancellationRequested)
+			{
+				tween.Kill();
+				return false;
+			}
 
-  /// <summary>
-  /// Applies the global action-animation multiplier to a tween. A multiplier
-  /// of 2 plays the tween twice as fast without changing its authored timing.
-  /// </summary>
-  protected Tween ApplyAnimationSpeed(Tween tween)
-  {
-    if (tween == null)
-      return null;
+			SceneTree tree = parentGridObject?.GetTree();
+			if (tree == null) return false;
 
-    tween.SetSpeedScale(
-      SettingsManager.Instance?.AnimationSpeedMultiplier ?? 1.0f
-    );
-    return tween;
-  }
+			await parentGridObject.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+		}
 
-  /// <summary>
-  /// Returns true when this action's visuals can actually be seen. Player
-  /// units bypass fog-of-war, but all units must be inside the active camera's
-  /// viewport. Non-player units must also occupy a currently visible cell.
-  /// </summary>
-  protected bool ShouldAnimate()
-  {
-    if (parentGridObject == null || !GodotObject.IsInstanceValid(parentGridObject))
-      return false;
+		return !IsCancellationRequested;
+	}
 
-    GridCell visibilityCell = startingGridCell
-      ?? parentGridObject.GridPositionData?.AnchorCell;
-    bool isPlayerUnit = parentGridObject.Team == Enums.UnitTeam.Player;
+	/// <summary>
+	/// Applies the global action-animation multiplier to a tween. A multiplier
+	/// of 2 plays the tween twice as fast without changing its authored timing.
+	/// </summary>
+	protected Tween ApplyAnimationSpeed(Tween tween)
+	{
+		if (tween == null)
+			return null;
 
-    if (
-      !isPlayerUnit
-      && (visibilityCell == null
-        || visibilityCell.fogState != Enums.FogState.Visible)
-    )
-      return false;
+		tween.SetSpeedScale(
+			SettingsManager.Instance?.AnimationSpeedMultiplier ?? 1.0f
+		);
+		return tween;
+	}
 
-    Viewport viewport = parentGridObject.GetViewport();
-    Camera3D camera = viewport?.GetCamera3D()
-      ?? CameraController.Instance?.MainCamera;
-    if (viewport == null || camera == null || !GodotObject.IsInstanceValid(camera))
-      return false;
+	/// <summary>
+	/// Returns true when this action's visuals can actually be seen. Player
+	/// units bypass fog-of-war, but all units must be inside the active camera's
+	/// viewport. Non-player units must also occupy a currently visible cell.
+	/// </summary>
+	protected bool ShouldAnimate()
+	{
+		if (parentGridObject == null || !GodotObject.IsInstanceValid(parentGridObject))
+			return false;
 
-    Vector3 worldPosition = parentGridObject.objectCenter?.GlobalPosition
-      ?? parentGridObject.GlobalPosition;
-    if (camera.IsPositionBehind(worldPosition))
-      return false;
+		GridCell visibilityCell = startingGridCell
+		                          ?? parentGridObject.GridPositionData?.AnchorCell;
+		bool isPlayerUnit = parentGridObject.Team == Enums.UnitTeam.Player;
 
-    // A small margin prevents animation popping when the unit is touching the
-    // viewport edge but its origin has just moved outside the exact rectangle.
-    Rect2 screenRect = viewport.GetVisibleRect().Grow(32.0f);
-    return screenRect.HasPoint(camera.UnprojectPosition(worldPosition));
-  }
+		if (
+			!isPlayerUnit
+			&& (visibilityCell == null
+			    || visibilityCell.fogState != Enums.FogState.Visible)
+		)
+			return false;
 
-  protected virtual bool ShouldDeductCosts() => true;
+		Viewport viewport = parentGridObject.GetViewport();
+		Camera3D camera = viewport?.GetCamera3D()
+		                  ?? CameraController.Instance?.MainCamera;
+		if (viewport == null || camera == null || !GodotObject.IsInstanceValid(camera))
+			return false;
 
-  public async Task ActionCompleteCall()
-  {
-    if (IsCancellationRequested) return;
+		Vector3 worldPosition = parentGridObject.objectCenter?.GlobalPosition
+		                        ?? parentGridObject.GlobalPosition;
+		if (camera.IsPositionBehind(worldPosition))
+			return false;
 
-    await ActionComplete();
+		// A small margin prevents animation popping when the unit is touching the
+		// viewport edge but its origin has just moved outside the exact rectangle.
+		Rect2 screenRect = viewport.GetVisibleRect().Grow(32.0f);
+		return screenRect.HasPoint(camera.UnprojectPosition(worldPosition));
+	}
 
-    if (IsCancellationRequested) return;
+	protected virtual bool ShouldDeductCosts() => true;
+
+	public async Task ActionCompleteCall()
+	{
+		if (IsCancellationRequested) return;
+
+		await ActionComplete();
+
+		if (IsCancellationRequested) return;
+
+		if (!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
+
+		if (!costsDeducted && ShouldDeductCosts())
+		{
+			foreach (var pair in costs)
+			{
+				if (!statHolder.TryGetStat(pair.Key, out var stat))
+				{
+					GD.Print($"Stat {pair.Key} not found");
+					continue;
+				}
+
+				if (pair.Value != 0)
+					stat.RemoveValue(pair.Value);
+			}
+
+			costsDeducted = true;
+		}
+
+		// IMPORTANT: pass both the definition and this action instance
+		ActionManager.Instance.ActionCompleteCall(parentActionDefinition, this);
+	}
+
+	protected abstract Task ActionComplete();
 	
-    if(!parentGridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return;
-    
-    if (!costsDeducted && ShouldDeductCosts())
-    {
-      foreach (var pair in costs)
-      {
-        if (!statHolder.TryGetStat(pair.Key, out var stat))
-        {
-          GD.Print($"Stat {pair.Key} not found");
-          continue;
-        }
-        if (pair.Value != 0)
-          stat.RemoveValue(pair.Value);
-      }
-      costsDeducted = true;
-    }
 
-    // IMPORTANT: pass both the definition and this action instance
-    ActionManager.Instance.ActionCompleteCall(parentActionDefinition, this);
-  }
+	public void SetNextAction(ActionBase nextActionBase) => NextActionBase = nextActionBase;
 
-  protected abstract Task ActionComplete();
-  
-  
-  public void SetNextAction(ActionBase nextActionBase) => NextActionBase = nextActionBase;
+	public Dictionary<Enums.Stat, int> GetCosts() => costs;
 }

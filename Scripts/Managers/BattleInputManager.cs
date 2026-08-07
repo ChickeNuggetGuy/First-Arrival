@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
@@ -15,7 +16,16 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 	public GridCell currentGridCell { get; private set; }
 
 	[Export] public Camera3D camera3D;
-	[Export] private Node3D mouseMarker;
+	[Export] private string currentMouseMarkerName = "default";
+	private string currentMouseMarkerLabel;
+
+	public Node3D CurrentMouseMarker =>
+		mouseMarkers != null
+		&& mouseMarkers.TryGetValue(currentMouseMarkerName, out Node3D marker)
+			? marker
+			: null;
+
+	[Export] private Godot.Collections.Dictionary<string, Node3D> mouseMarkers = new();
 
 	public bool MouseOverUI => GetViewport()?.GuiGetHoveredControl() != null;
 
@@ -24,11 +34,24 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 	protected override Task _Setup(bool loadingData)
 	{
 		gridSystem = GridSystem.Instance;
+
+		if (mouseMarkers.Count != 0)
+		{
+			foreach (KeyValuePair<string, Node3D> mouseMarker in mouseMarkers)
+			{
+				if (mouseMarker.Value != null)
+				{
+					mouseMarker.Value.Hide();
+				}
+			}
+		}
+
 		return Task.CompletedTask;
 	}
 
 	protected override Task _Execute(bool loadingData)
 	{
+		SetMouseMarker("default");
 		return Task.CompletedTask;
 	}
 
@@ -48,13 +71,16 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 
 		if (GameManager.Instance.currentScene != GameManager.GameScene.BattleScene)
 		{
-			if (DebugMode) GD.Print($"[BattleInputManager] Blocked: currentScene is {GameManager.Instance.currentScene}, not BattleScene");
+			if (DebugMode)
+				GD.Print(
+					$"[BattleInputManager] Blocked: currentScene is {GameManager.Instance.currentScene}, not BattleScene");
 			return;
 		}
 
 		if (DebugMode && gridSystem == null)
 		{
-			GD.Print("[BattleInputManager] gridSystem is null - was GridSystem.Instance set before this manager's _Setup ran?");
+			GD.Print(
+				"[BattleInputManager] gridSystem is null - was GridSystem.Instance set before this manager's _Setup ran?");
 		}
 
 		if (DebugMode && camera3D == null)
@@ -67,7 +93,8 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 
 		if (DebugMode)
 		{
-			GD.Print($"[BattleInputManager] currentGridCell = {(currentGridCell != null ? currentGridCell.GridCoordinates.ToString() : "null")}");
+			GD.Print(
+				$"[BattleInputManager] currentGridCell = {(currentGridCell != null ? currentGridCell.GridCoordinates.ToString() : "null")}");
 		}
 	}
 
@@ -85,10 +112,12 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 		}
 
 		GodotObject hitObject = GetObjectAtMousePosition(out Vector3 hitPosition);
-		
+
 		if (hitObject == null)
 		{
-			if (DebugMode) GD.Print("[BattleInputManager] Raycast hit nothing (check camera3D, CollisionMask, and that terrain/GridObjects are on PhysicsLayer.TERRAIN/GRIDOBJECT)");
+			if (DebugMode)
+				GD.Print(
+					"[BattleInputManager] Raycast hit nothing (check camera3D, CollisionMask, and that terrain/GridObjects are on PhysicsLayer.TERRAIN/GRIDOBJECT)");
 			ClearCurrentCell();
 			return;
 		}
@@ -123,22 +152,28 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 			}
 		}
 
-		if (DebugMode) GD.Print($"[BattleInputManager] Fallback lookup failed at hitPosition {hitPosition} (gridSystem null? {gridSystem == null})");
+		if (DebugMode)
+			GD.Print(
+				$"[BattleInputManager] Fallback lookup failed at hitPosition {hitPosition} (gridSystem null? {gridSystem == null})");
 		ClearCurrentCell();
 	}
 
 	private void SetCurrentCell(GridCell cell)
 	{
 		currentGridCell = cell;
-		if (mouseMarker != null)
-			mouseMarker.GlobalPosition = cell.WorldCenter;
+		if (CurrentMouseMarker != null)
+		{
+			CurrentMouseMarker.GlobalPosition = cell.WorldCenter;
+			CurrentMouseMarker.Show();
+		}
+		UpdateMarkerLabel();
 	}
 
 	private void ClearCurrentCell()
 	{
 		currentGridCell = GridCell.Null;
-		if (mouseMarker != null)
-			mouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
+		if (CurrentMouseMarker != null)
+			CurrentMouseMarker.GlobalPosition = new Vector3(-1, -1, -1);
 	}
 
 	/// <summary>
@@ -190,6 +225,73 @@ public partial class BattleInputManager : Manager<BattleInputManager>
 		return node;
 	}
 
+
+
+	public void SetMouseMarker(string markerName, string labelText = null)
+	{
+		if (mouseMarkers == null || mouseMarkers.Count == 0)
+		{
+			return;
+		}
+
+		if (!mouseMarkers.TryGetValue(markerName, out var marker))
+		{
+			GD.PrintErr($"[BattleInputManager] Marker {markerName} does not exist");
+			return;
+		}
+
+		Node3D previousMarker = CurrentMouseMarker;
+		if (previousMarker != null)
+		{
+			previousMarker.Hide();
+		}
+
+		currentMouseMarkerName = markerName;
+		currentMouseMarkerLabel = labelText;
+
+		if (CurrentMouseMarker != null)
+		{
+			if (currentGridCell != null && currentGridCell != GridCell.Null)
+			{
+				CurrentMouseMarker.GlobalPosition = currentGridCell.WorldCenter;
+				CurrentMouseMarker.Show();
+			}
+			UpdateMarkerLabel();
+		}
+	}
+
+	private void UpdateMarkerLabel()
+	{
+		if (CurrentMouseMarker == null) return;
+		Label3D markerLabel = CurrentMouseMarker.GetNodeOrNull<Label3D>("Label3D");
+
+		if (markerLabel == null)
+		{
+			GD.PrintErr($"[BattleInputManager] Marker '{currentMouseMarkerName}' has no Label3D child");
+			return;
+		}
+
+		if (!string.IsNullOrEmpty(currentMouseMarkerLabel))
+		{
+			markerLabel.Text = currentMouseMarkerLabel;
+			return;
+		}
+
+		switch (currentMouseMarkerName)
+		{
+			case "default":
+				markerLabel.Text = currentGridCell != null && currentGridCell != GridCell.Null
+					? currentGridCell.GridCoordinates.ToString()
+					: "";
+				break;
+			case "action":
+				markerLabel.Text = ActionManager.Instance?.SelectedAction?.GetActionName() ?? "";
+				break;
+			default:
+				markerLabel.Text = "";
+				break;
+		}
+	}
 	#region manager Data
 
 	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)

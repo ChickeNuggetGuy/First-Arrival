@@ -10,6 +10,7 @@ public partial class MonthlyReportUI : UIWindow
 	[Export] private Label reportTitleLabel;
 	[Export] private VBoxContainer teamReportsContainer;
 	[Export] private VBoxContainer financeReportsContainer;
+	[Export] private VBoxContainer countryReportsContainer;
 	[Export] private Button continueButton;
 
 	private readonly Dictionary<
@@ -17,12 +18,14 @@ public partial class MonthlyReportUI : UIWindow
 		Godot.Collections.Dictionary<Enums.MonthlyScoreReason, int>> reportScores = new();
 	private readonly Dictionary<Enums.UnitTeam, MonthlyFinanceSnapshot>
 		reportFinances = new();
+	private readonly List<CountryFundingReportEntry> reportCountries = new();
 
 	private Enums.Month reportedMonth;
 	private int reportedYear;
 	private bool wasPausedBeforeReport;
 	private bool pausedByReport;
 	private bool reportPending;
+	private bool showingCurrentReport;
 
 	protected override async Task _Setup()
 	{
@@ -48,10 +51,15 @@ public partial class MonthlyReportUI : UIWindow
 	protected override Task DrawUI()
 	{
 		if (reportTitleLabel != null)
-			reportTitleLabel.Text = $"{reportedMonth} {reportedYear} Monthly Report";
+			reportTitleLabel.Text = showingCurrentReport
+				? $"{reportedMonth} {reportedYear} Monthly Report (Current)"
+				: $"{reportedMonth} {reportedYear} Monthly Report";
+		if (continueButton != null)
+			continueButton.Text = showingCurrentReport ? "Close" : "Continue";
 
 		ClearContainer(teamReportsContainer);
 		ClearContainer(financeReportsContainer);
+		ClearContainer(countryReportsContainer);
 
 		if (teamReportsContainer != null)
 		{
@@ -65,6 +73,8 @@ public partial class MonthlyReportUI : UIWindow
 		{
 			AddFinanceReport(Enums.UnitTeam.Player, playerFinances);
 		}
+
+		AddCountryReports();
 
 		return Task.CompletedTask;
 	}
@@ -106,7 +116,48 @@ public partial class MonthlyReportUI : UIWindow
 		reportedYear = newMonth == Enums.Month.January
 			? timeManager.CurrentYear - 1
 			: timeManager.CurrentYear;
+		showingCurrentReport = false;
 
+		CaptureTeamReports(teamManager, resetMonthlyLedgers: true);
+		reportCountries.Clear();
+		reportCountries.AddRange(
+			teamManager.GetLatestCompletedCountryFundingReport());
+
+		PauseForReport();
+
+		await ShowCall();
+		reportPending = false;
+	}
+
+	public async Task ShowLatestReport()
+	{
+		if (IsShown || reportPending) return;
+		reportPending = true;
+
+		GlobeTimeManager timeManager = GlobeTimeManager.Instance;
+		GlobeTeamManager teamManager = GlobeTeamManager.Instance;
+		if (timeManager == null || teamManager == null)
+		{
+			reportPending = false;
+			return;
+		}
+
+		reportedMonth = timeManager.CurrentMonth;
+		reportedYear = timeManager.CurrentYear;
+		showingCurrentReport = true;
+		CaptureTeamReports(teamManager, resetMonthlyLedgers: false);
+		reportCountries.Clear();
+		reportCountries.AddRange(teamManager.GetCurrentCountryFundingReport());
+		PauseForReport();
+
+		await ShowCall();
+		reportPending = false;
+	}
+
+	private void CaptureTeamReports(
+		GlobeTeamManager teamManager,
+		bool resetMonthlyLedgers)
+	{
 		reportScores.Clear();
 		reportFinances.Clear();
 		foreach (var team in teamManager.GetAllTeamData())
@@ -114,17 +165,18 @@ public partial class MonthlyReportUI : UIWindow
 			if (team.Value == null) continue;
 			reportScores[team.Key] = team.Value.GetMonthlyScoreSnapshot();
 			reportFinances[team.Key] = team.Value.GetMonthlyFinanceSnapshot();
+			if (!resetMonthlyLedgers) continue;
 			team.Value.ResetMonthlyScore();
 			team.Value.ResetMonthlyFinances();
 		}
+	}
 
+	private void PauseForReport()
+	{
 		SceneTree tree = GetTree();
 		wasPausedBeforeReport = tree.Paused;
 		tree.Paused = true;
 		pausedByReport = true;
-
-		await ShowCall();
-		reportPending = false;
 	}
 
 	private void AddTeamReport(
@@ -270,6 +322,89 @@ public partial class MonthlyReportUI : UIWindow
 		container.AddChild(row);
 	}
 
+	private void AddCountryReports()
+	{
+		if (countryReportsContainer == null) return;
+		var namedCountries = reportCountries.FindAll(country =>
+			!string.IsNullOrWhiteSpace(country.CountryName) &&
+			!country.CountryName.StartsWith(
+				"Unnamed",
+				StringComparison.OrdinalIgnoreCase));
+		if (namedCountries.Count == 0)
+		{
+			countryReportsContainer.AddChild(new Label
+			{
+				Text = "No country funding data is available.",
+				HorizontalAlignment = HorizontalAlignment.Center
+			});
+			return;
+		}
+
+		var heading = new Label
+		{
+			Text = showingCurrentReport
+				? "Country Financial Support (Current Projection)"
+				: "Country Financial Support",
+			HorizontalAlignment = HorizontalAlignment.Center
+		};
+		heading.AddThemeFontSizeOverride("font_size", 20);
+		countryReportsContainer.AddChild(heading);
+
+		var grid = new GridContainer
+		{
+			Columns = 4,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill
+		};
+		AddCountryCell(grid, "Country", isHeader: true, expand: true);
+		AddCountryCell(grid, "Opinion", isHeader: true);
+		AddCountryCell(grid, "Monthly Support", isHeader: true);
+		AddCountryCell(grid, "Change This Month", isHeader: true);
+
+		foreach (CountryFundingReportEntry country in namedCountries)
+		{
+			AddCountryCell(grid, country.CountryName, expand: true);
+			AddCountryCell(grid, $"{country.PlayerOpinion:N1}");
+			AddCountryCell(grid, FormatMoney(country.MonthlySupport));
+			AddCountryCell(
+				grid,
+				FormatMoneyChange(country.SupportChange),
+				change: country.SupportChange);
+		}
+
+		countryReportsContainer.AddChild(grid);
+	}
+
+	private static void AddCountryCell(
+		GridContainer grid,
+		string text,
+		bool isHeader = false,
+		bool expand = false,
+		long change = 0)
+	{
+		var label = new Label
+		{
+			Text = text,
+			HorizontalAlignment = expand
+				? HorizontalAlignment.Left
+				: HorizontalAlignment.Right,
+			SizeFlagsHorizontal = expand
+				? SizeFlags.ExpandFill
+				: SizeFlags.ShrinkEnd,
+			CustomMinimumSize = expand
+				? new Vector2(220, 0)
+				: new Vector2(120, 0)
+		};
+
+		if (isHeader)
+			label.AddThemeFontSizeOverride("font_size", 16);
+		else if (change > 0)
+			label.AddThemeColorOverride("font_color", new Color(0.45f, 0.9f, 0.55f));
+		else if (change < 0)
+			label.AddThemeColorOverride("font_color", new Color(1.0f, 0.45f, 0.45f));
+
+		grid.AddChild(label);
+	}
+
 	private async void ContinueButtonOnPressed()
 	{
 		if (!IsShown) return;
@@ -278,6 +413,7 @@ public partial class MonthlyReportUI : UIWindow
 		RestorePauseState();
 		reportScores.Clear();
 		reportFinances.Clear();
+		reportCountries.Clear();
 	}
 
 	private void RestorePauseState()
@@ -312,6 +448,16 @@ public partial class MonthlyReportUI : UIWindow
 
 	private static string FormatScore(int score) =>
 		score > 0 ? $"+{score:N0}" : $"{score:N0}";
+
+	private static string FormatMoney(long amount) =>
+		amount < 0 ? $"-${Math.Abs(amount):N0}" : $"${amount:N0}";
+
+	private static string FormatMoneyChange(long amount) =>
+		amount > 0
+			? $"+${amount:N0}"
+			: amount < 0
+				? $"-${Math.Abs(amount):N0}"
+				: "$0";
 
 	private static string FormatName(string value)
 	{

@@ -63,7 +63,6 @@ public sealed class FacilityConstruction
 			GridSize = definition.GetValidatedGridSize(),
 			InitialCost = Mathf.Max(0, definition.InitialCost),
 			MonthlyCost = Mathf.Max(0, definition.MonthlyCost),
-			ScientistCapacity = Mathf.Max(0, definition.ScientistCapacity),
 			BuildTimeDays = buildDays,
 			RemainingBuildDays = constructImmediately ? 0 : buildDays,
 			AttachedToId = attachedToId ?? string.Empty,
@@ -162,8 +161,6 @@ public sealed class FacilityConstruction
 		{
 			FacilityDefinition definition =
 				ResourceLoader.Load<FacilityDefinition>(construction.DefinitionPath);
-			if (definition != null)
-				construction.ScientistCapacity = definition.ScientistCapacity;
 		}
 
 		construction.GridSize = new Vector2I(

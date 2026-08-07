@@ -43,7 +43,7 @@ public partial class OrbitalCamera : Node3D
     public override void _Ready()
     {
         // Find the child camera
-        _camera = GetNode<Camera3D>("Camera3D");
+        _camera = GetNodeOrNull<Camera3D>("Camera3D");
         
         if (_camera == null)
         {
@@ -53,8 +53,10 @@ public partial class OrbitalCamera : Node3D
         }
 
         // Initialize values based on current editor transform
-        _yaw = RotationDegrees.Y;
-        _pitch = RotationDegrees.X;
+        Vector3 initialRotation = RotationDegrees;
+        _yaw = float.IsFinite(initialRotation.Y) ? initialRotation.Y : 0.0f;
+        _pitch = float.IsFinite(initialRotation.X) ? initialRotation.X : 0.0f;
+        ClampPitch();
         _targetDistance = Mathf.Clamp(_camera.Position.Z, MinZoom, MaxZoom);
 
         // Apply the limit immediately so smoothing cannot leave the camera
@@ -63,6 +65,14 @@ public partial class OrbitalCamera : Node3D
         initialCameraPosition.Z = _targetDistance;
         _camera.Position = initialCameraPosition;
         Instance = this;
+    }
+
+    public override void _ExitTree()
+    {
+        if (Instance == this)
+            Instance = null;
+
+        base._ExitTree();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -97,39 +107,18 @@ public partial class OrbitalCamera : Node3D
 
     public override void _Process(double delta)
     {
+        RecoverInvalidOrbitState();
         HandleKeyboardInput((float)delta);
         UpdateTransform((float)delta);
     }
 
     private void HandleKeyboardInput(float delta)
     {
-        // Using Godot's default UI actions (Arrow keys / WASD if mapped)
-        // You can replace "ui_left" with your own Input Map actions.
-        float hInput = Input.GetAxis("ui_left", "ui_right"); // -1 left, +1 right
-        float vInput = Input.GetAxis("ui_down", "ui_up");    // -1 down, +1 up
-
-        if (Mathf.Abs(hInput) > 0.01f)
-        {
-            _yaw += hInput * KeySensitivity * 60f * delta;
-        }
-
-        if (Mathf.Abs(vInput) > 0.01f)
-        {
-            // Note: pressing "up" usually means looking up, which is negative X rotation
-            float pitchChange = vInput * KeySensitivity * 60f * delta;
-            
-            if (InvertY) _pitch -= pitchChange;
-            else _pitch += pitchChange; // Looks up when pressing up
-
-            ClampPitch();
-        }
-
-        // Explicit WASD controls let the globe be panned without requiring
-        // custom Input Map actions. Movement speeds up as the camera zooms out.
-        float panHorizontal = (Input.IsKeyPressed(Key.D) ? 1.0f : 0.0f) -
-                              (Input.IsKeyPressed(Key.A) ? 1.0f : 0.0f);
-        float panVertical = (Input.IsKeyPressed(Key.S) ? 1.0f : 0.0f) -
-                            (Input.IsKeyPressed(Key.W) ? 1.0f : 0.0f);
+        // Use the project's physical-key actions instead of polling logical
+        // key codes. This keeps WASD working regardless of keyboard layout or
+        // which Control currently owns keyboard focus.
+        float panHorizontal = Input.GetAxis("cameraLeft", "cameraRight");
+        float panVertical = Input.GetAxis("cameraUp", "cameraDown");
 
         if (!Mathf.IsZeroApprox(panHorizontal) || !Mathf.IsZeroApprox(panVertical))
         {
@@ -156,20 +145,29 @@ public partial class OrbitalCamera : Node3D
 
     private void ClampPitch()
     {
+        if (!float.IsFinite(_pitch))
+            _pitch = 0.0f;
+        if (!float.IsFinite(_yaw))
+            _yaw = 0.0f;
+
         _pitch = Mathf.Clamp(_pitch, MinPitch, MaxPitch);
     }
 
     private void UpdateTransform(float delta)
     {
-
         Vector3 targetRotation = new Vector3(Mathf.DegToRad(_pitch), Mathf.DegToRad(_yaw), 0);
 
-        if (UseSmoothing)
+        if (UseSmoothing && SmoothSpeed > 0.0f)
         {
-            // Interpolate the rotation quaternion for smoothness
-            Quaternion currentQ = Quaternion.FromEuler(Rotation);
-            Quaternion targetQ = Quaternion.FromEuler(targetRotation);
-            Rotation = currentQ.Slerp(targetQ, SmoothSpeed * delta).GetEuler();
+            // Interpolate each orbit axis directly. Converting a smoothed
+            // quaternion back to Euler angles can become unstable near the
+            // pitch limits and leave rotation frozen while zoom still works.
+            float weight = 1.0f - Mathf.Exp(-SmoothSpeed * Mathf.Max(delta, 0.0f));
+            Vector3 currentRotation = Rotation;
+            Rotation = new Vector3(
+                Mathf.LerpAngle(currentRotation.X, targetRotation.X, weight),
+                Mathf.LerpAngle(currentRotation.Y, targetRotation.Y, weight),
+                0.0f);
         }
         else
         {
@@ -180,9 +178,11 @@ public partial class OrbitalCamera : Node3D
         if (_camera != null)
         {
             Vector3 camPos = _camera.Position;
-            if (UseSmoothing)
+            if (UseSmoothing && SmoothSpeed > 0.0f)
             {
-                camPos.Z = Mathf.Lerp(camPos.Z, _targetDistance, SmoothSpeed * delta);
+                float weight =
+                    1.0f - Mathf.Exp(-SmoothSpeed * Mathf.Max(delta, 0.0f));
+                camPos.Z = Mathf.Lerp(camPos.Z, _targetDistance, weight);
             }
             else
             {
@@ -218,14 +218,35 @@ public partial class OrbitalCamera : Node3D
 
     private void SetFocusTarget(HexCellData cell, float? optionalZoom)
     {
+	    if (cell.Center.LengthSquared() <= Mathf.Epsilon)
+		    return;
+
 	    Vector3 dir = cell.Center.Normalized();
 	    _yaw = Mathf.RadToDeg(Mathf.Atan2(dir.X, dir.Z));
-	    _pitch = -Mathf.RadToDeg(Mathf.Asin(dir.Y));
+	    _pitch = -Mathf.RadToDeg(Mathf.Asin(Mathf.Clamp(dir.Y, -1.0f, 1.0f)));
 
 	    if (optionalZoom.HasValue)
 		    _targetDistance = Mathf.Clamp(optionalZoom.Value, MinZoom, MaxZoom);
 
 	    ClampPitch();
+    }
+
+    private void RecoverInvalidOrbitState()
+    {
+        Vector3 currentRotation = Rotation;
+        bool invalidRotation =
+            !float.IsFinite(currentRotation.X) ||
+            !float.IsFinite(currentRotation.Y) ||
+            !float.IsFinite(currentRotation.Z);
+        bool invalidTarget = !float.IsFinite(_pitch) || !float.IsFinite(_yaw);
+
+        if (!invalidRotation && !invalidTarget)
+            return;
+
+        GD.PushWarning("OrbitalCamera recovered from an invalid rotation state.");
+        _pitch = 0.0f;
+        _yaw = 0.0f;
+        Rotation = Vector3.Zero;
     }
 
     private async Task WaitForFocus()

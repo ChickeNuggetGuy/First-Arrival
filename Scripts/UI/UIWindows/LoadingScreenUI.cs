@@ -12,6 +12,9 @@ public partial class LoadingScreenUI : UIWindow
 
 	protected override async Task _Setup()
 	{
+		// The loading screen must be able to hide even if a modal window pauses
+		// the rest of the scene tree.
+		ProcessMode = ProcessModeEnum.Always;
 		wasLoading = false;
 		UpdateUI();
 	}

@@ -17,8 +17,22 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     [Export] private Node missionContainer;
     [Export] private float missionInterval = 10.0f;
     [Export] private int missionSpawnRangeSteps = 6;
-    [Export] private int maxActiveMissions = 8;
+	[Export] private int maxActiveMissions = 8;
 	[Export] private bool spawnLegacyRandomMissions = false;
+
+	[ExportGroup("Country Opinion")]
+	[Export] private Godot.Collections.Dictionary<Enums.MissionType, float>
+		failedMissionOpinionLoss = new()
+		{
+			{ Enums.MissionType.None, 5.0f },
+			{ Enums.MissionType.Eliminate, 8.0f },
+			{ Enums.MissionType.Survive, 10.0f },
+			{ Enums.MissionType.Objective, 12.0f },
+			{ Enums.MissionType.Timed, 6.0f },
+			{ Enums.MissionType.CityDefense, 20.0f },
+			{ Enums.MissionType.ScoutLanding, 8.0f },
+			{ Enums.MissionType.Abduction, 12.0f }
+		};
 
     public int GlobalDifficulty { get; set; } = 1;
 
@@ -82,8 +96,6 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     public override void _Process(double delta)
     {
-		// Kept as an opt-in testing tool. Normal campaign missions are initiated
-		// by GlobeAIManager operations rather than real-time random spawning.
         if (Engine.IsEditorHint() || !spawnLegacyRandomMissions)
             return;
 
@@ -194,6 +206,37 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			$"Alien Attack: {GlobeCityManager.Instance?.GetCityName(targetCellIndex) ?? "City"}");
 	}
 
+	/// <summary>
+	/// Creates a landing mission from a local-authority report. This deliberately
+	/// does not consult craft detection: countries can reveal the incident while
+	/// the UFO itself remains hidden from the player.
+	/// </summary>
+	public bool TryCreateReportedLandingMission(
+		int operationId,
+		int targetCellIndex,
+		Enums.MissionType missionType,
+		int difficulty)
+	{
+		HexCellData? cell = GlobeHexGridManager.Instance?.GetCellFromIndex(
+			targetCellIndex,
+			excludeWater: true);
+		if (!cell.HasValue) return false;
+
+		string activity = missionType == Enums.MissionType.Abduction
+			? "abduction"
+			: "scouting";
+		string reporter = GlobeHexGridManager.Instance
+			?.GetCountryStateForIndex(targetCellIndex)?.CountryName
+			?? "Local authorities";
+
+		return TryCreateMission(
+			cell.Value,
+			missionType,
+			difficulty,
+			operationId,
+			$"{reporter} reports alien {activity}");
+	}
+
 	private bool TryCreateMission(
 		HexCellData cell,
 		Enums.MissionType missionType,
@@ -238,9 +281,13 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
         if (missionType == Enums.MissionType.None)
         {
-            var values = Enum.GetValues<Enums.MissionType>();
-            // Exclude 'None' if it is at index 0
-            int missionIndex = GD.RandRange(1, values.Length - 1);
+            Enums.MissionType[] values = Enum.GetValues<Enums.MissionType>()
+	            .Where(value => value != Enums.MissionType.None &&
+	                            value != Enums.MissionType.CityDefense &&
+	                            value != Enums.MissionType.ScoutLanding &&
+	                            value != Enums.MissionType.Abduction)
+	            .ToArray();
+	        int missionIndex = GD.RandRange(0, values.Length - 1);
             missionType = values[missionIndex];
         }
 
@@ -281,7 +328,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
     public void LoadMissionScene(MissionCellDefinition missionDefinition)
     {
-	    // Save the complete Globe state NOW, before leaving
+	    // Save the complete Globe state before leaving
 	    SavesManager.Instance.SetSessionData("GlobeState", SavesManager.Instance.GetSceneTransitionState());
 
 	    // Snapshot the craft payload before its globe-scene unit nodes are freed.
@@ -324,6 +371,8 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             AddChild(missionInstance);
         
         _activeMissions[cell.Index].missionVisual = missionInstance;
+		if (missionInstance is CellDefinitionVisual missionVisual)
+			missionVisual.BindDefinition(_activeMissions[cell.Index]);
 
         missionInstance.GlobalPosition = cell.Center;
 
@@ -371,6 +420,9 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
             playerTeam.AddMonthlyScore(scoreChange, GetMonthlyScoreReason(outcome));
         }
 
+        if (outcome == Enums.MissionStatus.Failed)
+	        ApplyFailedMissionOpinionPenalty(missionDefinition);
+
 		Craft craft = playerTeam == null
 			? null
 			: FindMissionCraft(playerTeam, missionDefinition.onRouteCraft);
@@ -394,6 +446,38 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         
         RemoveMissionDefinition(missionDefinition);
     }
+
+	private void ApplyFailedMissionOpinionPenalty(
+		MissionCellDefinition missionDefinition)
+	{
+		if (missionDefinition?.mission == null) return;
+
+		var country = GlobeHexGridManager.Instance?.GetCountryStateForIndex(
+			missionDefinition.cellIndex);
+		if (country == null) return;
+
+		float opinionLoss = GetFailedMissionOpinionLoss(
+			missionDefinition.mission.MissionType);
+		if (opinionLoss <= 0.0f) return;
+
+		country.ChangePlayerOpinion(-opinionLoss);
+	}
+
+	public float GetFailedMissionOpinionLoss(Enums.MissionType missionType)
+	{
+		if (failedMissionOpinionLoss != null &&
+		    failedMissionOpinionLoss.TryGetValue(missionType, out float loss))
+		{
+			return Mathf.Max(0.0f, loss);
+		}
+
+		return failedMissionOpinionLoss != null &&
+		       failedMissionOpinionLoss.TryGetValue(
+			       Enums.MissionType.None,
+			       out float fallbackLoss)
+			? Mathf.Max(0.0f, fallbackLoss)
+			: 0.0f;
+	}
 
     private static Enums.MissionStatus GetMissionOutcome(MissionCellDefinition mission)
     {

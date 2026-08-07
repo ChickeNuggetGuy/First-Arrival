@@ -81,7 +81,7 @@ public partial class GridObjectStatHolder : GridObjectNode
 			
 			if (statObj == null) return false;
 			
-			if (stat.Value  > statObj.CurrentValue ) return false;
+			if (stat.Value > GetEffectiveCurrentValue(stat.Key)) return false;
 		}
 		return true;
 	}

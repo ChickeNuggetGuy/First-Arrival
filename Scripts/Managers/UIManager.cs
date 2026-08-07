@@ -25,6 +25,15 @@ public partial class UIManager : Manager<UIManager>
 		}
 	}
 
+	public async Task HideLoadingScreen()
+	{
+		if (loadingSCcreenUI != null &&
+		    GodotObject.IsInstanceValid(loadingSCcreenUI))
+		{
+			await loadingSCcreenUI.HideCall(false);
+		}
+	}
+
 	public override string GetManagerName() => "UIManager";
 
 	public override void _Ready()

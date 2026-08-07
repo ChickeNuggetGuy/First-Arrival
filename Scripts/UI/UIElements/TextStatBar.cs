@@ -34,6 +34,7 @@ public partial class TextStatBar : UIElement
 	private GridObjectStat _stat;
 	private GridObjectStat _healthStat;
 	private StatProgressBarOverlay _overlay;
+	private int _previewCost;
 
 	protected override async Task _Setup()
 	{
@@ -102,7 +103,17 @@ public partial class TextStatBar : UIElement
 	{
 		if (_statHolder == null || _stat == null || statProgressBar == null) return;
 		_overlay ??= new StatProgressBarOverlay(statProgressBar);
-		_overlay.Update(_statHolder, _stat);
+		_overlay.Update(_statHolder, _stat, _previewCost);
+	}
+
+	public void SetPreviewCosts(
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
+	)
+	{
+		_previewCost = costs != null && costs.TryGetValue(targetStat, out int cost)
+			? Mathf.Max(0, cost)
+			: 0;
+		Refresh();
 	}
 
 	private void UnbindStat()

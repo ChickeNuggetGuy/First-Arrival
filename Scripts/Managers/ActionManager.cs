@@ -15,9 +15,14 @@ public partial class ActionManager : Manager<ActionManager>
 	public ActionDefinition SelectedAction { get; private set; }
 	public ActionBase CurrentAction { get; private set; }
 	public bool LastActionWasInterruptedByNewEnemy { get; private set; }
+	public event System.Action<
+		ActionDefinition,
+		Godot.Collections.Dictionary<Enums.Stat, int>
+	> ActionPreviewChanged;
 	private GridCellHighlighter _cellHighlighter;
 
-	private GridCell currentGridCell;
+	private GridCell _pendingConfirmationCell;
+	private ActionDefinition _pendingConfirmationAction;
 
 	private List<(ActionBase action, GridObject gridObject)> delayedActions = new();
 
@@ -59,8 +64,7 @@ public partial class ActionManager : Manager<ActionManager>
 	{
 		if (gridObject == null)
 		{
-			SelectedAction = null;
-			_cellHighlighter?.Clear();
+			SetSelectedAction(null);
 			return;
 		}
 
@@ -93,7 +97,7 @@ public partial class ActionManager : Manager<ActionManager>
 		if (TurnManager.Instance.CurrentTurn.team != Enums.UnitTeam.Player) return;
 		if (BattleInputManager.Instance.MouseOverUI) return;
 
-		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
+		if (@event is InputEventMouseButton { Pressed: true } mouseButton)
 		{
 			GridObject selectedGridObject = GridObjectManager.Instance
 				.GetGridObjectTeamHolder(Enums.UnitTeam.Player).CurrentGridObject;
@@ -104,7 +108,7 @@ public partial class ActionManager : Manager<ActionManager>
 			}
 
 			GridCell currentGridCell = BattleInputManager.Instance.currentGridCell;
-			if (currentGridCell == null)
+			if (currentGridCell == null || currentGridCell == GridCell.Null)
 			{
 				return;
 			}
@@ -176,13 +180,14 @@ public partial class ActionManager : Manager<ActionManager>
 
 		try
 		{
-			await TryTakeAction(action, gridObject, start, target, null);
+			await TryTakeAction(action, gridObject, start, target, extraData);
 		}
 		catch (Exception e)
 		{
 			GD.PushError($"TryTakeAction failed: {e}");
 			CurrentAction = null;
 			SetIsBusy(false);
+			ClearActionPreview();
 		}
 	}
 
@@ -210,6 +215,7 @@ public partial class ActionManager : Manager<ActionManager>
 	)
 	{
 		SelectedAction = action;
+		ClearActionPreview();
 
 		if (action == null)
 		{
@@ -298,20 +304,26 @@ public partial class ActionManager : Manager<ActionManager>
 
 		if (action.confirmClick)
 		{
-			if (currentGridCell == null)
+			bool clickedPendingTarget =
+				_pendingConfirmationAction == action
+				&& _pendingConfirmationCell == targetGridCell;
+
+			if (!clickedPendingTarget)
 			{
-				currentGridCell = targetGridCell;
+				_pendingConfirmationAction = action;
+				_pendingConfirmationCell = targetGridCell;
+				PublishActionPreview(action, costs, reason);
 				return false;
 			}
-			else if (targetGridCell == currentGridCell)
+
+			if (!result)
 			{
-				currentGridCell = null;
-			}
-			else
-			{
-				currentGridCell = targetGridCell;
+				PublishActionPreview(action, costs, reason);
+				GD.Print(reason);
 				return false;
 			}
+
+			ClearActionPreview();
 		}
 
 		if (result)
@@ -349,6 +361,7 @@ public partial class ActionManager : Manager<ActionManager>
 				GD.PushError($"Exception during action '{action.GetActionName()}': {e}");
 				CurrentAction = null;
 				SetIsBusy(false);
+				ClearActionPreview();
 				return false;
 			}
 
@@ -358,6 +371,53 @@ public partial class ActionManager : Manager<ActionManager>
 			GD.Print(reason);
 			return false;
 		}
+	}
+
+	private void PublishActionPreview(
+		ActionDefinition action,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs,
+		string failureReason
+	)
+	{
+		bool costsAreUsable = costs != null && costs.All(pair => pair.Value >= 0);
+		var previewCosts = costsAreUsable
+			? new Godot.Collections.Dictionary<Enums.Stat, int>(costs)
+			: null;
+
+		string markerText = costsAreUsable
+			? FormatActionCosts(action, costs)
+			: $"{action.GetActionName()}\n{failureReason}";
+
+		BattleInputManager.Instance?.SetMouseMarker("action", markerText);
+		ActionPreviewChanged?.Invoke(action, previewCosts);
+	}
+
+	private void ClearActionPreview()
+	{
+		_pendingConfirmationCell = null;
+		_pendingConfirmationAction = null;
+		BattleInputManager.Instance?.SetMouseMarker("default");
+		ActionPreviewChanged?.Invoke(SelectedAction, null);
+	}
+
+	private static string FormatActionCosts(
+		ActionDefinition action,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
+	)
+	{
+		var costLines = costs
+			.Where(pair => pair.Value > 0)
+			.Select(pair => $"{GetStatDisplayName(pair.Key)}: {pair.Value}")
+			.ToArray();
+
+		return costLines.Length == 0
+			? $"{action.GetActionName()}\nNo stat cost"
+			: $"{action.GetActionName()}\n{string.Join("\n", costLines)}";
+	}
+
+	private static string GetStatDisplayName(Enums.Stat stat)
+	{
+		return stat == Enums.Stat.TimeUnits ? "Time Units" : stat.ToString();
 	}
 
 	public void ActionCompleteCall(ActionDefinition actionDef)
@@ -431,6 +491,7 @@ public partial class ActionManager : Manager<ActionManager>
 
 		if (isRoot)
 		{
+			ClearActionPreview();
 			GD.Print($"{actionDef.GetActionName()} complete");
 
 			if (actionBaseInst == null || ReferenceEquals(CurrentAction, actionBaseInst))
@@ -441,11 +502,17 @@ public partial class ActionManager : Manager<ActionManager>
 			{
 				if (actionDef == SelectedAction && !actionDef.GetRemainSelected())
 				{
-					if (!GridObjectManager.Instance.CurrentPlayerGridObject.TryGetGridObjectNode<GridObjectActions>(
-						    out var gridObjectActionsNode))
+					if (
+						GridObjectManager.Instance.CurrentPlayerGridObject.TryGetGridObjectNode<GridObjectActions>(
+							out var gridObjectActionsNode
+						)
+						&& gridObjectActionsNode.ActionDefinitions?.Length > 0
+					)
+					{
 						SetSelectedAction(gridObjectActionsNode
 							.ActionDefinitions
 							.First());
+					}
 				}
 			}
 
@@ -503,6 +570,7 @@ public partial class ActionManager : Manager<ActionManager>
 
 		GD.Print($"{actionDef?.GetActionName() ?? "Action"} canceled");
 		SetIsBusy(false);
+		ClearActionPreview();
 		RefreshValidCellHighlights();
 		EmitSignal(SignalName.ActionCanceled, actionDef, SelectedAction);
 	}

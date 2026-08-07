@@ -296,13 +296,10 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 
 			facilityNamesById[id] = facilityName;
 			Vector2I gridSize = definition.GetValidatedGridSize();
-			string scientistSlots = definition.ScientistCapacity > 0
-				? $", {definition.ScientistCapacity} scientist slots"
-				: string.Empty;
+
 			facilityMenu.AddItem(
 				$"{definition.DisplayName} — ${definition.InitialCost:N0} upfront, " +
 				$"${definition.MonthlyCost:N0}/mo, {definition.BuildTimeDays} days, " +
-				$"{gridSize.X}x{gridSize.Y}{scientistSlots}",
 				(int)id);
 			bool canAfford = CanAffordFacility(definition);
 			facilityMenu.SetItemDisabled(

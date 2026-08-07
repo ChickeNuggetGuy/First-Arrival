@@ -38,6 +38,7 @@ public partial class UnitActionUI : UIWindow
 			}
 		}
 		GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player).SelectedGridObjectChanged += OnSelectedGridObjectChanged;
+		ActionManager.Instance.ActionPreviewChanged += OnActionPreviewChanged;
 	}
 	
 	protected override async Task DrawUI()
@@ -47,6 +48,15 @@ public partial class UnitActionUI : UIWindow
 
 	private void OnSelectedGridObjectChanged(GridObject gridObject)
 	{
+		if (gridObject == null)
+		{
+			unitName.Text = "";
+			_unitIcon.Texture = null;
+			ClearActionButtons();
+			UpdateStatBars(null);
+			return;
+		}
+
 		unitName.Text = gridObject.Name;
 		_unitIcon.Texture = gridObject.Thumbnail;
 		UpdateActionButtons(gridObject);
@@ -74,11 +84,21 @@ public partial class UnitActionUI : UIWindow
 
 	private void UpdateStatBars(GridObject gridObject)
 	{
-		if (gridObject == null) return;
-
 		foreach (GridStatBarUI statBarUI in _statBars)
 		{
+			statBarUI.SetPreviewCosts(null);
 			statBarUI.SetupStatBar(gridObject);
+		}
+	}
+
+	private void OnActionPreviewChanged(
+		ActionDefinition action,
+		Godot.Collections.Dictionary<Enums.Stat, int> costs
+	)
+	{
+		foreach (GridStatBarUI statBarUI in _statBars)
+		{
+			statBarUI.SetPreviewCosts(costs);
 		}
 	}
 
@@ -107,5 +127,20 @@ public partial class UnitActionUI : UIWindow
 		}
 		
 		_actionButtons.Clear();
+	}
+
+	public override void _ExitTree()
+	{
+		GridObjectTeamHolder playerTeam = GridObjectManager.Instance?
+			.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+		if (playerTeam != null)
+		{
+			playerTeam.SelectedGridObjectChanged -= OnSelectedGridObjectChanged;
+		}
+		if (ActionManager.Instance != null)
+		{
+			ActionManager.Instance.ActionPreviewChanged -= OnActionPreviewChanged;
+		}
+		base._ExitTree();
 	}
 }

@@ -156,7 +156,18 @@ public class Enums
 	
 	public enum HexGridType {Land, Water}
 	
-	public enum MissionType {None, Eliminate, Survive, Objective, Timed}
+	// Append new mission types to preserve the numeric values stored in saves.
+	public enum MissionType
+	{
+		None,
+		Eliminate,
+		Survive,
+		Objective,
+		Timed,
+		CityDefense,
+		ScoutLanding,
+		Abduction,
+	}
 
 
 	#region Animation

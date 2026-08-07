@@ -7,6 +7,29 @@ using FirstArrival.Scripts.Globe.Countries;
 using FirstArrival.Scripts.Utility;
 using Godot.Collections;
 
+public sealed class CountryFundingReportEntry
+{
+	public uint CountryKey { get; }
+	public string CountryName { get; }
+	public float PlayerOpinion { get; }
+	public long MonthlySupport { get; }
+	public long SupportChange { get; }
+
+	public CountryFundingReportEntry(
+		uint countryKey,
+		string countryName,
+		float playerOpinion,
+		long monthlySupport,
+		long supportChange)
+	{
+		CountryKey = countryKey;
+		CountryName = countryName;
+		PlayerOpinion = playerOpinion;
+		MonthlySupport = monthlySupport;
+		SupportChange = supportChange;
+	}
+}
+
 [GlobalClass]
 public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 {
@@ -20,8 +43,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	public Node shipContainer;
 	
 	public bool buildBaseMode { get; private set; }= false;
-	public bool buyCraftMode = false;
-	private bool _sendCraftMode = false;
+	public bool SendCraftMode { get; private set; }= false;
 	private readonly HashSet<HexCellDefinition> _registeredDefinitions = new();
 	private readonly System.Collections.Generic.Dictionary<TeamBaseCellDefinition, TeambasedVisual> _baseVisuals = new();
 
@@ -37,6 +59,9 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	private bool applyCountryOpinionToFunding = true;
 	[Export(PropertyHint.Range, "0,1,0.05")]
 	private double countryOpinionFundingEffect = 0.5;
+	private readonly System.Collections.Generic.Dictionary<uint, long>
+		_countryFundingBaseline = new();
+	private List<CountryFundingReportEntry> _latestCompletedCountryFundingReport = new();
 
 	private bool _timeSignalsConnected;
 
@@ -187,6 +212,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		}
 
 		TransferPendingBaseExpenditureToLedgers();
+		EnsureCountryFundingBaseline();
 
 		if (GlobeTimeManager.Instance != null && !_timeSignalsConnected)
 		{
@@ -325,12 +351,36 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			teamHolderData[((int)kvp.Key).ToString()] = kvp.Value.Save();
 		}
 
-		return new Godot.Collections.Dictionary<string, Variant> { ["teamData"] = teamHolderData };
+		var countryFundingBaseline =
+			new Godot.Collections.Dictionary<string, Variant>();
+		foreach (var contribution in _countryFundingBaseline)
+			countryFundingBaseline[contribution.Key.ToString()] = contribution.Value;
+
+		return new Godot.Collections.Dictionary<string, Variant>
+		{
+			["teamData"] = teamHolderData,
+			["countryFundingBaseline"] = countryFundingBaseline
+		};
 	}
 
 	public override async Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		if (!HasLoadedData) return;
+
+		_countryFundingBaseline.Clear();
+		_latestCompletedCountryFundingReport.Clear();
+		if (data.TryGetValue("countryFundingBaseline", out Variant baselineVariant) &&
+		    baselineVariant.VariantType == Variant.Type.Dictionary)
+		{
+			var savedBaseline =
+				baselineVariant.AsGodotDictionary<string, Variant>();
+			foreach (var contribution in savedBaseline)
+			{
+				if (uint.TryParse(contribution.Key, out uint countryKey))
+					_countryFundingBaseline[countryKey] =
+						Math.Max(0, contribution.Value.AsInt64());
+			}
+		}
 
 		Godot.Collections.Dictionary<string, Variant> teamsDict = null;
 
@@ -399,30 +449,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			}
 		}
 
-		if (buyCraftMode)
-		{
-			if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed &&
-			    mouseButton.ButtonIndex == MouseButton.Left)
-			{
-				HexCellData? cell = GlobeInputManager.Instance.CurrentCell;
-
-				if (cell == null) return;
-				
-				if (!teamData[Enums.UnitTeam.Player].TryGetBaseAtIndex(cell.Value.Index, out var baseCell)) return;
-				
-				if(baseCell.TryAddCraft(Enums.CraftStatus.Home, (Craft)testCraft.Duplicate(true)))
-				{
-					GD.Print("Adding craft");
-					buyCraftMode = false;
-				}
-				else
-				{
-					GD.Print("Adding Craft failed");
-				}
-			}
-		}
-
-		if (_sendCraftMode)
+		if (SendCraftMode)
 		{
 			if (@event is InputEventMouseButton mouseButton
 			    && mouseButton.Pressed
@@ -476,6 +503,10 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	{
 		if (team ==  Enums.UnitTeam.None) return false;
 		if (cell.cellType == Enums.HexGridType.Water) return false;
+
+		GlobeCityManager cityManager = GlobeCityManager.Instance;
+		if (cityManager.TryGetCityDefinition(cell.Index, out var city)) return false;
+
 		foreach (GlobeTeamHolder holder in teamData.Values)
 		{
 			if (holder?.Bases == null) continue;
@@ -774,11 +805,68 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 
 	private void ApplyMonthlyCountryFunding(GlobeTeamHolder playerTeam)
 	{
-		long fundingPool = Math.Max(0, globalMonthlyFundingPool);
-		if (fundingPool == 0) return;
+		System.Collections.Generic.Dictionary<uint, long> contributions =
+			CalculateCountryFundingContributions();
 
-		List<CountryRuntimeState> countries =
-			GlobeHexGridManager.Instance.GetCountryStatesSnapshot();
+		_latestCompletedCountryFundingReport = BuildCountryFundingReport(
+			contributions,
+			_countryFundingBaseline);
+		ReplaceCountryFundingBaseline(contributions);
+
+		foreach (CountryFundingReportEntry entry in _latestCompletedCountryFundingReport)
+		{
+			if (entry.MonthlySupport <= 0) continue;
+			playerTeam.ChangeFunds(
+				entry.MonthlySupport,
+				$"{entry.CountryName} contribution");
+		}
+	}
+
+	public List<CountryFundingReportEntry> GetCurrentCountryFundingReport()
+	{
+		EnsureCountryFundingBaseline();
+		return BuildCountryFundingReport(
+			CalculateCountryFundingContributions(),
+			_countryFundingBaseline);
+	}
+
+	public List<CountryFundingReportEntry> GetLatestCompletedCountryFundingReport()
+	{
+		return _latestCompletedCountryFundingReport.Count > 0
+			? new List<CountryFundingReportEntry>(_latestCompletedCountryFundingReport)
+			: GetCurrentCountryFundingReport();
+	}
+
+	private void EnsureCountryFundingBaseline()
+	{
+		if (_countryFundingBaseline.Count > 0 ||
+		    GlobeHexGridManager.Instance == null)
+			return;
+
+		ReplaceCountryFundingBaseline(CalculateCountryFundingContributions());
+	}
+
+	private void ReplaceCountryFundingBaseline(
+		System.Collections.Generic.Dictionary<uint, long> contributions)
+	{
+		_countryFundingBaseline.Clear();
+		foreach (var contribution in contributions)
+			_countryFundingBaseline[contribution.Key] = contribution.Value;
+	}
+
+	private System.Collections.Generic.Dictionary<uint, long>
+		CalculateCountryFundingContributions()
+	{
+		var contributions =
+			new System.Collections.Generic.Dictionary<uint, long>();
+		List<CountryRuntimeState> countries = GlobeHexGridManager.Instance?
+			.GetCountryStatesSnapshot() ?? new List<CountryRuntimeState>();
+		foreach (CountryRuntimeState country in countries)
+			contributions[country.CountryKey] = 0;
+
+		long fundingPool = Math.Max(0, globalMonthlyFundingPool);
+		if (fundingPool == 0) return contributions;
+
 		double exponent = Math.Clamp(gdpFundingExponent, 0.1, 1.0);
 		double totalWeight = 0.0;
 		var weightedCountries = new List<(CountryRuntimeState Country, double Weight)>();
@@ -797,7 +885,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		    totalWeight <= 0.0 ||
 		    double.IsNaN(totalWeight) ||
 		    double.IsInfinity(totalWeight))
-			return;
+			return contributions;
 
 		var allocations = new List<CountryFundingAllocation>(weightedCountries.Count);
 		long distributed = 0;
@@ -855,13 +943,41 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 				: Math.Max(0, (long)Math.Round(
 					adjustedContribution,
 					MidpointRounding.AwayFromZero));
-			if (contribution <= 0) continue;
-
-			playerTeam.ChangeFunds(
-				contribution,
-				$"{allocation.Country.CountryName} contribution");
+			contributions[allocation.Country.CountryKey] = contribution;
 		}
+
+		return contributions;
 	}
+
+	private static List<CountryFundingReportEntry> BuildCountryFundingReport(
+		System.Collections.Generic.Dictionary<uint, long> contributions,
+		System.Collections.Generic.Dictionary<uint, long> baseline)
+	{
+		var report = new List<CountryFundingReportEntry>();
+		List<CountryRuntimeState> countries = GlobeHexGridManager.Instance?
+			.GetCountryStatesSnapshot() ?? new List<CountryRuntimeState>();
+
+		foreach (CountryRuntimeState country in countries)
+		{
+			long support = contributions.GetValueOrDefault(country.CountryKey);
+			long change = baseline.TryGetValue(
+				country.CountryKey,
+				out long previousSupport)
+				? ClampToLong((decimal)support - previousSupport)
+				: 0;
+			report.Add(new CountryFundingReportEntry(
+				country.CountryKey,
+				country.CountryName,
+				country.PlayerOpinion,
+				support,
+				change));
+		}
+
+		return report;
+	}
+
+	private static long ClampToLong(decimal value) =>
+		(long)Math.Clamp(value, long.MinValue, long.MaxValue);
 
 	private void TransferPendingBaseExpenditureToLedgers()
 	{
@@ -938,7 +1054,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	
 	public void SetSendCraftMode(bool value, GlobeTeamHolder teamHolder, Craft craft)
 	{
-		_sendCraftMode = value;
+		SendCraftMode = value;
 		teamHolder.SetSelectedCraft(craft);
 		Input.SetDefaultCursorShape(
 			value ? Input.CursorShape.Cross : Input.CursorShape.Arrow
