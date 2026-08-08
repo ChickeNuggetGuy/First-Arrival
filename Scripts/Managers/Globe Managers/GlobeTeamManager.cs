@@ -46,6 +46,10 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	public bool SendCraftMode { get; private set; }= false;
 	private readonly HashSet<HexCellDefinition> _registeredDefinitions = new();
 	private readonly System.Collections.Generic.Dictionary<TeamBaseCellDefinition, TeambasedVisual> _baseVisuals = new();
+	private readonly System.Collections.Generic.Dictionary<
+		TeamBaseCellDefinition,
+		Action<FacilityConstruction>> _facilityCompletionHandlers = new();
+	private readonly HashSet<GlobeTeamHolder> _researchCompletionHolders = new();
 
 	[Export] public Enums.UnitTeam ViewingTeam { get; set; } = Enums.UnitTeam.Player;
 	[Export] private bool scanForDefinitionsDaily = true;
@@ -87,6 +91,27 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		Craft craft,
 		int detectingTeam,
 		int cellIndex);
+	[Signal]
+	public delegate void CraftArrivedEventHandler(
+		Craft craft,
+		int craftTeam,
+		int cellIndex);
+	[Signal]
+	public delegate void BaseDetectedEventHandler(
+		int detectingTeam,
+		int owningTeam,
+		int cellIndex,
+		string baseName);
+	[Signal]
+	public delegate void FacilityConstructionCompletedEventHandler(
+		string facilityName,
+		string baseName,
+		int baseCellIndex,
+		int owningTeam);
+	[Signal]
+	public delegate void ResearchProjectCompletedEventHandler(
+		GlobeTeamHolder teamHolder,
+		string projectId);
 	
 
 	[Export] public bool overridePreviousInstance = false; 
@@ -114,31 +139,35 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		base._Ready();
 	}
 
-	protected override async Task _Setup(bool loadingData)
+	protected override Task _Setup(bool loadingData)
 	{
 		teamData ??= new Godot.Collections.Dictionary<Enums.UnitTeam, GlobeTeamHolder>();
 		foreach (GlobeTeamHolder existingHolder in teamData.Values)
 			existingHolder?.ConfigureResearchDatabase(researchDatabase);
 		
-		// Only run default setup if we aren't loading existing data.
-		if (loadingData && teamData.Count != 0) return;
-
-		// Initialize default teams defined 
-		foreach (var team in Enum.GetValues(typeof(Enums.UnitTeam)))
+		// Loaded data already supplies its teams. Otherwise initialize the
+		// configured defaults before any simulation manager begins processing.
+		if (!loadingData || teamData.Count == 0)
 		{
-			if (teamsConfig.HasFlag((Enums.UnitTeam)team))
+			foreach (var team in Enum.GetValues(typeof(Enums.UnitTeam)))
 			{
-				if((Enums.UnitTeam)team == Enums.UnitTeam.None) continue;
-				
-				// Avoid duplicates if Setup runs multiple times
-				if(teamData.ContainsKey((Enums.UnitTeam)team)) continue;
-				
-				var holder = new GlobeTeamHolder((Enums.UnitTeam)team, new List<TeamBaseCellDefinition>());
-				holder.ConfigureResearchDatabase(researchDatabase);
-				teamData[(Enums.UnitTeam)team] = holder;
-				AddChild(holder);
+				if (teamsConfig.HasFlag((Enums.UnitTeam)team))
+				{
+					if((Enums.UnitTeam)team == Enums.UnitTeam.None) continue;
+					
+					// Avoid duplicates if Setup runs multiple times
+					if(teamData.ContainsKey((Enums.UnitTeam)team)) continue;
+					
+					var holder = new GlobeTeamHolder((Enums.UnitTeam)team, new List<TeamBaseCellDefinition>());
+					holder.ConfigureResearchDatabase(researchDatabase);
+					teamData[(Enums.UnitTeam)team] = holder;
+					AddChild(holder);
+				}
 			}
 		}
+
+		RefreshResearchCompletionHandlers();
+		return Task.CompletedTask;
 	}
 
 	protected override async Task _Execute(bool loadingData)
@@ -525,6 +554,7 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			holder.ConfigureResearchDatabase(researchDatabase);
 			AddChild(holder);
 			teamData.Add(team, holder);
+			ConnectResearchCompletionHandler(holder);
 		}
 		
 		if(!teamData[team].CanAffordCost(cost)) return false;
@@ -591,6 +621,11 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		{
 			teamBase.FacilityEffectsChanged -= OnBaseFacilityEffectsChanged;
 			teamBase.FacilityEffectsChanged += OnBaseFacilityEffectsChanged;
+
+			Action<FacilityConstruction> completionHandler = construction =>
+				OnBaseFacilityCompleted(teamBase, construction);
+			_facilityCompletionHandlers[teamBase] = completionHandler;
+			teamBase.FacilityCompleted += completionHandler;
 		}
 	}
 
@@ -599,7 +634,10 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		if (definition == null || !_registeredDefinitions.Remove(definition)) return;
 		definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
 		if (definition is TeamBaseCellDefinition teamBase)
+		{
 			teamBase.FacilityEffectsChanged -= OnBaseFacilityEffectsChanged;
+			DisconnectFacilityCompletionHandler(teamBase);
+		}
 	}
 
 	/// <summary>
@@ -635,7 +673,18 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			if (GD.Randf() > chance) continue;
 
 			if (definition.RevealForTeam(detectingTeam))
+			{
 				revealed.Add(definition);
+				if (definition is TeamBaseCellDefinition detectedBase)
+				{
+					EmitSignal(
+						SignalName.BaseDetected,
+						(int)detectingTeam,
+						(int)detectedBase.teamAffiliation,
+						detectedBase.cellIndex,
+						detectedBase.definitionName ?? "Enemy base");
+				}
+			}
 		}
 
 		return revealed;
@@ -744,6 +793,19 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		if (DebugMode)
 			GD.Print($"[Detection] {ViewingTeam} detected {craft.ItemName} at cell {cellIndex}.");
 		return true;
+	}
+
+	public void ReportCraftArrival(
+		Craft craft,
+		Enums.UnitTeam craftTeam,
+		int cellIndex)
+	{
+		if (craft == null || cellIndex < 0) return;
+		EmitSignal(
+			SignalName.CraftArrived,
+			craft,
+			(int)craftTeam,
+			cellIndex);
 	}
 
 	private void OnDayChanged(
@@ -1020,6 +1082,60 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 			definition.ShowDetectionRadius);
 	}
 
+	private void OnBaseFacilityCompleted(
+		TeamBaseCellDefinition baseDefinition,
+		FacilityConstruction construction)
+	{
+		if (baseDefinition == null || construction == null) return;
+		EmitSignal(
+			SignalName.FacilityConstructionCompleted,
+			construction.DisplayName ?? "Facility",
+			baseDefinition.definitionName ?? "Base",
+			baseDefinition.cellIndex,
+			(int)baseDefinition.teamAffiliation);
+	}
+
+	private void RefreshResearchCompletionHandlers()
+	{
+		foreach (GlobeTeamHolder holder in _researchCompletionHolders)
+		{
+			if (holder != null && GodotObject.IsInstanceValid(holder))
+				holder.ResearchProjectCompleted -= OnTeamResearchProjectCompleted;
+		}
+		_researchCompletionHolders.Clear();
+
+		foreach (GlobeTeamHolder holder in teamData.Values)
+			ConnectResearchCompletionHandler(holder);
+	}
+
+	private void ConnectResearchCompletionHandler(GlobeTeamHolder holder)
+	{
+		if (holder == null || !_researchCompletionHolders.Add(holder)) return;
+		holder.ResearchProjectCompleted -= OnTeamResearchProjectCompleted;
+		holder.ResearchProjectCompleted += OnTeamResearchProjectCompleted;
+	}
+
+	private void OnTeamResearchProjectCompleted(
+		GlobeTeamHolder holder,
+		string projectId)
+	{
+		EmitSignal(SignalName.ResearchProjectCompleted, holder, projectId);
+	}
+
+	private void DisconnectFacilityCompletionHandler(
+		TeamBaseCellDefinition baseDefinition)
+	{
+		if (baseDefinition == null ||
+			!_facilityCompletionHandlers.Remove(
+				baseDefinition,
+				out Action<FacilityConstruction> completionHandler))
+		{
+			return;
+		}
+
+		baseDefinition.FacilityCompleted -= completionHandler;
+	}
+
 	private void OnDefinitionVisibilityChanged(HexCellDefinition definition)
 	{
 		if (definition is not TeamBaseCellDefinition baseDefinition) return;
@@ -1096,9 +1212,19 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		{
 			definition.VisibilityChanged -= OnDefinitionVisibilityChanged;
 			if (definition is TeamBaseCellDefinition teamBase)
+			{
 				teamBase.FacilityEffectsChanged -= OnBaseFacilityEffectsChanged;
+				DisconnectFacilityCompletionHandler(teamBase);
+			}
 		}
 		_registeredDefinitions.Clear();
+		_facilityCompletionHandlers.Clear();
+		foreach (GlobeTeamHolder holder in _researchCompletionHolders)
+		{
+			if (holder != null && GodotObject.IsInstanceValid(holder))
+				holder.ResearchProjectCompleted -= OnTeamResearchProjectCompleted;
+		}
+		_researchCompletionHolders.Clear();
 		_timeSignalsConnected = false;
 	}
 	

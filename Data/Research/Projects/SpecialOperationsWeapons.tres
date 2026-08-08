@@ -1,13 +1,21 @@
-[gd_resource type="Resource" script_class="ResearchProject" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="ResearchProject" format=3 uid="uid://d3b3r8jaf1e40"]
 
-[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
-[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
-[ext_resource type="Resource" path="res://Data/Items/Mk23_Pistol_Item.tres" id="3_item"]
-[ext_resource type="Resource" path="res://Data/Research/Projects/PolymerSidearms.tres" id="4_prerequisite"]
+[ext_resource type="Script" uid="uid://03wh2m7bp7c4" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
+[ext_resource type="Script" uid="uid://d34phexu31upe" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
+[ext_resource type="Resource" uid="uid://btyv2h0fmoxfx" path="res://Data/Items/Mk23_Pistol_Item.tres" id="3_item"]
+[ext_resource type="Script" uid="uid://ukgto3njhbno" path="res://Scripts/ResearchSystem/ResearchResult.cs" id="3_wav4o"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="4_2k1ck"]
+[ext_resource type="Resource" uid="uid://bh0e2wehrkuwc" path="res://Data/Research/Projects/PolymerSidearms.tres" id="4_prerequisite"]
+[ext_resource type="Script" uid="uid://faog0y12544p" path="res://Scripts/ResearchSystem/ResearchResults/GrantPointsResult.cs" id="7_3b8fn"]
 
 [sub_resource type="Resource" id="Unlock"]
 script = ExtResource("2_unlock")
-UnlockedItems = Array[Object]([ExtResource("3_item")])
+UnlockedItems = Array[ExtResource("4_2k1ck")]([ExtResource("3_item")])
+
+[sub_resource type="Resource" id="Resource_602to"]
+script = ExtResource("7_3b8fn")
+Amount = 25
+metadata/_custom_type_script = "uid://faog0y12544p"
 
 [resource]
 script = ExtResource("1_project")
@@ -15,5 +23,5 @@ ProjectId = "special_operations_weapons"
 DisplayName = "Special-Operations Weapons"
 Description = "Refine sidearms for demanding special-operations roles."
 TotalResearchPoints = 200
-Prerequisites = Array[Object]([ExtResource("4_prerequisite")])
-ResearchResults = Array[Object]([SubResource("Unlock")])
+Prerequisites = Array[ExtResource("1_project")]([ExtResource("4_prerequisite")])
+ResearchResults = Array[ExtResource("3_wav4o")]([SubResource("Unlock"), SubResource("Resource_602to")])

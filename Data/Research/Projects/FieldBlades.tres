@@ -1,12 +1,20 @@
-[gd_resource type="Resource" script_class="ResearchProject" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="ResearchProject" format=3 uid="uid://8joviupc4iyl"]
 
-[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
-[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
-[ext_resource type="Resource" path="res://Data/Items/Machete_Item.tres" id="3_item"]
+[ext_resource type="Script" uid="uid://03wh2m7bp7c4" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
+[ext_resource type="Script" uid="uid://ukgto3njhbno" path="res://Scripts/ResearchSystem/ResearchResult.cs" id="2_amy41"]
+[ext_resource type="Script" uid="uid://d34phexu31upe" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
+[ext_resource type="Resource" uid="uid://bsaljj3h0heh5" path="res://Data/Items/Machete_Item.tres" id="3_item"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_xgsnm"]
+[ext_resource type="Script" uid="uid://faog0y12544p" path="res://Scripts/ResearchSystem/ResearchResults/GrantPointsResult.cs" id="6_te2rr"]
 
 [sub_resource type="Resource" id="Unlock"]
 script = ExtResource("2_unlock")
-UnlockedItems = Array[Object]([ExtResource("3_item")])
+UnlockedItems = Array[ExtResource("3_xgsnm")]([ExtResource("3_item")])
+
+[sub_resource type="Resource" id="Resource_a5eck"]
+script = ExtResource("6_te2rr")
+Amount = 25
+metadata/_custom_type_script = "uid://faog0y12544p"
 
 [resource]
 script = ExtResource("1_project")
@@ -14,4 +22,4 @@ ProjectId = "field_blades"
 DisplayName = "Field Blades"
 Description = "Evaluate modern field blades for close-quarters use."
 TotalResearchPoints = 60
-ResearchResults = Array[Object]([SubResource("Unlock")])
+ResearchResults = Array[ExtResource("2_amy41")]([SubResource("Unlock"), SubResource("Resource_a5eck")])

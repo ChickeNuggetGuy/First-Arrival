@@ -23,6 +23,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	public int FacilityTroopCapacity { get; private set; }
 	
 	public int ScientistCapacity = 0;
+	
+	public int craftCapacity = 0;
+	
 	public int MaxStationedUnits => BaseTroopCapacity + FacilityTroopCapacity;
 
 	private Godot.Collections.Array<GridObject> stationedGridObjects = new Godot.Collections.Array<GridObject>();
@@ -32,8 +35,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		new(StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, long> pendingBaseExpenditure =
 		new(StringComparer.OrdinalIgnoreCase);
-
-	private int maxCraft = 3;
+	
 	private Godot.Collections.Dictionary<Enums.CraftStatus, Godot.Collections.Array<Craft>> craft = new();
 
 	public Godot.Collections.Dictionary<Enums.CraftStatus, Godot.Collections.Array<Craft>> GetAllCraftData() => craft;
@@ -73,7 +75,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 	}
 
-	public int MaxCraft => maxCraft;
+	public int CraftCapacity => craftCapacity;
 	public IReadOnlyList<FacilityConstruction> Facilities => facilities;
 
 	
@@ -593,6 +595,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 	#region Craft Functions
 
+
+	public void AddCraftCapacity(int amount)
+	{
+		craftCapacity += amount;
+	}
 	private void AddCraft(Enums.CraftStatus status, Craft craftToAdd)
 	{
 		craftToAdd.Setup(CraftCount, cellIndex, this);
@@ -608,7 +615,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		GlobeTeamHolder team = GlobeTeamManager.Instance?.GetTeamData(teamAffiliation);
 		if (team == null) return false;
 		if (!team.IsItemUnlocked(craftToAdd)) return false;
-		if (CraftCount >= maxCraft) return false;
+		if (CraftCount >= craftCapacity) return false;
 
 		if (!team.TryRemoveFunds(craftToAdd.buyPrice)) return false;
 		AddCraft(status, craftToAdd);
@@ -620,7 +627,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		if (craftToAdd == null) return false;
 		if (!craft.ContainsKey(status)) return false;
 		if (craft[status].Contains(craftToAdd)) return false;
-		if (CraftCount >= maxCraft) return false;
+		if (CraftCount >= craftCapacity) return false;
 
 		AddCraft(status, craftToAdd);
 		return true;
@@ -984,6 +991,11 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
 		}
 
+		// Mission arrivals immediately transition into battle, so a globe-only
+		// notification would disappear before the player could use it.
+		if (missionCellDefinition == null)
+			teamManager.ReportCraftArrival(craft, teamAffiliation, targetCellIndex);
+
 		onArrived?.Invoke(craft);
 		return true;
 	}
@@ -1125,7 +1137,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			return false;
 		}
 
-		if (toBase.maxCraft < craftList.Count + toBase.CraftCount)
+		if (toBase.craftCapacity < craftList.Count + toBase.CraftCount)
 		{
 			GD.PrintErr("To base cannot take more than total craft!");
 			return false;

@@ -271,6 +271,7 @@ public class Enums
 		SuccessfulMission,
 		ExpiredMission,
 		UfoLanding,
+		Research
 		
 	}
 }

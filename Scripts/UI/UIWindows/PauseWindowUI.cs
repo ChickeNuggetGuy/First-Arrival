@@ -14,7 +14,6 @@ public partial class PauseWindowUI : UIWindow
 	[Export] protected UIWindow _gameSaveUI;
 	protected override Task _Setup()
 	{
-		
 		if(!_resumeButton.IsConnected(Button.SignalName.Pressed, Callable.From(ResumeButtonPressed)))
 			_resumeButton.Pressed += ResumeButtonPressed;
 		
@@ -104,9 +103,17 @@ public partial class PauseWindowUI : UIWindow
 		}
 	}
 
+
+	protected override void _Show()
+	{
+		base._Show();
+		GetTree().Paused = true;
+	}
+
 	protected override void _Hide()
 	{
 		base._Hide();
+		GetTree().Paused = false;
 		if (_gameSaveUI != null)
 		{
 			_gameSaveUI.HideCall();

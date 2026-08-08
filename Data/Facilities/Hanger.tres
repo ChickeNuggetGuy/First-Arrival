@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HangerDefinition" format=3 uid="uid://brqbgrf4cq8xe"]
+
+[ext_resource type="Script" uid="uid://cxex7ysx3oy6l" path="res://Scripts/Base Scripts/HangerDefinition.cs" id="1_yflpw"]
+
+[resource]
+script = ExtResource("1_yflpw")
+FacilityId = "Hanger"
+DisplayName = "Hanger"
+InitialCost = 250000
+MonthlyCost = 15000
+GridSize = Vector2i(3, 3)
+BuildTimeDays = 3
+metadata/_custom_type_script = "uid://cxex7ysx3oy6l"

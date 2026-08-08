@@ -124,7 +124,7 @@ public partial class BuySellUI : UIWindow
 		{
 			int pendingCraftChange = GetPendingCraftChange() - oldChange + newChange;
 			int resultingCraftCount = teamBase.CraftCount + pendingCraftChange;
-			if (resultingCraftCount < 0 || resultingCraftCount > teamBase.MaxCraft) return;
+			if (resultingCraftCount < 0 || resultingCraftCount > teamBase.CraftCapacity) return;
 		}
 
 		if (newChange == 0) currentItemChange.Remove(itemId);
@@ -240,7 +240,7 @@ public partial class BuySellUI : UIWindow
 	private bool ValidateFinalQuantities(TeamBaseCellDefinition teamBase)
 	{
 		int finalCraftCount = teamBase.CraftCount + GetPendingCraftChange();
-		if (finalCraftCount < 0 || finalCraftCount > teamBase.MaxCraft) return false;
+		if (finalCraftCount < 0 || finalCraftCount > teamBase.CraftCapacity) return false;
 		int unitsToHire = currentItemChange.GetValueOrDefault(
 			RecruitUnitTransactionId,
 			0);

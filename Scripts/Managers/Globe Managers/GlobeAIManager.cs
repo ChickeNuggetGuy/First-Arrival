@@ -832,7 +832,7 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 			"res://Data/Items/Aien_Craft_Item.tres");
 		if (alienCraftTemplate == null) return;
 
-		while (baseDefinition.CraftCount < Math.Min(minimum, baseDefinition.MaxCraft))
+		while (baseDefinition.CraftCount < Math.Min(minimum, baseDefinition.CraftCapacity))
 		{
 			Craft craft = (Craft)alienCraftTemplate.Duplicate(true);
 			craft.Status = Enums.CraftStatus.Home;

@@ -1,13 +1,21 @@
-[gd_resource type="Resource" script_class="ResearchProject" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="ResearchProject" format=3 uid="uid://dqeigiq3mkpku"]
 
-[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
-[ext_resource type="Script" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
-[ext_resource type="Resource" path="res://Data/Items/P90_PDW_Item.tres" id="3_item"]
-[ext_resource type="Resource" path="res://Data/Research/Projects/ModernCloseQuartersWeapons.tres" id="4_prerequisite"]
+[ext_resource type="Script" uid="uid://03wh2m7bp7c4" path="res://Scripts/ResearchSystem/ResearchProject.cs" id="1_project"]
+[ext_resource type="Script" uid="uid://d34phexu31upe" path="res://Scripts/ResearchSystem/ResearchResults/UnlockItemsResult.cs" id="2_unlock"]
+[ext_resource type="Script" uid="uid://ukgto3njhbno" path="res://Scripts/ResearchSystem/ResearchResult.cs" id="3_878gr"]
+[ext_resource type="Resource" uid="uid://c61a06lg53b1a" path="res://Data/Items/P90_PDW_Item.tres" id="3_item"]
+[ext_resource type="Resource" uid="uid://ewc6kyxuafxc" path="res://Data/Research/Projects/ModernCloseQuartersWeapons.tres" id="4_prerequisite"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="4_rwdkp"]
+[ext_resource type="Script" uid="uid://faog0y12544p" path="res://Scripts/ResearchSystem/ResearchResults/GrantPointsResult.cs" id="7_ke8c6"]
 
 [sub_resource type="Resource" id="Unlock"]
 script = ExtResource("2_unlock")
-UnlockedItems = Array[Object]([ExtResource("3_item")])
+UnlockedItems = Array[ExtResource("4_rwdkp")]([ExtResource("3_item")])
+
+[sub_resource type="Resource" id="Resource_7ia7n"]
+script = ExtResource("7_ke8c6")
+Amount = 25
+metadata/_custom_type_script = "uid://faog0y12544p"
 
 [resource]
 script = ExtResource("1_project")
@@ -15,5 +23,5 @@ ProjectId = "personal_defense_weapons"
 DisplayName = "Personal-Defense Weapons"
 Description = "Explore compact high-velocity weapons for close defense."
 TotalResearchPoints = 200
-Prerequisites = Array[Object]([ExtResource("4_prerequisite")])
-ResearchResults = Array[Object]([SubResource("Unlock")])
+Prerequisites = Array[ExtResource("1_project")]([ExtResource("4_prerequisite")])
+ResearchResults = Array[ExtResource("3_878gr")]([SubResource("Unlock"), SubResource("Resource_7ia7n")])

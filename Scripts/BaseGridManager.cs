@@ -575,6 +575,7 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 			return false;
 		}
 
+		cell.CenterFacilityVisualOnFootprint(CELLSPACING);
 		facilityCell = cell;
 		return true;
 	}

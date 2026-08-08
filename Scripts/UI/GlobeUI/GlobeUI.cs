@@ -25,6 +25,7 @@ public partial class GlobeUI : UIWindow
 	private Dictionary<int, HBoxContainer> baseButtons = new Dictionary<int, HBoxContainer>();
 	private ResearchWindowUI researchWindow;
 	private GameManager researchRequestManager;
+	private bool isOpeningBase;
 	protected override Task _Setup()
 	{
 		
@@ -201,21 +202,8 @@ public partial class GlobeUI : UIWindow
 				baseButton.Text = baseCellDefinition.definitionName;
 				
 				
-				// Mark as async to await the scene change
-				baseButton.Pressed += async () => 
-				{
-					await OrbitalCamera.Instance.FocusOnCell(baseCellDefinition.cellIndex);
-					GameManager.Instance.SetCurrentBase(
-						baseCellDefinition,
-						teamHolder);
-					GameManager.Instance.SetCurrentTeamResearchState(
-						teamHolder.GetUnlockedItemIdsSnapshot(),
-						teamHolder.GetCompletedResearchProjectIdsSnapshot());
-                
-					SavesManager.Instance.StashSceneState("GlobeState");
-
-					await GameManager.Instance.ChangeSceneAsync(GameManager.GameScene.BaseScene, false);
-				};
+				baseButton.Pressed += () =>
+					_ = OpenBase(baseCellDefinition.cellIndex);
 				
 				Button panButton = new Button();
 				panButton.Icon = focusButtonTexture;
@@ -261,6 +249,11 @@ public partial class GlobeUI : UIWindow
 	
 	private void ResearchButtonOnPressed()
 	{
+		OpenResearchWindow();
+	}
+
+	public void OpenResearchWindow()
+	{
 		GlobeTeamHolder teamHolder = GlobeTeamManager.Instance?.GetTeamData(
 			Enums.UnitTeam.Player);
 		if (teamHolder == null) return;
@@ -273,6 +266,83 @@ public partial class GlobeUI : UIWindow
 		}
 
 		researchWindow.ShowFor(teamHolder);
+	}
+
+	public async Task OpenBase(int baseCellIndex)
+	{
+		if (isOpeningBase) return;
+
+		GameManager gameManager = GameManager.Instance;
+		GlobeTeamManager globeTeamManager = GlobeTeamManager.Instance;
+		OrbitalCamera camera = OrbitalCamera.Instance;
+		SavesManager savesManager = SavesManager.Instance;
+		if (gameManager == null || globeTeamManager == null ||
+			camera == null || savesManager == null ||
+			gameManager.loadingState != GameManager.LoadingState.NONE)
+		{
+			return;
+		}
+
+		GameManager.GameScene sceneAtStart = gameManager.currentScene;
+		if (sceneAtStart != GameManager.GameScene.GlobeScene &&
+			sceneAtStart != GameManager.GameScene.NONE)
+		{
+			return;
+		}
+
+		GlobeTeamHolder playerTeam = globeTeamManager.GetTeamData(
+			Enums.UnitTeam.Player);
+		if (playerTeam == null ||
+			!playerTeam.TryGetBaseAtIndex(
+				baseCellIndex,
+				out TeamBaseCellDefinition targetBase))
+		{
+			GD.PushWarning($"Base at cell {baseCellIndex} no longer exists.");
+			return;
+		}
+
+		isOpeningBase = true;
+		try
+		{
+			await camera.FocusOnCell(baseCellIndex);
+
+			// Camera focus awaits several frames. Another navigation may have won
+			// during that time, so revalidate both the scene and target base before
+			// changing any persistent transition state.
+			if (!IsInsideTree() ||
+				!GodotObject.IsInstanceValid(gameManager) ||
+				gameManager.loadingState != GameManager.LoadingState.NONE ||
+				gameManager.currentScene != sceneAtStart)
+			{
+				return;
+			}
+
+			globeTeamManager = GlobeTeamManager.Instance;
+			playerTeam = globeTeamManager?.GetTeamData(Enums.UnitTeam.Player);
+			if (playerTeam == null ||
+				!playerTeam.TryGetBaseAtIndex(baseCellIndex, out targetBase))
+			{
+				return;
+			}
+
+			gameManager.SetCurrentBase(targetBase, playerTeam);
+			gameManager.SetCurrentTeamResearchState(
+				playerTeam.GetUnlockedItemIdsSnapshot(),
+				playerTeam.GetCompletedResearchProjectIdsSnapshot());
+			savesManager.StashSceneState("GlobeState");
+
+			await gameManager.ChangeSceneAsync(
+				GameManager.GameScene.BaseScene,
+				false);
+		}
+		catch (Exception exception)
+		{
+			GD.PushError($"Failed to open base: {exception.Message}");
+		}
+		finally
+		{
+			isOpeningBase = false;
+		}
 	}
 
 	private void MonthlyReportButtonOnPressed()

@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Managers;
 
 [GlobalClass]
 public partial class OrbitalCamera : Node3D
@@ -77,7 +78,9 @@ public partial class OrbitalCamera : Node3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
+	    if(UIManager.Instance.BlockingInput) return;
         // Mouse Rotation (Only when Right Click is held)
+        
         if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Right))
         {
             _yaw -= mouseMotion.Relative.X * MouseSensitivity;

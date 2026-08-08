@@ -42,6 +42,24 @@ public partial class BaseCell : Node3D
 		RefreshConstructionAppearance();
 	}
 
+	/// <summary>
+	/// Centers the facility visual over every grid cell in its footprint while
+	/// keeping this node anchored to the footprint's origin cell.
+	/// </summary>
+	public void CenterFacilityVisualOnFootprint(float cellSpacing)
+	{
+		if (FacilityDefinition == null) return;
+
+		meshInstance ??= GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
+		if (meshInstance == null) return;
+
+		Vector2I gridSize = FacilityDefinition.GetValidatedGridSize();
+		Vector3 visualPosition = meshInstance.Position;
+		visualPosition.X = (gridSize.X - 1) * cellSpacing * 0.5f;
+		visualPosition.Z = (gridSize.Y - 1) * cellSpacing * 0.5f;
+		meshInstance.Position = visualPosition;
+	}
+
 	public void RefreshConstructionAppearance()
 	{
 		if (meshInstance == null) return;
