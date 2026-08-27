@@ -30,6 +30,16 @@ public partial class FacilityDefinition : Resource
 	{
 	}
 
+	/// <summary>
+	/// Returns the amount of weight-based item storage this facility provides.
+	/// The value is copied into the construction record so saved facilities keep
+	/// their original capacity if their designer-authored definition later changes.
+	/// </summary>
+	public virtual int GetItemStorageCapacityBonus() => 0;
+
+	/// <summary>Short, player-facing summary used by facility selection UI.</summary>
+	public virtual string GetEffectsSummary() => Purpose;
+
 	public Vector2I GetValidatedGridSize() => new(
 		Mathf.Max(1, GridSize.X),
 		Mathf.Max(1, GridSize.Y));

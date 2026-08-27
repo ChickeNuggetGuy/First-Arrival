@@ -19,7 +19,7 @@ public partial class TextStatBar : UIElement
 			_targetStat = value;
 			if (_statNameLabel != null)
 			{
-				_statNameLabel.Text = _targetStat.ToString();
+				_statNameLabel.Text = GetStatName(_targetStat);
 			}
 		}
 	}
@@ -41,14 +41,17 @@ public partial class TextStatBar : UIElement
 		if(_statNameLabel != null)
 		{
 			_statNameLabel.SetSize(new Vector2(_labelWidth, _statNameLabel.Size.Y));
-			_statNameLabel.Text = targetStat.ToString();
+			_statNameLabel.Text = GetStatName(targetStat);
 			_statNameLabel.HorizontalAlignment = _horizontalAlignment;
 			_statNameLabel.VerticalAlignment = _verticalAlignment;
 		}
 
 		if (statProgressBar != null)
 		{
-			SetProgressColor(Enums.statColors[targetStat], statProgressBar);
+			Color color = Enums.statColors.TryGetValue(targetStat, out Color statColor)
+				? statColor
+				: MissionUITheme.AccentColor;
+			MissionUITheme.StyleProgressBar(statProgressBar, color);
 			_overlay ??= new StatProgressBarOverlay(statProgressBar);
 		}
 	}
@@ -138,13 +141,9 @@ public partial class TextStatBar : UIElement
 		base._ExitTree();
 	}
 	
-	public void SetProgressColor(Color newColor, Control targetControl)
+	private static string GetStatName(Enums.Stat stat)
 	{
-		var styleBoxFlat = new StyleBoxFlat();
-
-		styleBoxFlat.BgColor = newColor;
-
-		targetControl.AddThemeStyleboxOverride("fill", styleBoxFlat);
+		return stat == Enums.Stat.TimeUnits ? "Time Units" : stat.ToString();
 	}
 
 }

@@ -18,6 +18,7 @@ dest_files=["res://.godot/imported/TODO_Manager_Logo.png-e07d7ec75201c66b732ef87
 
 compress/mode=2
 compress/high_quality=false
+compress/high_quality_mode=0
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

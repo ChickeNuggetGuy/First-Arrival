@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://bpiqt7yfmpj21"]
+
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_pux0h"]
+[ext_resource type="Texture2D" uid="uid://bb48tor5xora5" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Status/ICON_MilitaryCombat_Status_Poisoned_01_Clean.png" id="1_tw0tk"]
+[ext_resource type="ArrayMesh" uid="uid://djd67qoburlyf" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Icon_Skull_01.obj" id="2_mulxm"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="3_fs4dn"]
+
+[sub_resource type="Resource" id="Resource_hjb5r"]
+script = ExtResource("3_fs4dn")
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+
+[resource]
+resource_name = "Acid_Item"
+script = ExtResource("1_pux0h")
+ItemID = 210
+ItemName = "Acid"
+ItemDescription = "Lump of deadly acid. "
+ItemIcon = ExtResource("1_tw0tk")
+ResearchTier = 3
+RequiredResearch = "Organic Launchers"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Resource_hjb5r")
+weight = 5
+ItemMesh = ExtResource("2_mulxm")
+ActionDefinitions = Array[Object]([])
+IsAmmunition = true
+AmmoDamage = 45
+MagazineCapacity = 60
+ReloadTimeUnitCost = 15
+MaxStackSize = 20
+ShowInBuySellWindow = false

@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="GridConfiguration" load_steps=2 format=3 uid="uid://bosu3vpfk4e77"]
+[gd_resource type="Resource" script_class="GridConfiguration" format=3 uid="uid://bosu3vpfk4e77"]
 
-[ext_resource type="Script" uid="uid://b6sn8d2w6d2kk" path="res://Scripts/GridSystem/GridConfiuration.cs" id="1_grid_configuration"]
+[ext_resource type="Script" uid="uid://b6sn8d2w6d2kk" path="res://Scripts/GridSystem/GridConfiguration.cs" id="1_grid_configuration"]
 
 [resource]
 script = ExtResource("1_grid_configuration")

@@ -6,10 +6,11 @@
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_4g0y1"]
 [ext_resource type="Resource" uid="uid://bfepqresb4he1" path="res://Data/Items/Mossberg_500_Item.tres" id="3_item"]
 [ext_resource type="Script" uid="uid://faog0y12544p" path="res://Scripts/ResearchSystem/ResearchResults/GrantPointsResult.cs" id="6_rpsiv"]
+[ext_resource type="Resource" uid="uid://bh7bh3t1vooqo" path="res://Data/Items/Ammo_12Gauge_Item.tres" id="7_ammo"]
 
 [sub_resource type="Resource" id="Unlock"]
 script = ExtResource("2_unlock")
-UnlockedItems = Array[ExtResource("3_4g0y1")]([ExtResource("3_item")])
+UnlockedItems = Array[ExtResource("3_4g0y1")]([ExtResource("3_item"), ExtResource("7_ammo")])
 
 [sub_resource type="Resource" id="Resource_nli6q"]
 script = ExtResource("6_rpsiv")

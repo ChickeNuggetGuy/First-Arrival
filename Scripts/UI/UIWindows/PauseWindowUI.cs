@@ -9,11 +9,15 @@ public partial class PauseWindowUI : UIWindow
 	[Export] protected Button _saveButton;
 	[Export] protected Button _loadButton;
 	[Export] protected Button _settingsButton;
+	[Export] protected Button _abandonMissionButton;
 	[Export] protected Button _quitMenuButton;
 	[Export] protected Button _quitGameButton;
 	[Export] protected UIWindow _gameSaveUI;
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this);
+		MissionUITheme.InsetPanelContent(this);
+		MissionUITheme.StyleFirstTitle(this);
 		if(!_resumeButton.IsConnected(Button.SignalName.Pressed, Callable.From(ResumeButtonPressed)))
 			_resumeButton.Pressed += ResumeButtonPressed;
 		
@@ -25,6 +29,12 @@ public partial class PauseWindowUI : UIWindow
 		
 		if(!_settingsButton.IsConnected(Button.SignalName.Pressed, Callable.From(SettingsButtonPressed)))
 			_settingsButton.Pressed += SettingsButtonPressed;
+
+		if (_abandonMissionButton != null &&
+		    !_abandonMissionButton.IsConnected(
+			    Button.SignalName.Pressed,
+			    Callable.From(AbandonMissionButtonPressed)))
+			_abandonMissionButton.Pressed += AbandonMissionButtonPressed;
 		
 		if(!_quitMenuButton.IsConnected(Button.SignalName.Pressed, Callable.From(QuitmenuButtonPressed)))
 			_quitMenuButton.Pressed += QuitmenuButtonPressed;
@@ -48,6 +58,12 @@ public partial class PauseWindowUI : UIWindow
 		
 		if(_settingsButton.IsConnected(Button.SignalName.Pressed, Callable.From(SettingsButtonPressed)))
 			_settingsButton.Pressed -= SettingsButtonPressed;
+
+		if (_abandonMissionButton != null &&
+		    _abandonMissionButton.IsConnected(
+			    Button.SignalName.Pressed,
+			    Callable.From(AbandonMissionButtonPressed)))
+			_abandonMissionButton.Pressed -= AbandonMissionButtonPressed;
 		
 		if(_quitMenuButton.IsConnected(Button.SignalName.Pressed, Callable.From(QuitmenuButtonPressed)))
 			_quitMenuButton.Pressed -= QuitmenuButtonPressed;
@@ -81,6 +97,15 @@ public partial class PauseWindowUI : UIWindow
 	{
 		//TODO: Implement Settings
 	}
+
+	private async void AbandonMissionButtonPressed()
+	{
+		_abandonMissionButton.Disabled = true;
+		await HideCall(false);
+		bool abandoned = await GameManager.Instance.AbandonCurrentMission();
+		if (!abandoned && GodotObject.IsInstanceValid(_abandonMissionButton))
+			_abandonMissionButton.Disabled = false;
+	}
 	
 	private void QuitmenuButtonPressed()
 	{
@@ -96,6 +121,12 @@ public partial class PauseWindowUI : UIWindow
 	
 	protected override async Task DrawUI()
 	{
+		if (_abandonMissionButton != null)
+			_abandonMissionButton.Visible =
+				GameManager.Instance?.currentScene == GameManager.GameScene.BattleScene &&
+				!GameManager.Instance.IsQuickBattle &&
+				GameManager.Instance.currentMission != null;
+
 		base._Show();
 		if (_gameSaveUI != null)
 		{

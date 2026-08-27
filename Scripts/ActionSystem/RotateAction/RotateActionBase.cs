@@ -7,7 +7,7 @@ public partial class RotateActionBase : ActionBase
 {
   private Enums.Direction _targetDirection;
   private Tween _rotationTween;
-  private float _startingYaw;
+  private float _lastCommittedYaw;
   private bool _rotationStarted;
 
   private const float TurnSpeedDegPerSec = 540f;
@@ -81,30 +81,72 @@ public partial class RotateActionBase : ActionBase
   {
 	  if (_targetDirection == Enums.Direction.None) return;
 
-	  float targetYawRad = RotationHelperFunctions.GetRotationRadians(_targetDirection);
-
+	  Enums.Direction currentDirection = parentGridObject.GridPositionData.Direction;
+	  int rotationSteps = RotationHelperFunctions.GetRotationStepsBetweenDirections(
+		  currentDirection,
+		  _targetDirection
+	  );
 	  float currentYaw = parentGridObject.visualMesh.Rotation.Y;
-	  _startingYaw = currentYaw;
+	  _lastCommittedYaw = currentYaw;
 	  _rotationStarted = true;
+
+	  // Commit every 45-degree heading crossed by the turn. DirectionChanged
+	  // recalculates team visibility, allowing intermediate sight cones to add
+	  // their cells to the explored set instead of jumping straight to the end.
+	  if (rotationSteps != 0)
+	  {
+		  bool clockwise = rotationSteps > 0;
+		  for (int step = 0; step < Mathf.Abs(rotationSteps); step++)
+		  {
+			  Enums.Direction nextDirection =
+				  RotationHelperFunctions.GetNextDirection(currentDirection, clockwise);
+			  if (!await RotateToDirection(nextDirection, currentYaw)) return;
+
+			  parentGridObject.GridPositionData.SetDirection(nextDirection);
+			  currentDirection = nextDirection;
+			  currentYaw = parentGridObject.visualMesh.Rotation.Y;
+			  _lastCommittedYaw = currentYaw;
+		  }
+
+		  return;
+	  }
+
+	  // Invalid/unknown starting directions cannot be stepped through, but the
+	  // requested final direction should still be honored.
+	  await RotateToDirection(_targetDirection, currentYaw);
+  }
+
+  private async Task<bool> RotateToDirection(
+	  Enums.Direction direction,
+	  float currentYaw
+  )
+  {
+	  float targetYawRad = RotationHelperFunctions.GetRotationRadians(direction);
 	  float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
 	  float finalYaw = currentYaw + delta;
-
 	  float duration = Mathf.Abs(delta) / Mathf.DegToRad(TurnSpeedDegPerSec);
+
 	  if (!ShouldAnimate() || duration < 0.0001f)
 	  {
-		  var r = parentGridObject.visualMesh.Rotation;
-		  r.Y = finalYaw;
-		  parentGridObject.visualMesh.Rotation = r;
-		  return;
+		  var rotation = parentGridObject.visualMesh.Rotation;
+		  rotation.Y = finalYaw;
+		  parentGridObject.visualMesh.Rotation = rotation;
+		  return !IsCancellationRequested;
 	  }
 
 	  _rotationTween = ApplyAnimationSpeed(parentGridObject.visualMesh.CreateTween());
 	  _rotationTween.SetTrans(Tween.TransitionType.Sine);
 	  _rotationTween.SetEase(Tween.EaseType.InOut);
+	  _rotationTween.TweenProperty(
+		  parentGridObject.visualMesh,
+		  "rotation:y",
+		  finalYaw,
+		  duration
+	  );
 
-	  _rotationTween.TweenProperty(parentGridObject.visualMesh, "rotation:y", finalYaw, duration);
-	  await WaitForTween(_rotationTween);
+	  bool completed = await WaitForTween(_rotationTween);
 	  _rotationTween = null;
+	  return completed;
   }
 
   protected override Task ActionComplete()
@@ -128,7 +170,9 @@ public partial class RotateActionBase : ActionBase
 	  )
 	  {
 		  Vector3 rotation = parentGridObject.visualMesh.Rotation;
-		  rotation.Y = _startingYaw;
+		  // Keep any fully completed intermediate steps and discard only the
+		  // partially animated step that was interrupted.
+		  rotation.Y = _lastCommittedYaw;
 		  parentGridObject.visualMesh.Rotation = rotation;
 	  }
 

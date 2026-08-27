@@ -776,7 +776,7 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 
 	/// <summary>
 	/// Called by GlobeMissionManager when a mission tied to an alien operation
-	/// resolves. A player failure or timeout is an alien strategic success.
+	/// resolves. A player failure, timeout, or abandonment is an alien strategic success.
 	/// </summary>
 	public void ResolveOperation(int operationId, Enums.MissionStatus outcome)
 	{
@@ -787,7 +787,8 @@ public partial class GlobeAIManager : Manager<GlobeAIManager>
 		if (operation == null) return;
 
 		bool alienSucceeded = outcome == Enums.MissionStatus.Failed ||
-		                      outcome == Enums.MissionStatus.Timeout;
+		                      outcome == Enums.MissionStatus.Timeout ||
+		                      outcome == Enums.MissionStatus.Aborted;
 		if (alienSucceeded)
 			_strategicProgress += 10;
 

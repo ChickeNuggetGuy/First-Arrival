@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using System.Threading.Tasks;
+using FirstArrival.Scripts.Inventory_System;
+using FirstArrival.Scripts.UI;
 using FirstArrival.Scripts.TurnSystem;
 using FirstArrival.Scripts.Utility;
 using Godot.Collections;
@@ -67,8 +69,14 @@ public partial class GameManager : Manager<GameManager>
 	public PackedScene unitScene;
 	private Godot.Collections.Array<
 		Godot.Collections.Dictionary<string, Variant>> _pendingBattlePlayerUnits;
+	private MissionBattleResult _pendingBattleResult;
+	private bool _battleEnding;
+	private bool _isQuickBattleSession;
+	private Godot.Collections.Dictionary<string, Variant>
+		_savedBattleDeploymentInventory;
 
 	public bool HasPendingBattlePlayerUnits => _pendingBattlePlayerUnits != null;
+	public bool IsQuickBattle => _isQuickBattleSession;
 
 	public float loadingPercent = 0;
 	public LoadingState loadingState = LoadingState.NONE;
@@ -126,8 +134,16 @@ public partial class GameManager : Manager<GameManager>
 		GD.Print($"[Cleanup] Deinitializing scene managers for currentScene...");
 		foreach (var m in activeSceneManagers)
 		{
-			if (GodotObject.IsInstanceValid(m))
+			if (!GodotObject.IsInstanceValid(m)) continue;
+			try
+			{
 				m.Deinitialize();
+			}
+			catch (Exception exception)
+			{
+				GD.PrintErr(
+					$"Could not deinitialize {m.GetManagerName()}: {exception.Message}");
+			}
 		}
 	}
 
@@ -144,8 +160,7 @@ public partial class GameManager : Manager<GameManager>
 		SavesManager.Instance.currentSavename = tempSaveName;
 		SetCurrentTeamResearchState(null, null);
 
-		await ChangeSceneAsync(scene, false);
-		return true;
+		return await ChangeSceneAsync(scene, false);
 	}
 
 	public async Task<bool> TryChangeScene(GameScene sceneName, bool saveManagerData = true, bool loadSceneData = true)
@@ -153,6 +168,17 @@ public partial class GameManager : Manager<GameManager>
 		if (!scenePaths.ContainsKey(sceneName)) return false;
 
 		var sm = SavesManager.Instance;
+		if (sceneName == GameScene.BattleScene)
+		{
+			bool hasCampaignReturnState = sm != null &&
+			                              sm.TryGetSessionData(
+				                              "GlobeState",
+				                              out _);
+			_isQuickBattleSession = currentScene != GameScene.GlobeScene ||
+			                        currentMission == null ||
+			                        !hasCampaignReturnState;
+			if (_isQuickBattleSession) currentMission = null;
+		}
 		if (saveManagerData)
 		{
 			string saveKey = sm.currentSavename.Contains("quickplay_internal") ? "quickplay_internal" : "autosave";
@@ -166,25 +192,45 @@ public partial class GameManager : Manager<GameManager>
 			SavesManager.PendingSaveName = sm.currentSavename;
 		}
 
-		await ChangeSceneAsync(sceneName, true);
-		return true;
+		bool changed = await ChangeSceneAsync(sceneName, true);
+		if (!changed)
+		{
+			SavesManager.PendingSaveData = null;
+			SavesManager.LoadFromAutosave = false;
+		}
+		return changed;
 	}
 
 	/// <summary>
 	/// The core transition worker for the Autoload.
 	/// </summary>
-	public async Task ChangeSceneAsync(GameScene scene, bool loadingData)
+	public async Task<bool> ChangeSceneAsync(GameScene scene, bool loadingData)
 	{
+		if (!scenePaths.TryGetValue(scene, out string scenePath)) return false;
+		PackedScene packedScene = ResourceLoader.Load<PackedScene>(scenePath);
+		Node nextScene = packedScene?.Instantiate();
+		if (nextScene == null) return false;
+
 		loadingState = LoadingState.CHANGINGSCENES;
 		loadingPercent = 0;
 		loadingManagerName = "Scene Transition";
 		UIManager.Instance?.ShowLoadingScreen();
 
 		CleanupManagers();
+		GameScene previousScene = currentScene;
 		currentScene = scene;
-
-		Error err = GetTree().ChangeSceneToFile(scenePaths[scene]);
-		if (err != Error.Ok) return;
+		Error err = GetTree().ChangeSceneToNode(nextScene);
+		if (err != Error.Ok)
+		{
+			currentScene = previousScene;
+			if (GodotObject.IsInstanceValid(nextScene)) nextScene.QueueFree();
+			loadingState = LoadingState.NONE;
+			loadingManagerName = string.Empty;
+			if (UIManager.Instance != null &&
+			    GodotObject.IsInstanceValid(UIManager.Instance))
+				await UIManager.Instance.HideLoadingScreen();
+			return false;
+		}
 
 		// Wait for nodes to enter tree
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -201,6 +247,7 @@ public partial class GameManager : Manager<GameManager>
 		// source of truth here, so re-assert it.
 		currentScene = scene;
 		EmitSignal(SignalName.SceneChanged, (int)currentScene);
+		return true;
 	}
 
 	public void RegisterGlobalManager(ManagerBase manager)
@@ -451,12 +498,37 @@ public partial class GameManager : Manager<GameManager>
 
 	public void PrepareBattleLoadout(Craft craft)
 	{
-		_pendingBattlePlayerUnits = craft == null
-			? new Godot.Collections.Array<
-				Godot.Collections.Dictionary<string, Variant>>()
-			: GridObjectSerializationUtility.SaveGridObjects(
-				craft.GetStationedGridObjects()
-			);
+		_pendingBattlePlayerUnits = new Godot.Collections.Array<
+			Godot.Collections.Dictionary<string, Variant>>();
+		if (craft != null)
+		{
+			foreach (GridObject unit in craft.GetStationedGridObjects())
+			{
+				if (unit == null || !GodotObject.IsInstanceValid(unit)) continue;
+
+				var unitData = unit.Save();
+				string scenePath = unitData.TryGetValue(
+					"Filename",
+					out Variant filenameValue)
+					? filenameValue.AsString()
+					: string.Empty;
+				if (string.IsNullOrWhiteSpace(scenePath))
+				{
+					scenePath = unit.SceneFilePath;
+					if (string.IsNullOrWhiteSpace(scenePath))
+						scenePath = unitScene?.ResourcePath;
+				}
+
+				if (string.IsNullOrWhiteSpace(scenePath))
+				{
+					GD.PrintErr($"Could not prepare unit {unit.Name}: its scene path is missing.");
+					continue;
+				}
+
+				unitData["Filename"] = scenePath;
+				_pendingBattlePlayerUnits.Add(unitData.Duplicate(true));
+			}
+		}
 
 		unitCounts = new Vector2I(_pendingBattlePlayerUnits.Count, unitCounts.Y);
 		InventoryManager.Instance?.SetStartingItems(craft?.GetItemCounts);
@@ -474,60 +546,333 @@ public partial class GameManager : Manager<GameManager>
 		InventoryManager.Instance?.ResetStartingItemsToDefaults();
 	}
 
-	public void CheckGameState(Turn currentTurn)
+	public bool RestoreBattleDeploymentInventory(InventoryGrid inventory)
 	{
-		var teamHolders = GridObjectManager.Instance.GetGridObjectTeamHolders();
-		foreach (var kvp in teamHolders)
-		{
-			if (kvp.Value == null) continue;
-			if (kvp.Key == Enums.UnitTeam.Enemy || kvp.Key == Enums.UnitTeam.Player)
-			{
-				if (kvp.Value.GridObjects[Enums.GridObjectState.Active].Count < 1)
-				{
-					if (currentMission != null)
-					{
-						// Preserve the visit flag recorded when the battle began, while
-						// replacing the temporary OnRoute flag with the final outcome.
-						currentMission.missionStatus &= ~Enums.MissionStatus.OnRoute;
-						currentMission.missionStatus |= Enums.MissionStatus.Visited;
-						currentMission.missionStatus |= kvp.Key == Enums.UnitTeam.Player
-							? Enums.MissionStatus.Failed
-							: Enums.MissionStatus.Successful;
-					}
-
-					EndGame();
-					return;
-				}
-			}
-		}
+		if (inventory == null || _savedBattleDeploymentInventory == null)
+			return false;
+		inventory.LoadContents(_savedBattleDeploymentInventory);
+		_savedBattleDeploymentInventory = null;
+		return true;
 	}
 
-	private async void EndGame()
+	public void CheckGameState(Turn currentTurn)
 	{
-		if (SavesManager.Instance.currentSavename == "quickplay_internal")
+		if (_pendingBattleResult != null || _battleEnding ||
+		    GridObjectManager.Instance == null)
+			return;
+
+		GridObjectTeamHolder playerHolder = GridObjectManager.Instance
+			.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+		GridObjectTeamHolder enemyHolder = GridObjectManager.Instance
+			.GetGridObjectTeamHolder(Enums.UnitTeam.Enemy);
+		if (playerHolder == null || enemyHolder == null) return;
+
+		bool playerDefeated = GetGridObjectCount(
+			playerHolder,
+			Enums.GridObjectState.Active) == 0;
+		bool enemyDefeated = GetGridObjectCount(
+			enemyHolder,
+			Enums.GridObjectState.Active) == 0;
+		if (!playerDefeated && !enemyDefeated) return;
+
+		Enums.MissionStatus outcome = playerDefeated
+			? Enums.MissionStatus.Failed
+			: Enums.MissionStatus.Successful;
+		SetCurrentMissionOutcome(outcome);
+		EndGame(outcome);
+	}
+
+	private async void EndGame(Enums.MissionStatus outcome)
+	{
+		try
 		{
-			await ChangeSceneAsync(GameScene.MainMenu, false);
+			await PresentBattleEnd(outcome);
 		}
-		else
+		catch (Exception exception)
 		{
-			await EndBattleAndReturnToGlobe();
+			GD.PrintErr(
+				$"Could not show the mission report: {exception.Message}\n{exception.StackTrace}");
 		}
 	}
 
 	public async Task EndBattleAndReturnToGlobe()
 	{
-		// Pull from memory instead of disk
-		var globeData = SavesManager.Instance.ConsumeSceneState("GlobeState");
-		if (globeData == null) return;
+		if (_pendingBattleResult == null)
+		{
+			Enums.MissionStatus outcome = GetCurrentMissionOutcome(currentMission);
+			if (outcome != Enums.MissionStatus.None)
+				await PresentBattleEnd(outcome);
+			return;
+		}
 
-		if (currentMission != null)
-			UpdateMissionStatusInSavedData(globeData, currentMission);
+		await ConfirmBattleEnd(_pendingBattleResult);
+	}
+
+	public async Task<bool> ConfirmBattleEnd(MissionBattleResult result)
+	{
+		if (_battleEnding || result == null ||
+		    !ReferenceEquals(result, _pendingBattleResult) ||
+		    result.IsOverCapacity)
+			return false;
+
+		_battleEnding = true;
+
+		try
+		{
+			if (result.IsQuickBattle)
+			{
+				bool changed = await ChangeSceneAsync(
+					GameScene.MainMenu,
+					false);
+				if (!changed) return false;
+				_pendingBattleResult = null;
+				currentMission = null;
+				return true;
+			}
+
+			return await CommitMissionBattleResult(result);
+		}
+		catch (Exception exception)
+		{
+			GD.PrintErr(
+				$"Could not finish the mission: {exception.Message}\n{exception.StackTrace}");
+			return false;
+		}
+		finally
+		{
+			_battleEnding = false;
+		}
+	}
+
+	public async Task<bool> AbandonCurrentMission()
+	{
+		if (_battleEnding || _pendingBattleResult != null || IsQuickBattle ||
+		    currentScene != GameScene.BattleScene ||
+		    currentMission == null)
+			return false;
+
+		SetCurrentMissionOutcome(Enums.MissionStatus.Aborted);
+		return await PresentBattleEnd(Enums.MissionStatus.Aborted);
+	}
+
+	private async Task<bool> PresentBattleEnd(Enums.MissionStatus outcome)
+	{
+		if (_battleEnding || _pendingBattleResult != null) return false;
+		BattleEndUI battleEndUI = UIManager.Instance?.GetWindow<BattleEndUI>();
+		if (battleEndUI == null)
+		{
+			GD.PrintErr("BattleEndUI is not available in the battle scene.");
+			return false;
+		}
+
+		MissionBattleResult result = CreateBattleResult(outcome);
+		_pendingBattleResult = result;
+		try
+		{
+			await battleEndUI.ShowResult(result);
+			return true;
+		}
+		catch
+		{
+			_pendingBattleResult = null;
+			throw;
+		}
+	}
+
+	private MissionBattleResult CreateBattleResult(
+		Enums.MissionStatus outcome)
+	{
+		bool isQuickBattle = IsQuickBattle;
+		MouseHeldInventoryUI heldInventoryUI =
+			UIManager.Instance?.mouseHeldInventoryUI;
+		heldInventoryUI?.TryReturnHeldItem();
+		var recovery = new MissionRecoveryResult();
+		if (!isQuickBattle && currentMission?.mission != null &&
+		    currentMission.onRouteCraft != null)
+		{
+			StartingEuipmentUI equipmentUI = UIManager.Instance?
+				.GetWindow<StartingEuipmentUI>();
+			recovery = MissionRecoveryResolver.Resolve(
+				currentMission.mission,
+				outcome,
+				equipmentUI?.GetInventoryGrid(Enums.InventoryType.Ground),
+				heldInventoryUI?.InventoryGrid);
+		}
+
+		GridObjectTeamHolder enemyHolder = GridObjectManager.Instance?
+			.GetGridObjectTeamHolder(Enums.UnitTeam.Enemy);
+		GridObjectTeamHolder playerHolder = GridObjectManager.Instance?
+			.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
+		int enemiesKilled = GetGridObjectCount(
+			enemyHolder,
+			Enums.GridObjectState.Inactive);
+		int unitsLost = isQuickBattle
+			? GetGridObjectCount(playerHolder, Enums.GridObjectState.Inactive)
+			: Math.Max(
+				0,
+				GetGridObjectCount(playerHolder, Enums.GridObjectState.Active) +
+				GetGridObjectCount(playerHolder, Enums.GridObjectState.Inactive) -
+				recovery.RecoveredUnits.Count);
+
+		MissionScoreBreakdown score = !isQuickBattle && currentMission?.mission != null
+			? currentMission.mission.CalculateScore(
+				enemiesKilled,
+				unitsLost,
+				outcome)
+			: MissionBase.CalculateDefaultScore(
+				enemiesKilled,
+				unitsLost,
+				outcome);
+		long capacity = isQuickBattle
+			? long.MaxValue
+			: GetRecoveryWeightCapacity();
+		string missionName = isQuickBattle
+			? "Quick Battle"
+			: currentMission?.mission?.missionName;
+
+		return new MissionBattleResult(
+			outcome,
+			score,
+			recovery,
+			isQuickBattle,
+			capacity,
+			missionName);
+	}
+
+	private async Task<bool> CommitMissionBattleResult(
+		MissionBattleResult result)
+	{
+		MissionCellDefinition mission = currentMission;
+		if (mission == null || SavesManager.Instance == null) return false;
+		var battleState = SavesManager.Instance.PackageFullState()
+			.Duplicate(true);
+
+		if (!SavesManager.Instance.TryGetSessionData(
+			    "GlobeState",
+			    out Variant globeStateValue) ||
+		    globeStateValue.VariantType != Variant.Type.Dictionary)
+			return false;
+
+		var globeData = globeStateValue
+			.AsGodotDictionary<string, Variant>()
+			.Duplicate(true);
+		mission.SetBattleResult(result);
+		bool payloadUpdated = UpdateMissionCraftPayloadInSavedData(
+			globeData,
+			mission,
+			result.Recovery);
+		bool missionUpdated = payloadUpdated &&
+		                      UpdateMissionStatusInSavedData(globeData, mission);
+		if (!payloadUpdated || !missionUpdated)
+		{
+			GD.PrintErr("The mission result could not be written to the globe state.");
+			return false;
+		}
 
 		SavesManager.PendingSaveData = globeData;
 		SavesManager.LoadFromAutosave = false;
-		currentMission = null;
+		bool changed;
+		try
+		{
+			changed = await ChangeSceneAsync(GameScene.GlobeScene, true);
+		}
+		catch (Exception exception)
+		{
+			SavesManager.PendingSaveData = null;
+			GD.PrintErr(
+				$"The globe scene could not finish loading: {exception.Message}");
+			await RestoreBattleReportAfterFailedCommit(
+				result,
+				battleState,
+				mission);
+			return false;
+		}
+		if (!changed)
+		{
+			SavesManager.PendingSaveData = null;
+			return false;
+		}
 
-		await ChangeSceneAsync(GameScene.GlobeScene, true);
+		SavesManager.Instance.ConsumeSceneState("GlobeState");
+		currentMission = null;
+		_pendingBattleResult = null;
+		return true;
+	}
+
+	private async Task<bool> RestoreBattleReportAfterFailedCommit(
+		MissionBattleResult result,
+		Godot.Collections.Dictionary<string, Variant> battleState,
+		MissionCellDefinition mission)
+	{
+		BattleEndUI existingReport = UIManager.Instance?
+			.GetWindow<BattleEndUI>();
+		if (existingReport != null &&
+		    GodotObject.IsInstanceValid(existingReport) &&
+		    existingReport.IsInsideTree())
+		{
+			currentScene = GameScene.BattleScene;
+			currentMission = mission;
+			_pendingBattleResult = result;
+			SetCurrentMissionOutcome(result.Outcome);
+			return true;
+		}
+
+		if (battleState == null) return false;
+		SavesManager.PendingSaveData = battleState;
+		SavesManager.LoadFromAutosave = false;
+		try
+		{
+			if (!await ChangeSceneAsync(GameScene.BattleScene, true))
+			{
+				SavesManager.PendingSaveData = null;
+				return false;
+			}
+
+			_pendingBattleResult = result;
+			SetCurrentMissionOutcome(result.Outcome);
+			BattleEndUI restoredReport = UIManager.Instance?
+				.GetWindow<BattleEndUI>();
+			if (restoredReport == null) return false;
+			await restoredReport.ShowResult(result);
+			return true;
+		}
+		catch (Exception exception)
+		{
+			SavesManager.PendingSaveData = null;
+			GD.PrintErr(
+				$"The battle report could not be restored: {exception.Message}");
+			return false;
+		}
+	}
+
+	private void SetCurrentMissionOutcome(Enums.MissionStatus outcome)
+	{
+		if (currentMission == null || IsQuickBattle) return;
+		currentMission.missionStatus &= ~(
+			Enums.MissionStatus.OnRoute |
+			Enums.MissionStatus.Successful |
+			Enums.MissionStatus.Failed |
+			Enums.MissionStatus.Timeout |
+			Enums.MissionStatus.Aborted);
+		currentMission.missionStatus |= Enums.MissionStatus.Visited | outcome;
+	}
+
+	private long GetRecoveryWeightCapacity()
+	{
+		Craft returningCraft = currentMission?.onRouteCraft;
+		if (returningCraft != null) return returningCraft.ItemWeightCapacity;
+		return 0;
+	}
+
+	private static int GetGridObjectCount(
+		GridObjectTeamHolder holder,
+		Enums.GridObjectState state)
+	{
+		if (holder?.GridObjects == null ||
+		    !holder.GridObjects.TryGetValue(state, out List<GridObject> objects) ||
+		    objects == null)
+			return 0;
+		return objects.Count;
 	}
 
 	public async Task ReturnToGlobe()
@@ -594,21 +939,113 @@ public partial class GameManager : Manager<GameManager>
 		globeData["managers"] = managers;
 	}
 
-	private static void UpdateMissionStatusInSavedData(
+	private static bool UpdateMissionStatusInSavedData(
 		Godot.Collections.Dictionary<string, Variant> root,
 		MissionCellDefinition mission
 	)
 	{
-		if (!root.TryGetValue("managers", out var m)) return;
+		if (root == null || mission == null ||
+		    !root.TryGetValue("managers", out var m)) return false;
 		var managers = m.AsGodotDictionary<string, Variant>();
-		if (!managers.TryGetValue("GlobeMissionManager", out var mm)) return;
+		if (!managers.TryGetValue("GlobeMissionManager", out var mm)) return false;
 		var missionData = mm.AsGodotDictionary<string, Variant>();
-		if (!missionData.TryGetValue("activeMissions", out var am)) return;
+		if (!missionData.TryGetValue("activeMissions", out var am)) return false;
 		var missions = am.AsGodotDictionary<string, Variant>();
-		if (!missions.TryGetValue(mission.cellIndex.ToString(), out var savedMission)) return;
+		if (!missions.TryGetValue(
+			    mission.cellIndex.ToString(),
+			    out var savedMission)) return false;
 
 		var savedMissionData = savedMission.AsGodotDictionary<string, Variant>();
 		savedMissionData["missionStatus"] = (int)mission.missionStatus;
+		savedMissionData["battleResult"] = mission.SaveBattleResult();
+		missions[mission.cellIndex.ToString()] = savedMissionData;
+		missionData["activeMissions"] = missions;
+		managers["GlobeMissionManager"] = missionData;
+		root["managers"] = managers;
+		return true;
+	}
+
+	private static Enums.MissionStatus GetCurrentMissionOutcome(
+		MissionCellDefinition mission)
+	{
+		if (mission == null) return Enums.MissionStatus.None;
+		if (mission.missionStatus.HasFlag(Enums.MissionStatus.Successful))
+			return Enums.MissionStatus.Successful;
+		if (mission.missionStatus.HasFlag(Enums.MissionStatus.Aborted))
+			return Enums.MissionStatus.Aborted;
+		if (mission.missionStatus.HasFlag(Enums.MissionStatus.Failed))
+			return Enums.MissionStatus.Failed;
+		if (mission.missionStatus.HasFlag(Enums.MissionStatus.Timeout))
+			return Enums.MissionStatus.Timeout;
+		return Enums.MissionStatus.None;
+	}
+
+	private static bool UpdateMissionCraftPayloadInSavedData(
+		Godot.Collections.Dictionary<string, Variant> root,
+		MissionCellDefinition mission,
+		MissionRecoveryResult recovery)
+	{
+		Craft missionCraft = mission?.onRouteCraft;
+		if (recovery == null || root == null) return false;
+		if (missionCraft == null)
+			return recovery.RecoveredUnits.Count == 0 &&
+			       recovery.RecoveredItems.Count == 0;
+		if (!root.TryGetValue("managers", out Variant managersValue)) return false;
+
+		var managers = managersValue.AsGodotDictionary<string, Variant>();
+		if (!managers.TryGetValue(
+			    "GlobeTeamManager",
+			    out Variant teamManagerValue))
+			return false;
+
+		var teamManagerData =
+			teamManagerValue.AsGodotDictionary<string, Variant>();
+		if (!teamManagerData.TryGetValue("teamData", out Variant teamDataValue))
+			return false;
+
+		var teamData = teamDataValue.AsGodotDictionary<string, Variant>();
+		if (!teamData.TryGetValue(
+			    ((int)Enums.UnitTeam.Player).ToString(),
+			    out Variant playerTeamValue))
+			return false;
+
+		var playerTeam = playerTeamValue.AsGodotDictionary<string, Variant>();
+		if (!playerTeam.TryGetValue("bases", out Variant basesValue)) return false;
+
+		var bases = basesValue.AsGodotDictionary<string, Variant>();
+		if (!bases.TryGetValue(
+			    missionCraft.HomeBaseIndex.ToString(),
+			    out Variant homeBaseValue))
+			return false;
+
+		var homeBase = homeBaseValue.AsGodotDictionary<string, Variant>();
+		if (!homeBase.TryGetValue("crafts", out Variant craftsValue)) return false;
+
+		var crafts = craftsValue.AsGodotArray<
+			Godot.Collections.Dictionary<string, Variant>>();
+		for (int i = 0; i < crafts.Count; i++)
+		{
+			var craftData = crafts[i];
+			if (!craftData.TryGetValue("index", out Variant indexValue) ||
+			    indexValue.AsInt32() != missionCraft.Index)
+				continue;
+
+			craftData["stationedUnits"] = recovery.RecoveredUnits;
+			craftData["stationedItems"] = recovery.RecoveredItems;
+			crafts[i] = craftData;
+			homeBase["crafts"] = crafts;
+			bases[missionCraft.HomeBaseIndex.ToString()] = homeBase;
+			playerTeam["bases"] = bases;
+			teamData[((int)Enums.UnitTeam.Player).ToString()] = playerTeam;
+			teamManagerData["teamData"] = teamData;
+				managers["GlobeTeamManager"] = teamManagerData;
+				root["managers"] = managers;
+				return true;
+		}
+
+		GD.PrintErr(
+			$"Could not apply mission recovery to craft {missionCraft.Index}.");
+		return false;
 	}
 
 	#endregion
@@ -617,24 +1054,119 @@ public partial class GameManager : Manager<GameManager>
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
-		return new Godot.Collections.Dictionary<string, Variant>
+		var data = new Godot.Collections.Dictionary<string, Variant>
 		{
 			["mapSize"] = mapSize,
 			["unitCounts"] = unitCounts,
 			["currentScene"] = (int)currentScene,
+			["isQuickBattle"] = _isQuickBattleSession,
 			["currentBase"] = currentBase?.Save(),
 			["currentBaseFunds"] = currentBaseFunds,
 			["currentTeamUnlockedItemIds"] = SaveCurrentTeamUnlockedItems(),
 			["currentTeamCompletedResearchIds"] = SaveCurrentTeamCompletedResearch(),
 		};
+
+		if (currentScene == GameScene.BattleScene &&
+		    !_isQuickBattleSession && currentMission != null &&
+		    SavesManager.Instance != null &&
+		    SavesManager.Instance.TryGetSessionData(
+			    "GlobeState",
+			    out Variant globeState))
+		{
+			data["battleMissionCellIndex"] = currentMission.cellIndex;
+			data["battleReturnGlobeState"] = globeState;
+		}
+		if (currentScene == GameScene.BattleScene)
+		{
+			InventoryGrid deploymentInventory = UIManager.Instance?
+				.GetWindow<StartingEuipmentUI>()?
+				.GetInventoryGrid(Enums.InventoryType.Ground);
+			if (deploymentInventory != null)
+				data["battleDeploymentInventory"] =
+					deploymentInventory.SaveContents();
+		}
+		if (_pendingBattlePlayerUnits != null)
+			data["pendingBattlePlayerUnits"] =
+				_pendingBattlePlayerUnits.Duplicate(true);
+
+		return data;
 	}
 
 	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
 		if (data == null) return Task.CompletedTask;
+		GameScene targetScene = currentScene;
+		_savedBattleDeploymentInventory = null;
+		if (targetScene == GameScene.BattleScene &&
+		    data.TryGetValue(
+			    "pendingBattlePlayerUnits",
+			    out Variant pendingUnitsValue) &&
+		    pendingUnitsValue.VariantType == Variant.Type.Array)
+		{
+			_pendingBattlePlayerUnits = pendingUnitsValue
+				.AsGodotArray<
+					Godot.Collections.Dictionary<string, Variant>>()
+				.Duplicate(true);
+		}
 		if (data.ContainsKey("mapSize")) mapSize = (Vector2I)data["mapSize"];
 		if (data.ContainsKey("unitCounts")) unitCounts = (Vector2I)data["unitCounts"];
 		if (data.ContainsKey("currentScene")) currentScene = (GameScene)(int)data["currentScene"];
+		bool savedBattleState = currentScene == GameScene.BattleScene;
+		bool hasSavedBattleMode = data.ContainsKey("isQuickBattle");
+		if (hasSavedBattleMode)
+			_isQuickBattleSession = data["isQuickBattle"].AsBool();
+
+		if (targetScene != GameScene.BattleScene)
+		{
+			currentMission = null;
+			_isQuickBattleSession = false;
+		}
+		else if (savedBattleState)
+		{
+			if (data.TryGetValue(
+				    "battleDeploymentInventory",
+				    out Variant deploymentInventoryValue) &&
+			    deploymentInventoryValue.VariantType == Variant.Type.Dictionary)
+			{
+				_savedBattleDeploymentInventory = deploymentInventoryValue
+					.AsGodotDictionary<string, Variant>();
+			}
+
+			Godot.Collections.Dictionary<string, Variant> battleReturnState = null;
+			if (data.TryGetValue(
+				    "battleReturnGlobeState",
+				    out Variant globeStateValue) &&
+			    globeStateValue.VariantType == Variant.Type.Dictionary)
+			{
+				battleReturnState = globeStateValue
+					.AsGodotDictionary<string, Variant>();
+				SavesManager.Instance?.SetSessionData(
+					"GlobeState",
+					globeStateValue);
+			}
+
+			currentMission = null;
+			if (battleReturnState != null &&
+			    data.TryGetValue(
+				    "battleMissionCellIndex",
+				    out Variant missionIndexValue) &&
+			    TryGetSavedMissionDefinition(
+				    battleReturnState,
+				    missionIndexValue.AsInt32(),
+				    out var savedMissionDefinition))
+			{
+				currentMission = RestoreBattleMission(savedMissionDefinition);
+			}
+
+			if (!_isQuickBattleSession && currentMission == null)
+			{
+				GD.PrintErr(
+					"The saved campaign mission could not be restored. Loading as a quick battle.");
+				_isQuickBattleSession = true;
+			}
+			else if (!hasSavedBattleMode)
+				_isQuickBattleSession = currentMission == null;
+		}
 		if (data.ContainsKey("currentBaseFunds")) currentBaseFunds = data["currentBaseFunds"].AsInt64();
 		LoadCurrentTeamUnlockedItems(data);
 		LoadCurrentTeamCompletedResearch(data);
@@ -662,6 +1194,143 @@ public partial class GameManager : Manager<GameManager>
 			AttachCurrentBaseTeamContext(teamContext);
 		}
 		return Task.CompletedTask;
+	}
+
+	private static bool TryGetSavedMissionDefinition(
+		Godot.Collections.Dictionary<string, Variant> globeState,
+		int cellIndex,
+		out Godot.Collections.Dictionary<string, Variant> missionDefinition)
+	{
+		missionDefinition = null;
+		if (globeState == null ||
+		    !globeState.TryGetValue("managers", out Variant managersValue))
+			return false;
+
+		var managers = managersValue.AsGodotDictionary<string, Variant>();
+		if (!managers.TryGetValue(
+			    "GlobeMissionManager",
+			    out Variant managerValue))
+			return false;
+
+		var managerData = managerValue.AsGodotDictionary<string, Variant>();
+		if (!managerData.TryGetValue(
+			    "activeMissions",
+			    out Variant missionsValue))
+			return false;
+
+		var missions = missionsValue.AsGodotDictionary<string, Variant>();
+		if (!missions.TryGetValue(cellIndex.ToString(), out Variant missionValue) ||
+		    missionValue.VariantType != Variant.Type.Dictionary)
+			return false;
+
+		missionDefinition = missionValue
+			.AsGodotDictionary<string, Variant>();
+		return true;
+	}
+
+	private static MissionCellDefinition RestoreBattleMission(
+		Godot.Collections.Dictionary<string, Variant> missionDefinitionData)
+	{
+		try
+		{
+			var missionData = missionDefinitionData["missionData"]
+				.AsGodotDictionary<string, Variant>();
+			string missionClass = missionDefinitionData["missionClass"].AsString();
+			int cellIndex = missionDefinitionData["cellIndex"].AsInt32();
+			Enums.MissionType missionType =
+				(Enums.MissionType)missionData["type"].AsInt32();
+			Enums.MissionRecoveryType recoveryType = missionData.TryGetValue(
+				"recoveryType",
+				out Variant recoveryValue)
+				? (Enums.MissionRecoveryType)recoveryValue.AsInt32()
+				: Enums.MissionRecoveryType.FullFieldOnSuccess;
+			string missionName = missionData.TryGetValue(
+				"name",
+				out Variant nameValue)
+				? nameValue.AsString()
+				: "Mission";
+			string missionDescription = missionData.TryGetValue(
+				"description",
+				out Variant descriptionValue)
+				? descriptionValue.AsString()
+				: string.Empty;
+			int difficulty = missionData.TryGetValue(
+				"difficulty",
+				out Variant difficultyValue)
+				? difficultyValue.AsInt32()
+				: 1;
+			int enemyCount = missionData["enemyCount"].AsInt32();
+
+			MissionBase mission = missionClass == nameof(EliminateMission)
+				? new EliminateMission(
+					missionName,
+					missionDescription,
+					missionType,
+					difficulty,
+					enemyCount,
+					cellIndex,
+					recoveryType)
+				: null;
+			if (mission == null) return null;
+			mission.RestoreScoring(missionData);
+
+			Craft onRouteCraft = null;
+			if (missionDefinitionData.TryGetValue(
+				    "onRouteCraft",
+				    out Variant craftValue) &&
+			    craftValue.VariantType == Variant.Type.Dictionary)
+			{
+				var craftData = craftValue.AsGodotDictionary<string, Variant>();
+				if (craftData.Count > 0)
+				{
+					onRouteCraft = new Craft();
+					onRouteCraft.Load(craftData);
+				}
+			}
+
+			Enums.MissionStatus status = missionDefinitionData.TryGetValue(
+				"missionStatus",
+				out Variant statusValue)
+				? (Enums.MissionStatus)statusValue.AsInt32()
+				: Enums.MissionStatus.None;
+			string definitionName = missionDefinitionData.TryGetValue(
+				"definitionName",
+				out Variant definitionNameValue)
+				? definitionNameValue.AsString()
+				: missionName;
+			int alienOperationId = missionDefinitionData.TryGetValue(
+				"alienOperationId",
+				out Variant operationValue)
+				? operationValue.AsInt32()
+				: -1;
+			int timeoutTime = missionDefinitionData.TryGetValue(
+				"timeoutTime",
+				out Variant timeoutValue)
+				? timeoutValue.AsInt32()
+				: 12;
+			int timeLeft = missionDefinitionData.TryGetValue(
+				"timeLeft",
+				out Variant timeLeftValue)
+				? timeLeftValue.AsInt32()
+				: timeoutTime;
+
+			var definition = new MissionCellDefinition(
+				cellIndex,
+				definitionName,
+				mission,
+				null,
+				status,
+				onRouteCraft,
+				alienOperationId);
+			definition.RestoreTimeoutState(timeoutTime, timeLeft);
+			definition.RestoreBattleResult(missionDefinitionData);
+			return definition;
+		}
+		catch (Exception exception)
+		{
+			GD.PrintErr($"Could not restore the battle mission: {exception.Message}");
+			return null;
+		}
 	}
 
 	#endregion

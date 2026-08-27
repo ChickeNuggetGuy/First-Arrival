@@ -29,6 +29,8 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 
 		foreach (Enums.InventoryType inventoryType in inventoryTypes)
 		{
+			if (InventoryGrids.ContainsKey(inventoryType)) continue;
+
 			InventoryGrid inventory = inventoryManager.GetInventoryGrid(inventoryType);
 			if (inventory == null)
 			{
@@ -168,11 +170,16 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 	{
 		var data = new Godot.Collections.Dictionary<string, Variant>();
 		
-		// Save the inventory types this grid object has
 		var inventoryTypesArray = new Godot.Collections.Array<int>();
 		foreach (var type in inventoryTypes)
 		{
-			inventoryTypesArray.Add((int)type);
+			if (!inventoryTypesArray.Contains((int)type))
+				inventoryTypesArray.Add((int)type);
+		}
+		foreach (var type in InventoryGrids.Keys)
+		{
+			if (!inventoryTypesArray.Contains((int)type))
+				inventoryTypesArray.Add((int)type);
 		}
 		data.Add("inventory_types", inventoryTypesArray);
 		
@@ -182,31 +189,9 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 		{
 			var inventoryType = kvp.Key;
 			var inventoryGrid = kvp.Value;
-			
-			var inventoryData = new Godot.Collections.Dictionary<string, Variant>();
-			
-			// Save items in the inventory
-			var itemsData = new Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>();
-			for (int x = 0; x < inventoryGrid.Items.GetLength(0); x++)
-			{
-				for (int y = 0; y < inventoryGrid.Items.GetLength(1); y++)
-				{
-					var itemData = inventoryGrid.Items[x, y];
-					if (itemData.item != null)
-					{
-						var itemEntry = new Godot.Collections.Dictionary<string, Variant>();
-						itemEntry.Add("x", x);
-						itemEntry.Add("y", y);
-						itemEntry.Add("count", itemData.count);
-						itemEntry.Add("item_name", itemData.item.ItemData.ItemName);
-						itemEntry.Add("item_id", itemData.item.ItemData.ItemID);
-						itemsData.Add(itemEntry);
-					}
-				}
-			}
-			
-			inventoryData.Add("items", itemsData);
-			inventoriesData.Add(inventoryType.ToString(), inventoryData);
+			inventoriesData.Add(
+				inventoryType.ToString(),
+				inventoryGrid.SaveContents());
 		}
 		
 		data.Add("inventories", inventoriesData);
@@ -215,22 +200,59 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 
 	public override void Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		// Clear existing inventories
+		var configuredTypes = new Godot.Collections.Array<Enums.InventoryType>();
+		foreach (Enums.InventoryType type in inventoryTypes)
+		{
+			if (!configuredTypes.Contains(type)) configuredTypes.Add(type);
+		}
+
+		foreach (InventoryGrid inventory in InventoryGrids.Values)
+		{
+			foreach ((Item item, int _) in inventory.UniqueItems)
+			{
+				if (item == null) continue;
+				InventoryOnItemRemoved(inventory, item);
+				item.currentGrid = null;
+				item.QueueFree();
+			}
+			inventory.ItemAdded -= InventoryOnItemAdded;
+			inventory.ItemRemoved -= InventoryOnItemRemoved;
+		}
 		InventoryGrids.Clear();
 		inventoryTypes.Clear();
-		
-		// Load inventory types
+
 		if (data.ContainsKey("inventory_types"))
 		{
-			var inventoryTypesArray = (Godot.Collections.Array<int>)data["inventory_types"];
+			var inventoryTypesArray = data["inventory_types"]
+				.AsGodotArray<int>();
 			foreach (int typeValue in inventoryTypesArray)
 			{
 				var inventoryType = (Enums.InventoryType)typeValue;
-				inventoryTypes.Add(inventoryType);
+				if (inventoryType != Enums.InventoryType.None &&
+				    !inventoryTypes.Contains(inventoryType))
+					inventoryTypes.Add(inventoryType);
 			}
 		}
-		
-		// Re-setup inventories from types
+
+		if (data.ContainsKey("inventories"))
+		{
+			var savedInventories = data["inventories"]
+				.AsGodotDictionary<string, Variant>();
+			foreach (string typeName in savedInventories.Keys)
+			{
+				if (Enum.TryParse(typeName, out Enums.InventoryType savedType) &&
+				    savedType != Enums.InventoryType.None &&
+				    !inventoryTypes.Contains(savedType))
+					inventoryTypes.Add(savedType);
+			}
+		}
+
+		foreach (Enums.InventoryType configuredType in configuredTypes)
+		{
+			if (!inventoryTypes.Contains(configuredType))
+				inventoryTypes.Add(configuredType);
+		}
+
 		InventoryManager inventoryManager = InventoryManager.Instance;
 		if (inventoryManager != null)
 		{
@@ -240,11 +262,12 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 				if (inventory != null)
 				{
 					InventoryGrids.Add(inventoryType, inventory);
+					inventory.ItemAdded += InventoryOnItemAdded;
+					inventory.ItemRemoved += InventoryOnItemRemoved;
 				}
 			}
 		}
 		
-		// Load inventory contents
 		if (data.ContainsKey("inventories"))
 		{
 			var inventoriesData = (Godot.Collections.Dictionary<string, Variant>)data["inventories"];
@@ -254,39 +277,10 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 				var inventoryType = (Enums.InventoryType)Enum.Parse(typeof(Enums.InventoryType), inventoryEntry.Key);
 				var inventoryData = (Godot.Collections.Dictionary<string, Variant>)inventoryEntry.Value;
 				
-				if (InventoryGrids.TryGetValue(inventoryType, out var inventoryGrid) && 
-				    inventoryData.ContainsKey("items"))
-				{
-					var itemsData = (Godot.Collections.Array<Godot.Collections.Dictionary<string, Variant>>)inventoryData["items"];
-					
-					foreach (var itemEntry in itemsData)
-					{
-						int x = (int)itemEntry["x"];
-						int y = (int)itemEntry["y"];
-						int count = (int)itemEntry["count"];
-						var itemData = InventoryManager.Instance.GetItemData(itemEntry["item_id"].AsInt32());
-							
-						if (itemData != null)
-						{
-							Item item = ItemData.CreateItem(itemData);
-							if (item != null)
-							{
-								// Directly set the item in the grid
-								inventoryGrid.Items[x, y] = (item, count);
-								item.currentGrid = inventoryGrid;
-							}
-						}
-					}
-					
-					// Mark cache as dirty since we've modified items directly
-					var uniqueItemsField = inventoryGrid.GetType().GetField("_uniqueItemsCache", 
-						System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-					var isCacheDirtyField = inventoryGrid.GetType().GetField("_isCacheDirty", 
-						System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-					
-					if (uniqueItemsField != null) uniqueItemsField.SetValue(inventoryGrid, null);
-					if (isCacheDirtyField != null) isCacheDirtyField.SetValue(inventoryGrid, true);
-				}
+				if (InventoryGrids.TryGetValue(
+					    inventoryType,
+					    out var inventoryGrid))
+					inventoryGrid.LoadContents(inventoryData);
 			}
 		}
 	}

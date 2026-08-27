@@ -1166,6 +1166,32 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 
 	public GlobeTeamHolder GetTeamData(Enums.UnitTeam team) => teamData.GetValueOrDefault(team, null);
 
+	/// <summary>
+	/// Returns whether a team currently owns a valid craft that can be dispatched
+	/// or rerouted from the globe UI.
+	/// </summary>
+	public bool HasAvailableCraft(
+		Enums.UnitTeam team,
+		bool requireDeployableUnits = false)
+	{
+		GlobeTeamHolder teamHolder = GetTeamData(team);
+		if (teamHolder?.Bases == null || teamHolder.Bases.Count == 0) return false;
+
+		foreach (TeamBaseCellDefinition baseDefinition in teamHolder.Bases)
+		{
+			if (baseDefinition == null) continue;
+			foreach (Craft craft in baseDefinition.CraftList)
+			{
+				if (craft != null &&
+				    craft.Status != Enums.CraftStatus.None &&
+				    (!requireDeployableUnits || craft.HasDeployableUnits))
+					return true;
+			}
+		}
+
+		return false;
+	}
+
 	public ResearchDatabase GetResearchDatabase() => researchDatabase;
 	
 	public void SetSendCraftMode(bool value, GlobeTeamHolder teamHolder, Craft craft)

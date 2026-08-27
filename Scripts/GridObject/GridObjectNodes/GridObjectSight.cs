@@ -110,10 +110,20 @@ public partial class GridObjectSight : GridObjectNode
 
         var newlySeenObjects = new List<GridObject>();
 
-        // Rotation actions animate visualMesh, so its world basis is the
-        // authoritative visual/gameplay facing when one is present.
-        Node3D facingNode = parentGridObject.visualMesh ?? parentGridObject;
-        Vector3 forwardVector = facingNode.GlobalBasis.Z.Normalized();
+        // Gameplay direction is committed at every 45-degree rotation step.
+        // Reading the animated mesh here can return the previous transform in
+        // the same frame as DirectionChanged, causing intermediate sight cones
+        // (for example NorthWest while turning West -> North) to be skipped.
+        Vector3 forwardVector =
+            RotationHelperFunctions.GetWorldVector3FromDirection(
+                parentGridObject.GridPositionData.Direction
+            );
+
+        if (forwardVector == Vector3.Zero)
+        {
+            Node3D facingNode = parentGridObject.visualMesh ?? parentGridObject;
+            forwardVector = facingNode.GlobalBasis.Z.Normalized();
+        }
 
         var mainConeCells = gridSystem.GetGridCellsInCone(
             startCell,

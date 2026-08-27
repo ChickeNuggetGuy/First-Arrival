@@ -7,10 +7,11 @@
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="4_mhktt"]
 [ext_resource type="Resource" uid="uid://c60t0n1umx56j" path="res://Data/Research/Projects/SquadAutomaticWeapons.tres" id="4_prerequisite"]
 [ext_resource type="Script" uid="uid://faog0y12544p" path="res://Scripts/ResearchSystem/ResearchResults/GrantPointsResult.cs" id="7_0xsr1"]
+[ext_resource type="Resource" uid="uid://cpluvr615efv6" path="res://Data/Items/Ammo_7_62Belt_Item.tres" id="8_ammo"]
 
 [sub_resource type="Resource" id="Unlock"]
 script = ExtResource("2_unlock")
-UnlockedItems = Array[ExtResource("4_mhktt")]([ExtResource("3_item")])
+UnlockedItems = Array[ExtResource("4_mhktt")]([ExtResource("3_item"), ExtResource("8_ammo")])
 
 [sub_resource type="Resource" id="Resource_xby08"]
 script = ExtResource("7_0xsr1")

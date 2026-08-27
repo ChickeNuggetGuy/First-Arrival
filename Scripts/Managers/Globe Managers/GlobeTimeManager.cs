@@ -15,7 +15,6 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		get => _timeSpeed;
 		set => SetTimeSpeed(value);
 	}
-	[Export] private Label currentTimeUI;
 	[Export(PropertyHint.Range, "1,3600,1,or_greater")]
 	private double simulatedSecondsPerRealSecond = 20.0;
 
@@ -123,7 +122,6 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		secondsOfDay = (CurrentHour * 3600) + (CurrentMinute * 60) + CurrentSeconds;
 		accumulatedSimulatedSeconds = 0.0;
 
-		UpdateUI();
 		return Task.CompletedTask;
 	}
 
@@ -170,7 +168,6 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		secondsOfDay = (CurrentHour * 3600) + (CurrentMinute * 60) + CurrentSeconds;
 		accumulatedSimulatedSeconds = 0.0;
 		RecomputeDerivedDateFields();
-		UpdateUI();
 		return Task.CompletedTask;
 	}
 
@@ -192,7 +189,6 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		accumulatedSimulatedSeconds -= wholeSeconds;
 		AdvanceTimeBySeconds(wholeSeconds);
 
-		UpdateUI();
 		EmitSignal(
 			SignalName.TimeChanged,
 			CurrentHour,
@@ -297,15 +293,6 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		}
 
 		CurrentDayOfYear = doy + CurrentDayOfMonth;
-	}
-
-	private void UpdateUI()
-	{
-		if (currentTimeUI == null) return;
-
-		currentTimeUI.Text =
-			$"Current Time: {CurrentHour:D2}:{CurrentMinute:D2}:{CurrentSeconds:D2}\n" +
-			$"Date: {CurrentMonth} {CurrentDayOfMonth:D2}, {CurrentYear}";
 	}
 
 	private void UpdateSunLight(double delta)

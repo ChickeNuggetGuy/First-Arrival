@@ -43,6 +43,21 @@ public partial class MainMenuUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this, 20);
+		MissionUITheme.StyleFirstTitle(this, 36);
+
+		Label creditLabel = GetNodeOrNull<Label>(
+			"Panel/MarginContainer/VBoxContainer/Label2");
+		if (creditLabel != null)
+		{
+			creditLabel.LabelSettings = null;
+			creditLabel.AddThemeFontSizeOverride("font_size", 16);
+			creditLabel.AddThemeColorOverride(
+				"font_color",
+				MissionUITheme.MutedTextColor);
+		}
+
 		return Task.CompletedTask;
 	}
 

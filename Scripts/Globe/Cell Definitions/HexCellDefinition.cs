@@ -1,8 +1,10 @@
 using Godot;
 using System;
+using System.Collections.Generic;
+using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
-public partial class HexCellDefinition
+public partial class HexCellDefinition : IContextUserBase
 {
 	public string definitionName;
 	public int cellIndex;
@@ -24,6 +26,35 @@ public partial class HexCellDefinition
 		this.cellIndex = cellIndex;
 		this.definitionName = name;
 		StartsHidden = startsHidden;
+	}
+
+	/// <summary>
+	/// Actions shared by every defined globe cell. More specialized definitions
+	/// extend this list with their own gameplay actions.
+	/// </summary>
+	public virtual Dictionary<string, Callable> GetContextActions()
+	{
+		var actions = new Dictionary<string, Callable>();
+		if (cellIndex >= 0)
+		{
+			int targetCellIndex = cellIndex;
+			actions.Add("Focus", Callable.From(() =>
+			{
+				if (OrbitalCamera.Instance != null)
+					_ = OrbitalCamera.Instance.FocusOnCell(targetCellIndex);
+			}));
+			GlobeTeamManager teamManager = GlobeTeamManager.Instance;
+			if (teamManager?.HasAvailableCraft(Enums.UnitTeam.Player) == true)
+			{
+				actions.Add("Send Craft There", Callable.From(() =>
+				{
+					UIManager.Instance?.GetWindow<SelectCraftUI>()?.ShowForDestination(
+						targetCellIndex);
+				}));
+			}
+		}
+
+		return actions;
 	}
 
 	public bool IsVisibleTo(Enums.UnitTeam team)

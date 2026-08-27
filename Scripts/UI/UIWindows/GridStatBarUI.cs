@@ -26,14 +26,10 @@ public partial class GridStatBarUI : UIElement
 			return;
 		}
 
-		var sb = new StyleBoxFlat
-		{
-			BgColor = Enums.statColors.TryGetValue(stat, out Color color)
-				? color
-				: Colors.Black
-		};
-
-		statBar.AddThemeStyleboxOverride("fill", sb);
+		Color color = Enums.statColors.TryGetValue(stat, out Color statColor)
+			? statColor
+			: MissionUITheme.AccentColor;
+		MissionUITheme.StyleProgressBar(statBar, color);
 		_overlay ??= new StatProgressBarOverlay(statBar);
 	}
 

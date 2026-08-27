@@ -6,4 +6,4 @@
 script = ExtResource("1_y2t3e")
 ItemID = 5
 ItemName = "New Craft"
-ActionDefinitions = null
+ActionDefinitions = []

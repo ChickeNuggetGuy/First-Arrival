@@ -207,6 +207,28 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	}
 
 	/// <summary>
+	/// Creates a mission requested by the story system. It is deliberately not
+	/// associated with a GlobeAIManager operation, so resolving it cannot alter an
+	/// unrelated alien operation that happens to share the same numeric id.
+	/// </summary>
+	public bool TryCreateStoryMission(
+		int targetCellIndex,
+		Enums.MissionType missionType,
+		int difficulty,
+		string missionName)
+	{
+		HexCellData? cell = GlobeHexGridManager.Instance?.GetCellFromIndex(
+			targetCellIndex,
+			excludeWater: true);
+		return cell.HasValue && TryCreateMission(
+			cell.Value,
+			missionType,
+			difficulty,
+			alienOperationId: -1,
+			string.IsNullOrWhiteSpace(missionName) ? "Story Mission" : missionName);
+	}
+
+	/// <summary>
 	/// Creates a landing mission from a local-authority report. This deliberately
 	/// does not consult craft detection: countries can reveal the incident while
 	/// the UFO itself remains hidden from the player.
@@ -255,7 +277,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 		if (unresolvedMissionCount >= maxActiveMissions)
 			return false;
 
-		MissionBase mission = GenerateRandomMission(cell.Index, missionType, difficulty);
+		MissionBase mission = GenerateRandomMission(cell.Index, missionType, "New Mission TEST","Alien Activity sighted", difficulty);
         if (mission == null)
             return false;
 
@@ -275,6 +297,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     }
 
     public MissionBase GenerateRandomMission(int cellIndex, Enums.MissionType missionType = Enums.MissionType.None,
+	    string name = "", string description = "",
         int difficulty = -1)
     {
         int enemyCount;
@@ -305,7 +328,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         else
             enemyCount = GD.RandRange(4, 10);
 
-        return new EliminateMission(missionType, enemyCount, cellIndex);
+        return new EliminateMission(name, description, missionType, difficulty, enemyCount, cellIndex);
     }
 
 	/// <summary>
@@ -326,10 +349,18 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	}
     
 
-    public void LoadMissionScene(MissionCellDefinition missionDefinition)
+    public async Task<bool> LoadMissionScene(MissionCellDefinition missionDefinition)
     {
-	    // Save the complete Globe state before leaving
-	    SavesManager.Instance.SetSessionData("GlobeState", SavesManager.Instance.GetSceneTransitionState());
+	    if (missionDefinition?.mission == null ||
+	        missionDefinition.onRouteCraft?.HasDeployableUnits != true ||
+	        SavesManager.Instance == null ||
+	        GameManager.Instance == null)
+		    return false;
+
+	    Enums.MissionStatus previousStatus = missionDefinition.missionStatus;
+	    var globeState = SavesManager.Instance.GetSceneTransitionState()
+		    .Duplicate(true);
+	    SavesManager.Instance.SetSessionData("GlobeState", globeState);
 
 	    // Snapshot the craft payload before its globe-scene unit nodes are freed.
 	    GameManager.Instance.PrepareBattleLoadout(missionDefinition.onRouteCraft);
@@ -349,11 +380,89 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    SavesManager.PendingSaveData = null;
 	    SavesManager.PendingSaveName = "";
 
-	    GameManager.Instance.TryChangeScene(
-		    GameManager.GameScene.BattleScene,
-		    saveManagerData: false  
-	    );
+	    bool changed = false;
+	    try
+	    {
+		    changed = await GameManager.Instance.TryChangeScene(
+			    GameManager.GameScene.BattleScene,
+			    saveManagerData: false);
+	    }
+	    catch (Exception exception)
+	    {
+		    GD.PrintErr(
+			    $"The mission battle could not finish loading: {exception.Message}");
+	    }
+
+	    if (changed) return true;
+	    GameManager.Instance.ClearPendingBattleLoadout();
+	    GameManager.Instance.currentMission = null;
+
+	    if (GodotObject.IsInstanceValid(this) && IsInsideTree())
+	    {
+		    Craft craft = missionDefinition.onRouteCraft;
+		    missionDefinition.SetOnRouteCraft(null);
+		    missionDefinition.missionStatus = previousStatus & ~(
+			    Enums.MissionStatus.Visited |
+			    Enums.MissionStatus.OnRoute);
+		    craft?.GoToBase();
+		    return false;
+	    }
+
+	    ResetFailedMissionLaunch(globeState, missionDefinition.cellIndex);
+	    SavesManager.PendingSaveData = globeState;
+	    SavesManager.LoadFromAutosave = false;
+	    try
+	    {
+		    await GameManager.Instance.ChangeSceneAsync(
+			    GameManager.GameScene.GlobeScene,
+			    true);
+	    }
+	    catch (Exception exception)
+	    {
+		    SavesManager.PendingSaveData = null;
+		    GD.PrintErr(
+			    $"The globe scene could not be restored: {exception.Message}");
+	    }
+	    return false;
     }
+
+	private static void ResetFailedMissionLaunch(
+		Godot.Collections.Dictionary<string, Variant> root,
+		int cellIndex)
+	{
+		if (root == null ||
+		    !root.TryGetValue("managers", out Variant managersValue))
+			return;
+		var managers = managersValue.AsGodotDictionary<string, Variant>();
+		if (!managers.TryGetValue(
+			    "GlobeMissionManager",
+			    out Variant missionManagerValue))
+			return;
+		var managerData = missionManagerValue
+			.AsGodotDictionary<string, Variant>();
+		if (!managerData.TryGetValue(
+			    "activeMissions",
+			    out Variant missionsValue))
+			return;
+		var missions = missionsValue.AsGodotDictionary<string, Variant>();
+		if (!missions.TryGetValue(cellIndex.ToString(), out Variant missionValue))
+			return;
+
+		var missionData = missionValue.AsGodotDictionary<string, Variant>();
+		Enums.MissionStatus status = missionData.TryGetValue(
+			"missionStatus",
+			out Variant statusValue)
+			? (Enums.MissionStatus)statusValue.AsInt32()
+			: Enums.MissionStatus.None;
+		status &= ~(Enums.MissionStatus.Visited | Enums.MissionStatus.OnRoute);
+		missionData["missionStatus"] = (int)status;
+		missionData["onRouteCraft"] =
+			new Godot.Collections.Dictionary<string, Variant>();
+		missions[cellIndex.ToString()] = missionData;
+		managerData["activeMissions"] = missions;
+		managers["GlobeMissionManager"] = managerData;
+		root["managers"] = managers;
+	}
 
 
     private Node3D SpawnMissionVisual(HexCellData cell, string name)
@@ -404,7 +513,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     /// </summary>
     public void ResolveMission(MissionCellDefinition missionDefinition)
     {
-	    if (missionDefinition == null) return;
+	    if (missionDefinition == null ||
+	        !_activeMissions.TryGetValue(
+		        missionDefinition.cellIndex,
+		        out MissionCellDefinition activeMission) ||
+	        activeMission != missionDefinition)
+		    return;
 
         GlobeTeamManager teamManager = GlobeTeamManager.Instance;
         GlobeTeamHolder playerTeam = teamManager?.GetTeamData(Enums.UnitTeam.Player);
@@ -414,11 +528,8 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			GlobeAIManager.Instance?.ResolveOperation(
 				missionDefinition.alienOperationId,
 				outcome);
-		if (playerTeam != null && outcome != Enums.MissionStatus.None &&
-            missionDefinition.scoreChange.TryGetValue(outcome, out int scoreChange))
-        {
-            playerTeam.AddMonthlyScore(scoreChange, GetMonthlyScoreReason(outcome));
-        }
+		if (playerTeam != null && outcome != Enums.MissionStatus.None)
+			ApplyMissionRewards(playerTeam, missionDefinition, outcome);
 
         if (outcome == Enums.MissionStatus.Failed)
 	        ApplyFailedMissionOpinionPenalty(missionDefinition);
@@ -427,25 +538,67 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			? null
 			: FindMissionCraft(playerTeam, missionDefinition.onRouteCraft);
         
-        if (craft != null)
-        {
-	        if (craft.CurrentCellIndex != craft.HomeBaseIndex)
-	        {
-		        TeamBaseCellDefinition homeBase = craft.GetBaseCellDefinition();
-		        if (homeBase == null)
-			        return;
+		if (craft != null && craft.CurrentCellIndex != craft.HomeBaseIndex)
+		{
+			TeamBaseCellDefinition homeBase = craft.GetBaseCellDefinition();
+			if (homeBase != null)
+			{
+				_ = homeBase.SendCraft(
+					craft.CurrentCellIndex,
+					craft.HomeBaseIndex,
+					craft,
+					teamManager);
+			}
+		}
 
-		        _ = homeBase.SendCraft(
-			        craft.CurrentCellIndex,
-			        craft.HomeBaseIndex,
-			        craft,
-			        teamManager
-		        );
-	        }
-        }
-        
-        RemoveMissionDefinition(missionDefinition);
-    }
+		RemoveMissionDefinition(missionDefinition);
+	}
+
+	private static void ApplyMissionRewards(
+		GlobeTeamHolder playerTeam,
+		MissionCellDefinition missionDefinition,
+		Enums.MissionStatus outcome)
+	{
+		if (missionDefinition.HasBattleResult)
+		{
+			MissionScoreBreakdown score = missionDefinition.BattleScore;
+			AddScore(
+				playerTeam,
+				score.EnemyKillPoints,
+				Enums.MonthlyScoreReason.EnemyUnitsKilled);
+			AddScore(
+				playerTeam,
+				score.UnitLossPoints,
+				Enums.MonthlyScoreReason.PlayerUnitsLost);
+			AddScore(
+				playerTeam,
+				score.OutcomePoints,
+				GetMonthlyScoreReason(outcome));
+
+			if (missionDefinition.RecoverySaleProceeds > 0)
+				playerTeam.ChangeFunds(
+					missionDefinition.RecoverySaleProceeds,
+					"Recovered equipment sales");
+			return;
+		}
+
+		int outcomeScore = missionDefinition.mission != null
+			? missionDefinition.mission.GetOutcomePoints(outcome)
+			: missionDefinition.scoreChange.TryGetValue(
+				outcome,
+				out int legacyScore)
+				? legacyScore
+				: 0;
+		AddScore(playerTeam, outcomeScore, GetMonthlyScoreReason(outcome));
+	}
+
+	private static void AddScore(
+		GlobeTeamHolder playerTeam,
+		int score,
+		Enums.MonthlyScoreReason reason)
+	{
+		if (score != 0) playerTeam.AddMonthlyScore(score, reason);
+	}
 
 	private void ApplyFailedMissionOpinionPenalty(
 		MissionCellDefinition missionDefinition)
@@ -487,8 +640,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    {
 		    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Successful))
 			    return Enums.MissionStatus.Successful;
+		    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Aborted))
+			    return Enums.MissionStatus.Aborted;
 		    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Failed))
 			    return Enums.MissionStatus.Failed;
+		    if (mission.missionStatus.HasFlag(Enums.MissionStatus.Timeout))
+			    return Enums.MissionStatus.Timeout;
 	    }
 	    else if (mission.timeLeft <= 0)
 	    {
@@ -501,10 +658,11 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     {
 	    return outcome switch
 	    {
-		    Enums.MissionStatus.Successful => Enums.MonthlyScoreReason.SuccessfulMission,
-		    Enums.MissionStatus.Failed => Enums.MonthlyScoreReason.FailedMission,
-		    Enums.MissionStatus.Timeout => Enums.MonthlyScoreReason.ExpiredMission,
-		    _ => Enums.MonthlyScoreReason.None
+			Enums.MissionStatus.Successful => Enums.MonthlyScoreReason.SuccessfulMission,
+			Enums.MissionStatus.Failed => Enums.MonthlyScoreReason.FailedMission,
+			Enums.MissionStatus.Timeout => Enums.MonthlyScoreReason.ExpiredMission,
+			Enums.MissionStatus.Aborted => Enums.MonthlyScoreReason.AbandonedMission,
+			_ => Enums.MonthlyScoreReason.None
 	    };
     }
 
@@ -601,8 +759,22 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 				: "New Mission";
 
             MissionBase mission = null;
+
             Enums.MissionType type = (Enums.MissionType)mData["type"].AsInt32();
+			Enums.MissionRecoveryType recoveryType = mData.ContainsKey("recoveryType")
+				? (Enums.MissionRecoveryType)mData["recoveryType"].AsInt32()
+				: Enums.MissionRecoveryType.FullFieldOnSuccess;
+			string missionName = mData.ContainsKey("name")
+				? mData["name"].AsString()
+				: "Mission";
+			string missionDescription = mData.ContainsKey("description")
+				? mData["description"].AsString()
+				: string.Empty;
+			int difficulty = mData.ContainsKey("difficulty")
+				? mData["difficulty"].AsInt32()
+				: 1;
             Enums.MissionStatus status = (Enums.MissionStatus)mDefData["missionStatus"].AsInt32();
+
 			int timeoutTime = mDefData.ContainsKey("timeoutTime")
 				? mDefData["timeoutTime"].AsInt32()
 				: 12;
@@ -626,11 +798,19 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 
             if (className == nameof(EliminateMission))
             {
-                mission = new EliminateMission(type, count, cellIdx);
+                mission = new EliminateMission(
+	                missionName,
+	                missionDescription,
+	                type,
+	                difficulty,
+	                count,
+	                cellIdx,
+	                recoveryType);
             }
 
-            if (mission != null)
-            {
+			if (mission != null)
+			{
+				mission.RestoreScoring(mData);
 				var missionDefinition = new MissionCellDefinition(
 					cellIdx,
 					definitionName,
@@ -638,11 +818,11 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 					null,
 					status,
 					onRouteCraft,
-					alienOperationId
-				);
+					alienOperationId);
 				missionDefinition.RestoreTimeoutState(timeoutTime, timeLeft);
+				missionDefinition.RestoreBattleResult(mDefData);
 				_activeMissions.Add(cellIdx, missionDefinition);
-            }
+			}
         }
         return Task.CompletedTask;
     }

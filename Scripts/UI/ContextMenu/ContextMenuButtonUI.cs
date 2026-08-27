@@ -18,6 +18,6 @@ public partial class ContextMenuButtonUI : Button
 	private void OnPressed()
 	{
 		callable.Call();
-		contextMenuUI.HideCall();
+		_ = contextMenuUI.HideCall();
 	}
 }

@@ -21,6 +21,10 @@ public partial class EquipCraftUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this);
+		MissionUITheme.StyleFirstTitle(this, 24);
+		MissionUITheme.NormalizeButtonText(this);
 		if (renameButton != null)
 		{
 			renameButton.Pressed += RenameButtonOnPressed;

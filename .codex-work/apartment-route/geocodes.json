@@ -1,0 +1,142 @@
+[
+  {
+    "id": "approx_start",
+    "name": "Approximate US-183 / Anderson Mill start",
+    "query": "US 183 and Anderson Mill Road, Austin, TX 78750",
+    "candidates": []
+  },
+  {
+    "id": "alma",
+    "name": "Alma Apartments",
+    "query": "Alma Apartments, 9220 N Interstate Highway 35, Austin, TX 78753",
+    "candidates": []
+  },
+  {
+    "id": "keystone",
+    "name": "Keystone Apartments",
+    "query": "Keystone Apartments, 5230 Thunder Creek Rd, Austin, TX 78759",
+    "candidates": [
+      {
+        "place_id": 315488727,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 383167606,
+        "lat": "30.4163715",
+        "lon": "-97.7443001",
+        "category": "office",
+        "type": "property_management",
+        "place_rank": 30,
+        "importance": 0.00007494392309448413,
+        "addresstype": "office",
+        "name": "Keystone Apartments leasing office",
+        "display_name": "Keystone Apartments leasing office, 5230, Thunder Creek Road, Austin, Travis County, Texas, 78759, United States",
+        "address": {
+          "office": "Keystone Apartments leasing office",
+          "house_number": "5230",
+          "road": "Thunder Creek Road",
+          "city": "Austin",
+          "county": "Travis County",
+          "state": "Texas",
+          "ISO3166-2-lvl4": "US-TX",
+          "postcode": "78759",
+          "country": "United States",
+          "country_code": "us"
+        },
+        "boundingbox": [
+          "30.4162652",
+          "30.4164524",
+          "-97.7444129",
+          "-97.7441873"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "copperline",
+    "name": "Copperline at Village Oaks",
+    "query": "Copperline at Village Oaks, 9811 Copper Creek Dr, Austin, TX 78729",
+    "candidates": []
+  },
+  {
+    "id": "san_gabriel",
+    "name": "San Gabriel Square Apartments",
+    "query": "San Gabriel Square Apartments, 2212 San Gabriel St, Austin, TX 78705",
+    "candidates": []
+  },
+  {
+    "id": "chevy_chase",
+    "name": "Chevy Chase Downs",
+    "query": "Chevy Chase Downs, 2504 Huntwick Dr, Austin, TX 78741",
+    "candidates": []
+  },
+  {
+    "id": "creeks_edge",
+    "name": "Creeks Edge Apartments",
+    "query": "Creeks Edge Apartments, 1124 Rutland Dr, Austin, TX 78758",
+    "candidates": []
+  },
+  {
+    "id": "the_brook",
+    "name": "The Brook Apartments",
+    "query": "The Brook Apartments, 1824 S Interstate 35, Austin, TX 78704",
+    "candidates": []
+  },
+  {
+    "id": "bridge_south",
+    "name": "Bridge at South Point",
+    "query": "Bridge at South Point, 6808 S Interstate 35, Austin, TX 78745",
+    "candidates": []
+  },
+  {
+    "id": "walnut",
+    "name": "Walnut Creek Crossing",
+    "query": "Walnut Creek Crossing, 2000 Cedar Bend Dr, Austin, TX 78758",
+    "candidates": []
+  },
+  {
+    "id": "wildwood",
+    "name": "Wildwood Apartments",
+    "query": "Wildwood Apartments, 7610 Cameron Rd, Austin, TX 78752",
+    "candidates": []
+  },
+  {
+    "id": "patton",
+    "name": "1706 Patton Lane #102",
+    "query": "1706 Patton Ln, Austin, TX 78723",
+    "candidates": [
+      {
+        "place_id": 400770696,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "way",
+        "osm_id": 15409989,
+        "lat": "30.3191163",
+        "lon": "-97.6892395",
+        "category": "place",
+        "type": "house",
+        "place_rank": 30,
+        "importance": 0.00000999999999995449,
+        "addresstype": "place",
+        "name": "",
+        "display_name": "1706, Patton Lane, Windsor Park, Austin, Travis County, Texas, 78723, United States",
+        "address": {
+          "house_number": "1706",
+          "road": "Patton Lane",
+          "neighbourhood": "Windsor Park",
+          "city": "Austin",
+          "county": "Travis County",
+          "state": "Texas",
+          "ISO3166-2-lvl4": "US-TX",
+          "postcode": "78723",
+          "country": "United States",
+          "country_code": "us"
+        },
+        "boundingbox": [
+          "30.3190663",
+          "30.3191663",
+          "-97.6892895",
+          "-97.6891895"
+        ]
+      }
+    ]
+  }
+]

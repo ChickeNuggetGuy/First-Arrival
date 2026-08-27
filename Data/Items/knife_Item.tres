@@ -12,7 +12,7 @@ damage = 28
 
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("2_shape")
-SizeZ = 2
+SizeX = 2
 OccupiedCells = Array[bool]([true, true])
 
 [resource]

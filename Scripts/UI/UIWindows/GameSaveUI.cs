@@ -17,6 +17,9 @@ public partial class GameSaveUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this);
+		MissionUITheme.StyleFirstTitle(this, 22);
 		if(!_saveButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(SaveButtonOnPressed)))
 			_saveButton.Pressed += SaveButtonOnPressed;
 		

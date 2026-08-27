@@ -101,6 +101,7 @@ public partial class SavesManager : Manager<SavesManager>
     /// </summary>
     public async Task<bool> LoadSaveAsync(string saveName)
     {
+        string previousSaveName = currentSavename;
         string fullName = saveName.EndsWith(SaveExt) ? saveName : saveName + SaveExt;
         string path = saveDir.PathJoin(fullName);
 
@@ -120,15 +121,26 @@ public partial class SavesManager : Manager<SavesManager>
             if (root.TryGetValue("scene", out var sceneVar) &&
                 Enum.TryParse<GameManager.GameScene>(sceneVar.AsString(), out var scene))
             {
-                // Route through GameManager to handle scene change and manager discovery
-                await GameManager.Instance.ChangeSceneAsync(scene, true);
-                return true;
+                bool changed = await GameManager.Instance.ChangeSceneAsync(scene, true);
+                if (!changed)
+                {
+                    PendingSaveData = null;
+                    PendingSaveName = "";
+                    currentSavename = previousSaveName;
+                }
+                return changed;
             }
         }
         catch (Exception e)
         {
+            PendingSaveData = null;
+            PendingSaveName = "";
+            currentSavename = previousSaveName;
             GD.PrintErr($"LoadSaveAsync failed: {e.Message}");
         }
+        PendingSaveData = null;
+        PendingSaveName = "";
+        currentSavename = previousSaveName;
         return false;
     }
 

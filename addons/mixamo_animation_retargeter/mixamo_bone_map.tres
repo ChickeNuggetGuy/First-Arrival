@@ -1,4 +1,4 @@
-[gd_resource type="BoneMap" load_steps=2 format=3 uid="uid://b1olt0r5ogiu2"]
+[gd_resource type="BoneMap" format=3 uid="uid://b1olt0r5ogiu2"]
 
 [sub_resource type="SkeletonProfileHumanoid" id="SkeletonProfileHumanoid_w5guw"]
 

@@ -14,6 +14,6 @@ public partial class MissionCellVisual : CellDefinitionVisual
 
 	public override Dictionary<string, Callable> GetContextActions()
 	{
-		throw new NotImplementedException();
+		return base.GetContextActions();
 	}
 }

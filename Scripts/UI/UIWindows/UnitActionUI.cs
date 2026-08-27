@@ -22,6 +22,13 @@ public partial class UnitActionUI : UIWindow
 
 	protected override async Task _Setup()
 	{
+		MissionUITheme.StylePanel(GetNodeOrNull<Panel>("Panel"));
+		MissionUITheme.StylePanel(GetNodeOrNull<Panel>("Panel/Panel"));
+		MissionUITheme.InsetPanelContent(this, 10);
+		MissionUITheme.Apply(_actionButtonContainer);
+		MissionUITheme.Apply(_statBarContainer);
+		MissionUITheme.StyleTitle(unitName, 20);
+
 		GridObject selectedGridObject = GridObjectManager.Instance.CurrentPlayerGridObject;
 		
 		foreach (UIElement uiElement in uiElements)

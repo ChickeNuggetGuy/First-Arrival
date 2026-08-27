@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemStoresFacilityDefinition" format=3 uid="uid://c1t3kdeyrpqjs"]
+
+[ext_resource type="Script" uid="uid://drbcjiqi6r4om" path="res://Scripts/Base Scripts/ItemStoresFacilityDefinition.cs" id="1_definition"]
+
+[resource]
+script = ExtResource("1_definition")
+FacilityId = "item_stores"
+DisplayName = "Item Stores"
+Purpose = "Adds 1,000 weight of storage capacity for equipment kept at this base."
+InitialCost = 100000
+MonthlyCost = 2500
+BuildTimeDays = 5

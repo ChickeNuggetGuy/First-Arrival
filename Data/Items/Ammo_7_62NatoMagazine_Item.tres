@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://b3r0l0mkf801c"]
+
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="1_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="2_item"]
+[ext_resource type="Texture2D" uid="uid://cu4snbg1n35f" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Resources/ICON_SM_Wep_Bullet_Ammo_Box_02_BattleRoyale.png" id="3_icon"]
+[ext_resource type="ArrayMesh" uid="uid://ccyn21y1p4fa1" path="res://Third-Party Assets/Synty/PolygonBattleRoyale/Models/extracted/SM_Wep_Bullet_Ammo_Box_02.res" id="4_mesh"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("1_shape")
+
+[resource]
+resource_name = "7.62x51 mm Full Load"
+script = ExtResource("2_item")
+ItemID = 206
+ItemName = "7.62x51 mm Full Load"
+ItemDescription = "One complete 7.62x51 mm reload for a compatible marksman or precision rifle. Each count is one full weapon load."
+ItemIcon = ExtResource("3_icon")
+ResearchTier = 1
+RequiredResearch = "designated_marksman_weapons"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 2
+ItemMesh = ExtResource("4_mesh")
+ActionDefinitions = []
+IsAmmunition = true
+AmmoDamage = 24
+MagazineCapacity = 14
+MaxStackSize = 8
+buyPrice = 100
+sellPrice = 50

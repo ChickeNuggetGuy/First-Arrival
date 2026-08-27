@@ -322,7 +322,12 @@ public partial class GridObjectTeamHolder : Node
         return data;
     }
 
-    public void Load(Godot.Collections.Dictionary<string, Variant> data)
+    public async void Load(Godot.Collections.Dictionary<string, Variant> data)
+    {
+        await LoadAsync(data);
+    }
+
+    public async Task LoadAsync(Godot.Collections.Dictionary<string, Variant> data)
     {
         Setup();
         foreach (var unit in GridObjects[Enums.GridObjectState.Active]) unit.QueueFree();
@@ -339,7 +344,7 @@ public partial class GridObjectTeamHolder : Node
                 if (newUnit != null)
                 {
                     _activeUnitsHolder.AddChild(newUnit);
-                    newUnit.Load(unitData); 
+                    await newUnit.LoadAsync(unitData);
                     GridObjects[Enums.GridObjectState.Active].Add(newUnit);
                     
                     if (newUnit.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder))
@@ -362,7 +367,7 @@ public partial class GridObjectTeamHolder : Node
                 if (newUnit != null)
                 {
                     _inactiveUnitsHolder.AddChild(newUnit);
-                    newUnit.Load(unitData); 
+                    await newUnit.LoadAsync(unitData);
                     GridObjects[Enums.GridObjectState.Inactive].Add(newUnit);
                     newUnit.SetIsActive(false); 
                 }

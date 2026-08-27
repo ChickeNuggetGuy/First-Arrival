@@ -57,23 +57,42 @@ public partial class Craft : ItemData
 	[Export] public int maxweight = -1;
 	private Godot.Collections.Dictionary<int, int> itemCounts = new();
 
-	public int CurrentEquipmentWight
+	public bool HasUnlimitedItemWeightCapacity => maxweight < 0;
+	public long ItemWeightCapacity => HasUnlimitedItemWeightCapacity
+		? long.MaxValue
+		: System.Math.Max(0L, maxweight);
+
+	public long CurrentItemWeight
 	{
 		get
 		{
-			int currentItemsWeight = 0;
+			long currentItemsWeight = 0;
+			InventoryManager inventoryManager = InventoryManager.Instance;
+			if (inventoryManager == null) return currentItemsWeight;
+
 			foreach (KeyValuePair<int, int> itemPair in itemCounts)
 			{
-				ItemData itemData = InventoryManager.Instance.GetItemData(itemPair.Key);
+				if (itemPair.Value <= 0) continue;
+				ItemData itemData = inventoryManager.GetItemData(itemPair.Key);
+				if (itemData == null) continue;
 
-				if (itemData != null)
-				{
-					currentItemsWeight +=  itemData.weight * itemPair.Value;
-				}
+				long itemWeight = System.Math.Max(0L, itemData.weight);
+				long stackWeight = itemWeight * itemPair.Value;
+				if (currentItemsWeight > long.MaxValue - stackWeight)
+					return long.MaxValue;
+				currentItemsWeight += stackWeight;
 			}
 			return currentItemsWeight;
 		}
 	}
+
+	public long RemainingItemWeightCapacity => HasUnlimitedItemWeightCapacity
+		? long.MaxValue
+		: System.Math.Max(0L, ItemWeightCapacity - CurrentItemWeight);
+
+	public int CurrentEquipmentWight =>
+		(int)System.Math.Min(CurrentItemWeight, int.MaxValue);
+
 	public int Index { get; private set; }
 
 	public float GetGlobeMaxSpeed() =>
@@ -140,6 +159,18 @@ public partial class Craft : ItemData
 		return stationedGridObjects;
 	}
 
+	public bool HasDeployableUnits
+	{
+		get
+		{
+			foreach (GridObject unit in stationedGridObjects)
+			{
+				if (unit != null && GodotObject.IsInstanceValid(unit)) return true;
+			}
+			return false;
+		}
+	}
+
 	public void GoToBase()
 	{
 		GD.Print("Sending craft home");
@@ -187,10 +218,16 @@ public bool TryAddItem(int itemId, int count)
 	int currentCount = itemCounts.TryGetValue(itemId, out int storedCount)
 		? storedCount
 		: 0;
-	if (CurrentEquipmentWight + (itemData.weight * count) > maxweight)
-	{
+	if (currentCount < 0 || (long)currentCount + count > int.MaxValue)
 		return false;
-	}
+
+	long currentItemWeight = CurrentItemWeight;
+	long addedWeight = System.Math.Max(0L, itemData.weight) * count;
+	if (!HasUnlimitedItemWeightCapacity &&
+	    (currentItemWeight > ItemWeightCapacity ||
+	     addedWeight > ItemWeightCapacity - currentItemWeight))
+		return false;
+
 	itemCounts[itemId] = currentCount + count;
 	return true;
 }
@@ -220,6 +257,8 @@ public new Godot.Collections.Dictionary<string, Variant> Save()
 		{ "homeBaseIndex", HomeBaseIndex },
 		{ "maxSpeed", MaxSpeed },
 		{ "acceleration", Acceleration },
+		{ "maxUnits", maxUnits },
+		{ "maxweight", maxweight },
 		{ "isAvailable", IsAvailable },
 		{ "detectionRadius", DetectionRadius },
 		{ "detectionChance", DetectionChance },
@@ -255,6 +294,14 @@ private void LoadDataOnly(
 	{
 		SetName(data["name"].AsString());
 	}
+	if (data.ContainsKey("itemID"))
+		ItemID = data["itemID"].AsInt32();
+
+	Craft savedTemplate = InventoryManager.Instance?.GetItemData(ItemID) as Craft;
+	if (!data.ContainsKey("maxUnits") && savedTemplate != null)
+		maxUnits = savedTemplate.maxUnits;
+	if (!data.ContainsKey("maxweight") && savedTemplate != null)
+		maxweight = savedTemplate.maxweight;
 
 	if (data.ContainsKey("index")) Index = data["index"].AsInt32();
 	if (data.ContainsKey("status"))
@@ -280,6 +327,14 @@ private void LoadDataOnly(
 	if (data.ContainsKey("acceleration"))
 	{
 		Acceleration = data["acceleration"].AsInt32();
+	}
+	if (data.ContainsKey("maxUnits"))
+	{
+		maxUnits = data["maxUnits"].AsInt32();
+	}
+	if (data.ContainsKey("maxweight"))
+	{
+		maxweight = data["maxweight"].AsInt32();
 	}
 	if (data.ContainsKey("isAvailable"))
 	{

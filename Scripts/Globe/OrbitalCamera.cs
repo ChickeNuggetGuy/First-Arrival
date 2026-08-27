@@ -81,7 +81,7 @@ public partial class OrbitalCamera : Node3D
 	    if(UIManager.Instance.BlockingInput) return;
         // Mouse Rotation (Only when Right Click is held)
         
-        if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Right))
+        if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Left))
         {
             _yaw -= mouseMotion.Relative.X * MouseSensitivity;
             

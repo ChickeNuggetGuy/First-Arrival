@@ -31,6 +31,9 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 	{
 		this.inventoryCoords = inventoryCoords;
 		this.parentGridUI = parentGridUI;
+		// Every atlas region must fill its cell; preserving each slice's aspect ratio
+		// independently adds padding and makes one multi-cell icon look chopped apart.
+		itemIcon.StretchMode = TextureRect.StretchModeEnum.Scale;
 		Pressed += ButtonOnPressed;
 		MouseFilter = MouseFilterEnum.Stop;
 	}
@@ -51,15 +54,24 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 			return;
 		}
 
-		// Only show the count if this is the root cell AND count is > 1
-		itemCountLabel.Text = (isRoot && count > 1) ? count.ToString() : "";
+		if (isRoot && item.IsRangedWeapon)
+			itemCountLabel.Text = $"{item.CurrentAmmo}/{item.AmmoCapacity}";
+		else
+			itemCountLabel.Text = (isRoot && count > 1) ? count.ToString() : "";
+
+		TooltipText = item.IsRangedWeapon
+			? $"{item.ItemData.ItemName} ({item.CurrentAmmo}/{item.AmmoCapacity} loaded)"
+			: item.ItemData.ItemName;
 
 		// Texture Slicing Logic
 		if (parentGridUI.InventoryGrid.InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes))
 		{
-			AtlasTexture atlasTex = new AtlasTexture();
-			atlasTex.Atlas = item.ItemData.ItemIcon;
-			atlasTex.Region = item.ItemData.GetTextureRegionForCell(localCoords.X, localCoords.Y);
+			AtlasTexture atlasTex = new AtlasTexture
+			{
+				Atlas = item.ItemData.ItemIcon,
+				Region = item.ItemData.GetTextureRegionForCell(localCoords.X, localCoords.Y),
+				FilterClip = true
+			};
 
 			itemIcon.Texture = atlasTex;
 		}

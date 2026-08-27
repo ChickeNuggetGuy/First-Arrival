@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 using Godot;
 using Godot.Collections;
@@ -13,7 +15,7 @@ public partial class InventoryGrid : Resource
     [Export(PropertyHint.ResourceType, "GridShape")] public GridShape GridShape { get; protected set; }
 
     private Enums.InventorySettings _inventorySettings;
-    [Export(PropertyHint.Enum)]
+    [Export]
     public Enums.InventorySettings InventorySettings
     {
         get => _inventorySettings;
@@ -26,7 +28,20 @@ public partial class InventoryGrid : Resource
 
     public int maxItemCount = 0;
     public int maxWeight { get; protected set; }
-    public (Item item, int count)[,] Items { get; private set; }
+    private readonly List<(Item item, int count)[,]> _pages = new();
+    private int _currentPageIndex;
+
+    /// <summary>
+    /// The cells on the page currently shown by an InventoryGridUI.
+    /// Single-page inventories always expose page zero.
+    /// </summary>
+    public (Item item, int count)[,] Items =>
+        _pages.Count == 0 ? null : _pages[_currentPageIndex];
+
+    public int CurrentPageIndex => _currentPageIndex;
+    public int PageCount => _pages.Count;
+    public bool AllowsMultiplePages =>
+        InventorySettings.HasFlag(Enums.InventorySettings.AllowMultiplePages);
 
     // Caching for performance
     private List<(Item item, int count)> _uniqueItemsCache;
@@ -67,13 +82,16 @@ public partial class InventoryGrid : Resource
             {
                 _uniqueItemsCache = new List<(Item item, int count)>();
 
-                for (int x = 0; x < Items.GetLength(0); x++)
+                foreach (var page in _pages)
                 {
-                    for (int y = 0; y < Items.GetLength(1); y++)
+                    for (int x = 0; x < page.GetLength(0); x++)
                     {
-                        if (Items[x, y].item == null) continue;
-                        if (_uniqueItemsCache.Contains(Items[x, y])) continue;
-                        _uniqueItemsCache.Add(Items[x, y]);
+                        for (int y = 0; y < page.GetLength(1); y++)
+                        {
+                            if (page[x, y].item == null) continue;
+                            if (_uniqueItemsCache.Contains(page[x, y])) continue;
+                            _uniqueItemsCache.Add(page[x, y]);
+                        }
                     }
                 }
 
@@ -134,17 +152,38 @@ public partial class InventoryGrid : Resource
             return;
         }
 
-        Items = new (Item item, int count)[GridShape.SizeX, GridShape.SizeZ];
-
-        for (int x = 0; x < GridShape.SizeX; x++)
-        {
-            for (int y = 0; y < GridShape.SizeZ; y++)
-            {
-                Items[x, y] = (null, 0);
-            }
-        }
+        _pages.Clear();
+        _pages.Add(CreateEmptyPage());
+        _currentPageIndex = 0;
 
         _isCacheDirty = true;
+    }
+
+    private (Item item, int count)[,] CreateEmptyPage()
+    {
+        return new (Item item, int count)[GridShape.SizeX, GridShape.SizeZ];
+    }
+
+    /// <summary>
+    /// Changes which page coordinate-based operations and the UI refer to.
+    /// </summary>
+    public bool SetCurrentPage(int pageIndex)
+    {
+        if (pageIndex < 0 || pageIndex >= _pages.Count || pageIndex == _currentPageIndex)
+            return false;
+
+        _currentPageIndex = pageIndex;
+        EmitSignal(SignalName.InventoryChanged);
+        return true;
+    }
+
+    public bool TryGetPageItems(int pageIndex, out (Item item, int count)[,] pageItems)
+    {
+        pageItems = null;
+        if (pageIndex < 0 || pageIndex >= _pages.Count) return false;
+
+        pageItems = _pages[pageIndex];
+        return true;
     }
 
     private bool IsValidCell(int x, int y)
@@ -172,26 +211,33 @@ public partial class InventoryGrid : Resource
 
     #region Add / Remove / Check Items
 
-    private void AddItem(Item item, int count)
+    private bool AddItem(Item item, int count)
     {
-        if (item == null) return;
+        if (item == null) return false;
 
-        if (!CanAddItem(item, out var position, count, out string reason))
+        if (!TryFindItemPlacement(item, count, out int pageIndex, out var position, out string reason))
         {
             GD.Print($"Error: can not add item to Grid: {reason}");
-            return;
+            return false;
         }
 
-        AddItemAt(position, item, count);
+        if (pageIndex == _pages.Count)
+            _pages.Add(CreateEmptyPage());
+
+        AddItemAt(position.X, position.Y, item, count, pageIndex);
+        return true;
     }
 
     private void AddItemAt(Vector2I position, Item item, int count)
     {
-        AddItemAt(position.X, position.Y, item, count);
+        AddItemAt(position.X, position.Y, item, count, _currentPageIndex);
     }
 
-    private void AddItemAt(int x, int y, Item item, int count)
+    private void AddItemAt(int x, int y, Item item, int count, int pageIndex)
     {
+        var pageItems = _pages[pageIndex];
+        _isCacheDirty = true;
+
         if (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes))
         {
             GridShape itemShape = item?.ItemData?.ItemShape;
@@ -203,14 +249,16 @@ public partial class InventoryGrid : Resource
                 if (IsValidCell(x, y))
                 {
                      // Logic for merging/overwriting single cell
-                     if(Items[x, y].item != null && Items[x, y].item.ItemData == item.ItemData && _inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
+                     if(pageItems[x, y].item != null && pageItems[x, y].item.ItemData == item.ItemData && _inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                      {
                          // Merging into existing single-cell stack
-                         Items[x, y].count += count;
+                         pageItems[x, y].count += count;
                      }
                      else
                      {
-                         Items[x, y] = (item, count);
+                         pageItems[x, y] = (item, count);
+                         item.currentGrid = this;
+                         EmitSignal(SignalName.ItemAdded, this, item);
                      }
                 }
             }
@@ -229,13 +277,13 @@ public partial class InventoryGrid : Resource
                         int gridX = x + relX;
                         int gridY = y + relY;
                         
-                        if (IsValidCell(gridX, gridY) && Items[gridX, gridY].item != null)
+                        if (IsValidCell(gridX, gridY) && pageItems[gridX, gridY].item != null)
                         {
                             // Found an item. Check if compatible.
-                            if (Items[gridX, gridY].item.ItemData.ItemID == item.ItemData.ItemID && 
+                            if (pageItems[gridX, gridY].item.ItemData.ItemID == item.ItemData.ItemID &&
                                 _inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                             {
-                                existingItem = Items[gridX, gridY].item;
+                                existingItem = pageItems[gridX, gridY].item;
                                 break; // Found our target
                             }
                         }
@@ -247,12 +295,12 @@ public partial class InventoryGrid : Resource
                 if (existingItem != null)
                 {
                     // Update ALL cells of the EXISTING item
-                    int newCount = Items[GetItemPositions(existingItem)[0].X, GetItemPositions(existingItem)[0].Y].count + count; // Use any valid cell to get current count
-                    
-                    List<Vector2I> existingPositions = GetItemPositions(existingItem);
+                    List<Vector2I> existingPositions = GetItemPositions(existingItem, pageItems);
+                    int newCount = pageItems[existingPositions[0].X, existingPositions[0].Y].count + count;
+
                     foreach(var pos in existingPositions)
                     {
-                        Items[pos.X, pos.Y] = (existingItem, newCount);
+                        pageItems[pos.X, pos.Y] = (existingItem, newCount);
                     }
                     
                     if (item != existingItem)
@@ -274,7 +322,7 @@ public partial class InventoryGrid : Resource
 
                             if (IsValidCell(gridX, gridY))
                             {
-                                Items[gridX, gridY] = (item, count);
+                                pageItems[gridX, gridY] = (item, count);
                             }
                         }
                     }
@@ -287,14 +335,14 @@ public partial class InventoryGrid : Resource
         {
             if (IsValidCell(x, y))
             {
-                if(Items[x, y].item != null && Items[x, y].item.ItemData.ItemID == item.ItemData.ItemID && _inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
+                if(pageItems[x, y].item != null && pageItems[x, y].item.ItemData.ItemID == item.ItemData.ItemID && _inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                 {
-                     Items[x, y].count += count;
-                     if (item != Items[x,y].item) item.QueueFree();
+                     pageItems[x, y].count += count;
+                     if (item != pageItems[x,y].item) item.QueueFree();
                 }
                 else
                 {
-                     Items[x, y] = (item, count);
+                     pageItems[x, y] = (item, count);
                      item.currentGrid = this;
                      EmitSignal(SignalName.ItemAdded,this, item);
                 }
@@ -302,27 +350,18 @@ public partial class InventoryGrid : Resource
         }
 
         EmitSignal(SignalName.InventoryChanged);
-
-        _isCacheDirty = true;
     }
 
     public bool TryAddItem(Item item, int count)
     {
-        if (!CanAddItem(item, out Vector2I position, count, out string reason))
-        {
-            GD.Print($"Cannot add item to Grid: {reason}");
-            return false;
-        }
-
-        AddItemAt(position.X, position.Y, item, count);
-        return true;
+        return AddItem(item, count);
     }
 
     public bool TryAddItemAt(Item item, Vector2I position, int count)
     {
         if (CanAddItemAt(position.X, position.Y, item, count, out string reason))
         {
-            AddItemAt(position.X, position.Y, item, count);
+            AddItemAt(position.X, position.Y, item, count, _currentPageIndex);
             return true;
         }
 
@@ -334,12 +373,13 @@ public partial class InventoryGrid : Resource
     {
         if (item == null) return;
 
-        List<Vector2I> positions = GetItemPositions(item);
-        if (positions.Count == 0) return;
+        if (!TryFindItemPage(item, out _, out var pageItems)) return;
+
+        List<Vector2I> positions = GetItemPositions(item, pageItems);
 
         // Determine the current stack size from the first found position
         var firstPos = positions[0];
-        int currentStackSize = Items[firstPos.X, firstPos.Y].count;
+        int currentStackSize = pageItems[firstPos.X, firstPos.Y].count;
         
         int newStackSize = currentStackSize - count;
         
@@ -351,12 +391,12 @@ public partial class InventoryGrid : Resource
         {
              if (itemRemovedCompletely)
              {
-                 Items[pos.X, pos.Y] = (null, 0);
+                 pageItems[pos.X, pos.Y] = (null, 0);
              }
              else
              {
                  // Update the stack size for this cell to match the new total
-                 Items[pos.X, pos.Y] = (item, newStackSize);
+                 pageItems[pos.X, pos.Y] = (item, newStackSize);
              }
         }
 
@@ -365,11 +405,11 @@ public partial class InventoryGrid : Resource
             if (item.currentGrid == this)
                 item.currentGrid = null;
         }
-        
+
+        RemoveEmptyTrailingPages();
+        _isCacheDirty = true;
         EmitSignal(SignalName.ItemRemoved,this, item);
         EmitSignal(SignalName.InventoryChanged);
-
-        _isCacheDirty = true;
     }
 
     public bool TryRemoveItem(Item item, int count)
@@ -379,31 +419,271 @@ public partial class InventoryGrid : Resource
         return true;
     }
 
+    /// <summary>
+    /// Refreshes inventory observers after instance state changes without moving
+    /// the item (for example, when a weapon fires or reloads).
+    /// </summary>
+    public void NotifyItemChanged()
+    {
+        EmitSignal(SignalName.InventoryChanged);
+    }
+
 
     public void ClearInventory()
     {
-	    for (int x = 0; x < Items.GetLength(0); x++)
-	    {
-		    for (int y = 0; y < Items.GetLength(1); y++)
-		    {
-			    (Item item, int count) itemSlot = Items[x, y];
-			    
-			    if (itemSlot.count == 0) continue;
-			    
-			    itemSlot.count = 0;
-			    itemSlot.item = null;
-		    }
-	    }
+        foreach (var itemInfo in UniqueItems)
+        {
+            if (itemInfo.item != null && itemInfo.item.currentGrid == this)
+                itemInfo.item.currentGrid = null;
+        }
+
+        _pages.Clear();
+        _pages.Add(CreateEmptyPage());
+        _currentPageIndex = 0;
+        _uniqueItemsCache = null;
+        _isCacheDirty = true;
+        EmitSignal(SignalName.InventoryChanged);
     }
+
+    public Godot.Collections.Dictionary<string, Variant> SaveContents()
+    {
+        var items = new Godot.Collections.Array<
+            Godot.Collections.Dictionary<string, Variant>>();
+        var visited = new HashSet<Item>();
+
+        for (int pageIndex = 0; pageIndex < _pages.Count; pageIndex++)
+        {
+            var page = _pages[pageIndex];
+            for (int x = 0; x < page.GetLength(0); x++)
+            {
+                for (int y = 0; y < page.GetLength(1); y++)
+                {
+                    (Item item, int count) itemInfo = page[x, y];
+                    if (itemInfo.item?.ItemData == null ||
+                        itemInfo.count <= 0 ||
+                        !visited.Add(itemInfo.item))
+                        continue;
+
+                    var positions = new Godot.Collections.Array<Vector2I>();
+                    for (int itemX = 0; itemX < page.GetLength(0); itemX++)
+                    {
+                        for (int itemY = 0; itemY < page.GetLength(1); itemY++)
+                        {
+                            if (ReferenceEquals(
+                                    page[itemX, itemY].item,
+                                    itemInfo.item))
+                                positions.Add(new Vector2I(itemX, itemY));
+                        }
+                    }
+
+                    var entry = new Godot.Collections.Dictionary<string, Variant>
+                    {
+                        ["page"] = pageIndex,
+                        ["count"] = itemInfo.count,
+                        ["item_id"] = itemInfo.item.ItemData.ItemID,
+                        ["positions"] = positions
+                    };
+                    if (itemInfo.item.IsRangedWeapon)
+                        entry["loaded_ammo"] = itemInfo.item.CurrentAmmo;
+                    items.Add(entry);
+                }
+            }
+        }
+
+        return new Godot.Collections.Dictionary<string, Variant>
+        {
+            ["current_page"] = _currentPageIndex,
+            ["items"] = items
+        };
+    }
+
+    public void LoadContents(
+        Godot.Collections.Dictionary<string, Variant> data)
+    {
+        Initialize();
+        if (_pages.Count == 0 || data == null ||
+            !data.TryGetValue("items", out Variant itemsValue) ||
+            itemsValue.VariantType != Variant.Type.Array)
+            return;
+
+        var items = itemsValue.AsGodotArray<
+            Godot.Collections.Dictionary<string, Variant>>();
+        var consumedLegacyEntries = new HashSet<int>();
+        for (int itemIndex = 0; itemIndex < items.Count; itemIndex++)
+        {
+            if (consumedLegacyEntries.Contains(itemIndex)) continue;
+            Godot.Collections.Dictionary<string, Variant> entry =
+                items[itemIndex];
+            if (!entry.TryGetValue("item_id", out Variant itemIdValue) ||
+                !entry.TryGetValue("count", out Variant countValue))
+                continue;
+
+            int itemId = itemIdValue.AsInt32();
+            int count = countValue.AsInt32();
+            int pageIndex = entry.TryGetValue("page", out Variant pageValue)
+                ? pageValue.AsInt32()
+                : 0;
+            if (count <= 0 || pageIndex < 0) continue;
+
+            ItemData itemData = InventoryManager.Instance?.GetItemData(
+                itemId);
+            if (itemData == null) continue;
+            Item item = ItemData.CreateItem(itemData);
+            if (item == null) continue;
+            if (entry.TryGetValue("loaded_ammo", out Variant ammoValue))
+                item.RestoreAmmo(ammoValue.AsInt32());
+
+            while (_pages.Count <= pageIndex)
+                _pages.Add(CreateEmptyPage());
+
+            var positions = new Godot.Collections.Array<Vector2I>();
+            if (entry.TryGetValue("positions", out Variant positionsValue) &&
+                positionsValue.VariantType == Variant.Type.Array)
+            {
+                positions = positionsValue.AsGodotArray<Vector2I>();
+            }
+            else if (entry.TryGetValue("x", out Variant xValue) &&
+                     entry.TryGetValue("y", out Variant yValue))
+            {
+                var savedPosition = new Vector2I(
+                    xValue.AsInt32(),
+                    yValue.AsInt32());
+                positions.Add(savedPosition);
+                consumedLegacyEntries.Add(itemIndex);
+
+                int expectedPositions = 1;
+                GridShape itemShape = itemData.ItemShape;
+                if (InventorySettings.HasFlag(
+                        Enums.InventorySettings.UseItemSizes) &&
+                    itemShape != null)
+                {
+                    expectedPositions = 0;
+                    for (int shapeX = 0; shapeX < itemShape.SizeX; shapeX++)
+                    {
+                        for (int shapeY = 0; shapeY < itemShape.SizeZ; shapeY++)
+                        {
+                            if (itemShape.IsOccupied(shapeX, 0, shapeY))
+                                expectedPositions++;
+                        }
+                    }
+                    expectedPositions = Math.Max(1, expectedPositions);
+                }
+
+                while (positions.Count < expectedPositions)
+                {
+                    int connectedIndex = -1;
+                    Vector2I connectedPosition = Vector2I.Zero;
+                    for (int candidateIndex = itemIndex + 1;
+                         candidateIndex < items.Count;
+                         candidateIndex++)
+                    {
+                        if (consumedLegacyEntries.Contains(candidateIndex))
+                            continue;
+                        var candidate = items[candidateIndex];
+                        if (!candidate.TryGetValue("item_id", out Variant candidateItemId) ||
+                            candidateItemId.AsInt32() != itemId ||
+                            !candidate.TryGetValue("count", out Variant candidateCount) ||
+                            candidateCount.AsInt32() != count ||
+                            candidate.ContainsKey("positions") ||
+                            !candidate.TryGetValue("x", out Variant candidateX) ||
+                            !candidate.TryGetValue("y", out Variant candidateY))
+                            continue;
+
+                        int candidatePage = candidate.TryGetValue(
+                            "page",
+                            out Variant candidatePageValue)
+                            ? candidatePageValue.AsInt32()
+                            : 0;
+                        if (candidatePage != pageIndex) continue;
+
+                        var candidatePosition = new Vector2I(
+                            candidateX.AsInt32(),
+                            candidateY.AsInt32());
+                        bool connected = false;
+                        foreach (Vector2I position in positions)
+                        {
+                            Vector2I offset = candidatePosition - position;
+                            if (Math.Abs(offset.X) + Math.Abs(offset.Y) != 1)
+                                continue;
+                            connected = true;
+                            break;
+                        }
+                        if (!connected) continue;
+
+                        connectedIndex = candidateIndex;
+                        connectedPosition = candidatePosition;
+                        break;
+                    }
+
+                    if (connectedIndex < 0) break;
+                    consumedLegacyEntries.Add(connectedIndex);
+                    positions.Add(connectedPosition);
+                }
+            }
+
+            var page = _pages[pageIndex];
+            bool canPlace = positions.Count > 0;
+            foreach (Vector2I position in positions)
+            {
+                if (!IsValidCell(position.X, position.Y) ||
+                    page[position.X, position.Y].item != null)
+                {
+                    canPlace = false;
+                    break;
+                }
+            }
+
+            if (!canPlace)
+            {
+                item.QueueFree();
+                continue;
+            }
+
+            foreach (Vector2I position in positions)
+                page[position.X, position.Y] = (item, count);
+
+            item.currentGrid = this;
+            EmitSignal(SignalName.ItemAdded, this, item);
+        }
+
+        int currentPage = data.TryGetValue(
+            "current_page",
+            out Variant currentPageValue)
+            ? currentPageValue.AsInt32()
+            : 0;
+        _currentPageIndex = Mathf.Clamp(currentPage, 0, _pages.Count - 1);
+        _uniqueItemsCache = null;
+        _isCacheDirty = true;
+        EmitSignal(SignalName.InventoryChanged);
+    }
+
     public bool HasItem(Item item)
     {
-        if (item == null || Items == null) return false;
+        return TryFindItemPage(item, out _, out _);
+    }
 
-        for (int x = 0; x < GridShape.SizeX; x++)
+    private bool TryFindItemPage(
+        Item item,
+        out int pageIndex,
+        out (Item item, int count)[,] pageItems)
+    {
+        pageIndex = -1;
+        pageItems = null;
+        if (item == null) return false;
+
+        for (int page = 0; page < _pages.Count; page++)
         {
-            for (int y = 0; y < GridShape.SizeZ; y++)
+            var candidatePage = _pages[page];
+            for (int x = 0; x < GridShape.SizeX; x++)
             {
-                if (Items[x, y].item == item) return true;
+                for (int y = 0; y < GridShape.SizeZ; y++)
+                {
+                    if (candidatePage[x, y].item != item) continue;
+
+                    pageIndex = page;
+                    pageItems = candidatePage;
+                    return true;
+                }
             }
         }
 
@@ -437,15 +717,20 @@ public partial class InventoryGrid : Resource
 
     public List<Vector2I> GetItemPositions(Item item)
     {
+        return GetItemPositions(item, Items);
+    }
+
+    private List<Vector2I> GetItemPositions(Item item, (Item item, int count)[,] pageItems)
+    {
         List<Vector2I> result = new();
 
-        if (item == null || Items == null) return result;
+        if (item == null || pageItems == null) return result;
 
         for (int x = 0; x < GridShape.SizeX; x++)
         {
             for (int y = 0; y < GridShape.SizeZ; y++)
             {
-                if (Items[x, y].item == item)
+                if (pageItems[x, y].item == item)
                 {
                     Vector2I pos = new(x, y);
                     if (!result.Contains(pos))
@@ -459,50 +744,138 @@ public partial class InventoryGrid : Resource
         return result;
     }
 
+    private void RemoveEmptyTrailingPages()
+    {
+        while (_pages.Count > 1 && !PageHasItems(_pages[^1]))
+            _pages.RemoveAt(_pages.Count - 1);
+
+        if (_currentPageIndex >= _pages.Count)
+            _currentPageIndex = _pages.Count - 1;
+    }
+
+    private static bool PageHasItems((Item item, int count)[,] pageItems)
+    {
+        foreach (var itemInfo in pageItems)
+        {
+            if (itemInfo.item != null) return true;
+        }
+
+        return false;
+    }
+
     #endregion
 
     #region CanAdd Validation Logic
 
     public bool CanAddItem(Item item, out Vector2I position, int count, out string reason)
     {
-        reason = "N/A";
-        position = new Vector2I(-1, -1);
+        return TryFindItemPlacement(item, count, out _, out position, out reason);
+    }
 
-        if (item == null)
+    private bool TryFindItemPlacement(
+        Item item,
+        int count,
+        out int pageIndex,
+        out Vector2I position,
+        out string reason)
+    {
+        pageIndex = -1;
+        position = new Vector2I(-1, -1);
+        reason = "N/A";
+
+        if (item?.ItemData == null)
         {
-            reason = "Item is null";
+            reason = "Item or ItemData is null";
             return false;
         }
 
-        GridShape itemShape = item.ItemData?.ItemShape;
+        if (_pages.Count == 0)
+        {
+            reason = "Inventory has not been initialized";
+            return false;
+        }
 
-        int width = (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null) ? itemShape.SizeX : 1;
-        int height = (InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null) ? itemShape.SizeZ : 1;
-        
+        // Prefer the visible page, then use any existing overflow page.
+        if (TryFindPositionOnPage(_pages[_currentPageIndex], item, count, out position, out reason))
+        {
+            pageIndex = _currentPageIndex;
+            return true;
+        }
+
+        if (AllowsMultiplePages)
+        {
+            for (int page = 0; page < _pages.Count; page++)
+            {
+                if (page == _currentPageIndex) continue;
+                if (TryFindPositionOnPage(_pages[page], item, count, out position, out reason))
+                {
+                    pageIndex = page;
+                    return true;
+                }
+            }
+
+            var emptyPage = CreateEmptyPage();
+            if (TryFindPositionOnPage(emptyPage, item, count, out position, out reason))
+            {
+                pageIndex = _pages.Count;
+                return true;
+            }
+        }
+
+        GD.Print($"CanAddItem: No valid position found. Last reason: {reason}");
+        return false;
+    }
+
+    private bool TryFindPositionOnPage(
+        (Item item, int count)[,] pageItems,
+        Item item,
+        int count,
+        out Vector2I position,
+        out string reason)
+    {
+        position = new Vector2I(-1, -1);
+        reason = "No valid position found";
+
+        GridShape itemShape = item.ItemData?.ItemShape;
+        int width = InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null
+            ? itemShape.SizeX
+            : 1;
+        int height = InventorySettings.HasFlag(Enums.InventorySettings.UseItemSizes) && itemShape != null
+            ? itemShape.SizeZ
+            : 1;
 
         for (int x = 0; x <= GridShape.SizeX - width; x++)
         {
             for (int y = 0; y <= GridShape.SizeZ - height; y++)
             {
-                if (CanAddItemAt(x, y, item, count, out reason))
-                {
-                    position = new Vector2I(x, y);
-                    return true;
-                }
+                if (!CanAddItemAt(x, y, item, count, pageItems, out reason)) continue;
+
+                position = new Vector2I(x, y);
+                return true;
             }
         }
-        
-        GD.Print($"CanAddItem: No valid position found. Last reason: {reason}");
+
         return false;
     }
 
     public bool CanAddItemAt(int x, int y, Item item, int count, out string reason)
     {
+        return CanAddItemAt(x, y, item, count, Items, out reason);
+    }
+
+    private bool CanAddItemAt(
+        int x,
+        int y,
+        Item item,
+        int count,
+        (Item item, int count)[,] pageItems,
+        out string reason)
+    {
         reason = "";
 
-        if (item == null)
+        if (item?.ItemData == null || pageItems == null)
         {
-            reason = "Item is null.";
+            reason = "Item, ItemData, or inventory page is null.";
             return false;
         }
 
@@ -531,12 +904,12 @@ public partial class InventoryGrid : Resource
                         return false;
                     }
 
-                    if (Items[gridX, gridY].item != null)
+                    if (pageItems[gridX, gridY].item != null)
                     {
                         if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                         {
-                            if (Items[gridX, gridY].item.ItemData.ItemID == item.ItemData.ItemID &&
-                                Items[gridX, gridY].count + count <= item.ItemData.MaxStackSize)
+                            if (pageItems[gridX, gridY].item.ItemData.ItemID == item.ItemData.ItemID &&
+                                pageItems[gridX, gridY].count + count <= item.ItemData.MaxStackSize)
                                 continue;
                             else
                             {
@@ -561,12 +934,12 @@ public partial class InventoryGrid : Resource
                 return false;
             }
 
-            if (Items[x, y].item != null)
+            if (pageItems[x, y].item != null)
             {
                 if (_inventorySettings.HasFlag(Enums.InventorySettings.AllowItemStacking))
                 {
-                    if (Items[x, y].item.ItemData.ItemID == item.ItemData.ItemID &&
-                        Items[x, y].count + count <= item.ItemData.MaxStackSize)
+                    if (pageItems[x, y].item.ItemData.ItemID == item.ItemData.ItemID &&
+                        pageItems[x, y].count + count <= item.ItemData.MaxStackSize)
                         return true;
                     else
                     {

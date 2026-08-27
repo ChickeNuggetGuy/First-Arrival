@@ -8,6 +8,7 @@ public partial class BaseCell : Node3D
 	public GridShape shape;
 	public Vector3 worldPosition;
 	public MeshInstance3D meshInstance;
+	[Export] public Label3D label;
 	[Export] public FacilityDefinition FacilityDefinition { get; private set; }
 	public FacilityConstruction Construction { get; private set; }
 	public bool IsFacilityOrigin { get; private set; }
@@ -71,6 +72,12 @@ public partial class BaseCell : Node3D
 			return;
 		}
 
+		if (label != null)
+		{
+			label.Text = Construction.IsConstructed
+				? Construction.DisplayName
+				: $"{Construction.DisplayName} : {Construction.RemainingBuildDays} Days Left";
+		}
 		meshInstance.Visible = IsFacilityOrigin;
 		meshInstance.Transparency =
 			Construction.IsConstructed ? 0.0f : 0.45f;

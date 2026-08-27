@@ -20,17 +20,23 @@ public partial class ContextMenuUI : UIWindow
 	}
 
 	
-	protected override async Task DrawUI()
+	protected override Task DrawUI()
 	{
 		GD.Print("ContextMenuUI Show");
 		Position = GetViewport().GetMousePosition();
 		base._Show();
+		return Task.CompletedTask;
 	}
 
 	private bool TryGenerateContextMenu(IContextUserBase contextUser)
 	{
+		return contextUser != null &&
+		       TryGenerateContextMenu(contextUser.GetContextActions());
+	}
+
+	private bool TryGenerateContextMenu(Dictionary<String, Callable> callables)
+	{
 		ClearContextButtons();
-		Dictionary<String, Callable> callables = contextUser.GetContextActions();
 		if (callables == null || callables.Count == 0)
 		{
 			GD.Print("Callables was null or 0!");
@@ -43,6 +49,47 @@ public partial class ContextMenuUI : UIWindow
 		}
 
 		return true;
+	}
+
+	private bool TryGenerateGlobeContextMenu(HexCellData cell)
+	{
+		var actions = new Dictionary<string, Callable>();
+		AddActions(actions, new HexCellDefinition(cell.Index, $"Hex {cell.Index}"));
+
+		foreach (Node node in GetTree().GetNodesInGroup(
+			         CellDefinitionVisual.ContextUserGroup))
+		{
+			if (node is not CellDefinitionVisual visual ||
+			    visual.CellIndex != cell.Index)
+			{
+				continue;
+			}
+
+			HexCellDefinition definition = visual.parentCellDefinition;
+			if (definition == null ||
+			    !definition.IsVisibleTo(Enums.UnitTeam.Player)) continue;
+
+			AddActions(actions, definition);
+		}
+
+		return TryGenerateContextMenu(actions);
+	}
+
+	private static void AddActions(
+		Dictionary<string, Callable> destination,
+		IContextUserBase contextUser)
+	{
+		if (contextUser == null) return;
+		Dictionary<string, Callable> source = contextUser.GetContextActions();
+		if (source == null) return;
+
+		foreach (var action in source)
+		{
+			// Multiple definitions can occupy a hex. Shared actions such as Focus
+			// should appear only once while type-specific actions are combined.
+			if (!destination.ContainsKey(action.Key))
+				destination.Add(action.Key, action.Value);
+		}
 	}
 
 	private void ClearContextButtons()
@@ -76,16 +123,13 @@ public partial class ContextMenuUI : UIWindow
 			{
 				GD.Print("Context Menu: Right Clicked");
 
-				// UI takes precedence over the 3D raycast. Inventory controls can sit
-				// over a GridObject, and that object must not prevent the slot from
-				// providing its own context actions.
 				IContextUserBase hoveredContextUser = GetHoveredContextUser();
 				if (hoveredContextUser != null)
 				{
 					if (TryGenerateContextMenu(hoveredContextUser))
 					{
 						GD.Print("Context Menu: Context UI Item");
-						ShowCall();
+							_ = ShowCall();
 					}
 					return;
 				}
@@ -104,14 +148,22 @@ public partial class ContextMenuUI : UIWindow
 
 						if (!TryGenerateContextMenu(contextUser)) return;
 						GD.Print("Context Menu: Context Item");
-						ShowCall();
+							_ = ShowCall();
 					}
 				}
 			}
 			else if (GameManager.Instance.currentScene == GameManager.GameScene.GlobeScene)
 			{
-				HexCellData? hexCellData = GlobeInputManager.Instance.CurrentCell;
-				//TODO Implement definition context menu
+				HexCellData? hexCellData = GlobeInputManager.Instance?.CurrentCell;
+				if (hexCellData.HasValue &&
+				    TryGenerateGlobeContextMenu(hexCellData.Value))
+				{
+						_ = ShowCall();
+				}
+				else
+				{
+						_ = HideCall();
+				}
 			}
 		}
 		else if (@event is InputEventMouseMotion mouseMotionEvent)
@@ -123,7 +175,7 @@ public partial class ContextMenuUI : UIWindow
 			// Check if the hovered control is part of the context menu hierarchy
 			if (hoveredControl != null && !IsPartOfContextMenu(hoveredControl))
 			{
-				HideCall();
+					_ = HideCall();
 			}
 		}
 	}

@@ -8,4 +8,5 @@ DetectionRadiusBonus = 10
 ScientistCapacityBonus = 5
 FacilityId = "HeadQuaters"
 DisplayName = "HQ"
+Purpose = "Coordinates base operations and provides initial troop, scientist, detection, and item storage capacity."
 UniquePerBase = true

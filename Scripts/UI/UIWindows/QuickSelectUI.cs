@@ -17,6 +17,12 @@ public partial class QuickSelectUI : UIWindow
 	
 	protected override async Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		ScrollContainer scrollContainer = GetNodeOrNull<ScrollContainer>(
+			"Panel/ScrollContainer");
+		if (scrollContainer != null)
+			scrollContainer.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+		MissionUITheme.InsetPanelContent(this, 8);
 
 		GridObjectTeamHolder playerTeamHolder =
 			GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);

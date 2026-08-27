@@ -129,9 +129,9 @@ public partial class InventoryManager : Manager<InventoryManager>
 	
 	public ItemData GetItemData(int itemID)
 	{
-		if (Database != null && Database.Items.ContainsKey(itemID))
+		if (Database != null && Database.Items.TryGetValue(itemID, out var itemData))
 		{
-			return Database.Items[itemID];
+			return (ItemData)itemData.Duplicate();
 		}
 		return null;
 	}

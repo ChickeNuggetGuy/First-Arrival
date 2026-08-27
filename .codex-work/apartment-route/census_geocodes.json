@@ -1,0 +1,328 @@
+[
+  {
+    "id": "alma",
+    "name": "Alma Apartments",
+    "address": "9220 N Interstate Highway 35, Austin, TX 78753",
+    "matches": []
+  },
+  {
+    "id": "keystone",
+    "name": "Keystone Apartments",
+    "address": "5230 Thunder Creek Rd, Austin, TX 78759",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "R",
+          "tigerLineId": "63982386"
+        },
+        "coordinates": {
+          "x": -97.743528509216,
+          "y": 30.41578375771
+        },
+        "addressComponents": {
+          "zip": "78759",
+          "streetName": "THUNDER CREEK",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "5224",
+          "state": "TX",
+          "suffixType": "RD",
+          "toAddress": "5328",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "5230 THUNDER CREEK RD, AUSTIN, TX, 78759"
+      }
+    ]
+  },
+  {
+    "id": "copperline",
+    "name": "Copperline at Village Oaks",
+    "address": "9811 Copper Creek Dr, Austin, TX 78729",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "L",
+          "tigerLineId": "646490207"
+        },
+        "coordinates": {
+          "x": -97.787065331835,
+          "y": 30.458494926521
+        },
+        "addressComponents": {
+          "zip": "78729",
+          "streetName": "COPPER CREEK",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "9701",
+          "state": "TX",
+          "suffixType": "DR",
+          "toAddress": "9899",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "9811 COPPER CREEK DR, AUSTIN, TX, 78729"
+      }
+    ]
+  },
+  {
+    "id": "san_gabriel",
+    "name": "San Gabriel Square Apartments",
+    "address": "2212 San Gabriel St, Austin, TX 78705",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "L",
+          "tigerLineId": "63942598"
+        },
+        "coordinates": {
+          "x": -97.748063236453,
+          "y": 30.28643345177
+        },
+        "addressComponents": {
+          "zip": "78705",
+          "streetName": "SAN GABRIEL",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "2212",
+          "state": "TX",
+          "suffixType": "ST",
+          "toAddress": "2298",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "2212 SAN GABRIEL ST, AUSTIN, TX, 78705"
+      }
+    ]
+  },
+  {
+    "id": "chevy_chase",
+    "name": "Chevy Chase Downs",
+    "address": "2504 Huntwick Dr, Austin, TX 78741",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "R",
+          "tigerLineId": "63948845"
+        },
+        "coordinates": {
+          "x": -97.726928235911,
+          "y": 30.225610732726
+        },
+        "addressComponents": {
+          "zip": "78741",
+          "streetName": "HUNTWICK",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "2400",
+          "state": "TX",
+          "suffixType": "DR",
+          "toAddress": "2698",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "2504 HUNTWICK DR, AUSTIN, TX, 78741"
+      }
+    ]
+  },
+  {
+    "id": "creeks_edge",
+    "name": "Creeks Edge Apartments",
+    "address": "1124 Rutland Dr, Austin, TX 78758",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "R",
+          "tigerLineId": "63930566"
+        },
+        "coordinates": {
+          "x": -97.702703283824,
+          "y": 30.368011292463
+        },
+        "addressComponents": {
+          "zip": "78758",
+          "streetName": "RUTLAND",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "1000",
+          "state": "TX",
+          "suffixType": "DR",
+          "toAddress": "1198",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "1124 RUTLAND DR, AUSTIN, TX, 78758"
+      }
+    ]
+  },
+  {
+    "id": "the_brook",
+    "name": "The Brook Apartments",
+    "address": "1824 S Interstate 35, Austin, TX 78704",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "R",
+          "tigerLineId": "64015939"
+        },
+        "coordinates": {
+          "x": -97.738158497983,
+          "y": 30.239779287524
+        },
+        "addressComponents": {
+          "zip": "78704",
+          "streetName": "I- 35 SVC",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "S",
+          "suffixDirection": "",
+          "fromAddress": "1700",
+          "state": "TX",
+          "suffixType": "RD",
+          "toAddress": "1898",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "1824 S I- 35 SVC RD, AUSTIN, TX, 78704"
+      }
+    ]
+  },
+  {
+    "id": "bridge_south",
+    "name": "Bridge at South Point",
+    "address": "6808 S Interstate 35, Austin, TX 78745",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "R",
+          "tigerLineId": "641669545"
+        },
+        "coordinates": {
+          "x": -97.771493683247,
+          "y": 30.189952238738
+        },
+        "addressComponents": {
+          "zip": "78745",
+          "streetName": "I- 35 SVC",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "S",
+          "suffixDirection": "",
+          "fromAddress": "6800",
+          "state": "TX",
+          "suffixType": "RD",
+          "toAddress": "6898",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "6808 S I- 35 SVC RD, AUSTIN, TX, 78745"
+      }
+    ]
+  },
+  {
+    "id": "walnut",
+    "name": "Walnut Creek Crossing",
+    "address": "2000 Cedar Bend Dr, Austin, TX 78758",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "R",
+          "tigerLineId": "63930181"
+        },
+        "coordinates": {
+          "x": -97.697715641312,
+          "y": 30.408499745459
+        },
+        "addressComponents": {
+          "zip": "78758",
+          "streetName": "CEDAR BEND",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "1900",
+          "state": "TX",
+          "suffixType": "DR",
+          "toAddress": "2098",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "2000 CEDAR BEND DR, AUSTIN, TX, 78758"
+      }
+    ]
+  },
+  {
+    "id": "wildwood",
+    "name": "Wildwood Apartments",
+    "address": "7610 Cameron Rd, Austin, TX 78752",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "L",
+          "tigerLineId": "64022285"
+        },
+        "coordinates": {
+          "x": -97.687466559804,
+          "y": 30.3313332483
+        },
+        "addressComponents": {
+          "zip": "78752",
+          "streetName": "CAMERON",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "7602",
+          "state": "TX",
+          "suffixType": "RD",
+          "toAddress": "7698",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "7610 CAMERON RD, AUSTIN, TX, 78752"
+      }
+    ]
+  },
+  {
+    "id": "patton",
+    "name": "1706 Patton Lane #102",
+    "address": "1706 Patton Ln, Austin, TX 78723",
+    "matches": [
+      {
+        "tigerLine": {
+          "side": "L",
+          "tigerLineId": "63934907"
+        },
+        "coordinates": {
+          "x": -97.689312434787,
+          "y": 30.319119655191
+        },
+        "addressComponents": {
+          "zip": "78723",
+          "streetName": "PATTON",
+          "preType": "",
+          "city": "AUSTIN",
+          "preDirection": "",
+          "suffixDirection": "",
+          "fromAddress": "1700",
+          "state": "TX",
+          "suffixType": "LN",
+          "toAddress": "1798",
+          "suffixQualifier": "",
+          "preQualifier": ""
+        },
+        "matchedAddress": "1706 PATTON LN, AUSTIN, TX, 78723"
+      }
+    ]
+  }
+]

@@ -88,11 +88,11 @@ public class Enums
 
 	public static Dictionary<Stat, Color> statColors = new()
 	{
-		{ Stat.Health, Colors.Red },
-		{ Stat.Stamina, Colors.Green },
-		{ Stat.Bravery, Colors.Purple },
-		{ Stat.TimeUnits, Colors.Orange },
-		{ Stat.RangedAccuracy, Colors.LightBlue }
+		{ Stat.Health, new Color(0.82f, 0.18f, 0.22f) },
+		{ Stat.Stamina, new Color(0.95f, 0.75f, 0.16f) },
+		{ Stat.Bravery, new Color(0.6f, 0.3f, 0.82f) },
+		{ Stat.TimeUnits, new Color(0.2f, 0.72f, 0.32f) },
+		{ Stat.RangedAccuracy, new Color(0.3f, 0.65f, 0.9f) }
 	};
 
 	public enum StatTurnBehavior
@@ -130,7 +130,8 @@ public class Enums
 		CanExecuteActions = 4,
 		MaxItemAmount = 8,
 		MaxWeight = 16,
-		AllowItemStacking = 32
+		AllowItemStacking = 32,
+		AllowMultiplePages = 64
 		
 	}
 
@@ -167,6 +168,13 @@ public class Enums
 		CityDefense,
 		ScoutLanding,
 		Abduction,
+	}
+
+	public enum MissionRecoveryType
+	{
+		None,
+		StartingCellsOnly,
+		FullFieldOnSuccess,
 	}
 
 
@@ -262,6 +270,7 @@ public class Enums
 		Failed = 4,
 		Timeout = 8,
 		OnRoute = 16,
+		Aborted = 32,
 	}
 
 	public enum MonthlyScoreReason
@@ -271,7 +280,10 @@ public class Enums
 		SuccessfulMission,
 		ExpiredMission,
 		UfoLanding,
-		Research
+		Research,
+		EnemyUnitsKilled,
+		PlayerUnitsLost,
+		AbandonedMission
 		
 	}
 }

@@ -17,6 +17,7 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 	public Item Item { get; set; }
 	public ActionBase ParentActionBase { get; set; }
 	public List<ActionBase> SubActions { get; set; }
+	private bool _ammoConsumed;
 
 	public RangedAttackActionBase(GridObject parentGridObject, GridCell startingGridCell, GridCell targetGridCell,
 		ActionDefinition parentAction,
@@ -63,12 +64,26 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 			return;
 		}
 
+		ItemData ammo = Item?.GetRequiredAmmoItem();
+		if (ammo == null || !ammo.IsAmmunition || ammo.AmmoDamage <= 0)
+		{
+			GD.PrintErr("RangedAttack: weapon ammunition damage is not configured");
+			return;
+		}
+
+		if (Item == null || !Item.TryConsumeAmmo(rangedAttackActionDefinition.ammoCost))
+		{
+			GD.PrintErr("RangedAttack: weapon no longer has enough ammo");
+			return;
+		}
+		_ammoConsumed = true;
+
 		Vector3 origin = parentGridObject.objectCenter?.GlobalPosition
 			?? parentGridObject.GlobalPosition + Vector3.Up;
 		if (parentGridObject.objectCenter == null)
 			GD.PushWarning("RangedAttack: objectCenter is not assigned; using the GridObject origin instead");
 
-		int damage = rangedAttackActionDefinition.damage;
+		int damage = ammo.AmmoDamage;
 		float fatalWoundAccuracyMultiplier = 1f;
 		if (
 			parentStatHolder.TryGetStat(Enums.Stat.Health, out GridObjectStat shooterHealth)
@@ -269,4 +284,6 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 	{
 		return;
 	}
+
+	protected override bool ShouldDeductCosts() => _ammoConsumed;
 }

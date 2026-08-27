@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://b0h4bgx3j7t5w"]
+
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="1_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="2_item"]
+[ext_resource type="Texture2D" uid="uid://1km1s1tw6r6o" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Resources/ICON_SM_Wep_Pistol_Ammo_Box_01_BattleRoyale.png" id="3_icon"]
+[ext_resource type="ArrayMesh" uid="uid://cigr5tblqlpyv" path="res://Third-Party Assets/Synty/PolygonBattleRoyale/Models/extracted/SM_Wep_Pistol_Ammo_Box_01.res" id="4_mesh"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("1_shape")
+
+[resource]
+resource_name = ".45 ACP Full Load"
+script = ExtResource("2_item")
+ItemID = 200
+ItemName = ".45 ACP Full Load"
+ItemDescription = "One complete .45 ACP reload for a compatible weapon. Each inventory count is one full magazine or weapon load."
+ItemIcon = ExtResource("3_icon")
+ItemShape = SubResource("Shape")
+weight = 1
+ItemMesh = ExtResource("4_mesh")
+ActionDefinitions = []
+IsAmmunition = true
+AmmoDamage = 23
+MaxStackSize = 8
+buyPrice = 70
+sellPrice = 35

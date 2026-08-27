@@ -12,17 +12,22 @@ public partial class RangedAttackActionDefinition
 {
 	[Export] public Enums.RangedAttackType Type;
 	[Export] public int attackCount = 1;
+	[Export(PropertyHint.Range, "1,100,1")] public int ammoCost = 1;
 	[Export] public int range;
-	[Export] public int damage;
 	[Export] public bool canCauseFatalWounds = true;
-	// Added to the shooter's RangedAccuracy when calculating projectile spread.
-	// Positive values make this attack more accurate; negative values make it less accurate.
+
+	// Legacy per-action ammo links remain supported while weapon resources migrate
+	// to ItemData.AmmoItem. Damage still comes from the linked ammo ItemData.
+	[Export] public ItemData ammoItem;
+
 	[Export(PropertyHint.Range, "-100,100,1")] public float accuracy = 0f;
 	[Export] public Godot.Collections.Dictionary<Enums.Stat, int> damagingStats = new();
 
 	[ExportGroup("Action Cost")]
-	[Export(PropertyHint.Range, "1,100,1")] public int timeUnitCost = 20;
-	[Export(PropertyHint.Range, "0,100,1")] public int staminaCost;
+	[Export] public Godot.Collections.Dictionary<Enums.Stat, int> actionCosts = new()
+	{
+		{ Enums.Stat.TimeUnits, 20 }
+	};
 	
 	public override ActionBase InstantiateAction(
 		GridObject parent,
@@ -48,6 +53,25 @@ public partial class RangedAttackActionDefinition
 		if (Item == null)
 		{
 			reason = "No item equipped";
+			return false;
+		}
+
+		ItemData ammo = Item.GetRequiredAmmoItem();
+		if (Item.AmmoCapacity <= 0 || ammo == null || !ammo.IsAmmunition)
+		{
+			reason = "Weapon ammo is not configured";
+			return false;
+		}
+
+		if (ammo.AmmoDamage <= 0)
+		{
+			reason = $"{ammo.ItemName} has no ranged damage configured";
+			return false;
+		}
+
+		if (!Item.HasAmmoForAttack(ammoCost))
+		{
+			reason = $"Not enough ammo ({Item.CurrentAmmo}/{Item.AmmoCapacity}; requires {ammoCost})";
 			return false;
 		}
 
@@ -85,8 +109,7 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
-		AddCost(costs, Enums.Stat.TimeUnits, timeUnitCost);
-		AddCost(costs, Enums.Stat.Stamina, staminaCost);
+		AddCosts(costs, actionCosts);
 
 
 		reason = "success";
@@ -98,6 +121,8 @@ public partial class RangedAttackActionDefinition
 		GridCell startingGridCell
 	)
 	{
+		if (Item == null || !Item.HasAmmoForAttack(ammoCost))
+			return new List<GridCell>();
 
 		List<GridCell> tempCells = parentGridObject.TeamHolder.GetVisibleGridCells().Where(cell =>
 		{
@@ -152,29 +177,13 @@ public partial class RangedAttackActionDefinition
 			return (targetGridCell, 0);;
 
 
-		// if (targetGridCell.gridObjects.Contains( parentGridObject))
-		// {
-		// 	GD.Print("RANGED ATTACK: Target grid object is parent");
-		// 	return (null, 0);
-		// }
-		//
-		// if (!targetGridCell.gridObjects.Any(gridObject => gridObject.IsActive))
-		// {
-		// 	GD.Print("RANGED ATTACK: Grid object is not active");
-		// 	return (null, 0);
-		// }
-		//
-		// if (targetGridCell.gridObjects.Any(gridObject => gridObject.Team.HasFlag(parentGridObject.Team)))
-		// {
-		// 	GD.Print($"RANGED ATTACK: Target grid object team is equal to parent: {parentGridObject.Team}");
-		// }
 
 
-		score += 80; // Base score for attacking an enemy
-		// Add more score based on enemy health (e.g., higher score for lower health)
+
+		score += 80;
 		if (statHolder.TryGetStat(Enums.Stat.Health, out var healthStat))
 		{
-			score += (100 - Mathf.RoundToInt(healthStat.CurrentValue)); // Higher score for lower health
+			score += (100 - Mathf.RoundToInt(healthStat.CurrentValue));
 		}
 
 		return (targetGridCell, score);

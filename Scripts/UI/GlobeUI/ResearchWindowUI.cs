@@ -22,6 +22,7 @@ public partial class ResearchWindowUI : Control
 
 	public override void _Ready()
 	{
+		MissionUITheme.Apply(this);
 		SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 		MouseFilter = MouseFilterEnum.Stop;
 		ZIndex = 100;
@@ -105,7 +106,7 @@ public partial class ResearchWindowUI : Control
 			Text = "RESEARCH",
 			SizeFlagsHorizontal = SizeFlags.ExpandFill
 		};
-		title.AddThemeFontSizeOverride("font_size", 28);
+		MissionUITheme.StyleTitle(title, 28);
 		header.AddChild(title);
 
 		var closeButton = new Button

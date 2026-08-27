@@ -11,6 +11,9 @@ public partial class TurnUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this, 8);
+		MissionUITheme.StyleFirstTitle(this, 14);
 		if (endTurnButton != null)
 		{
 			endTurnButton.Pressed += EndTurnButtonOnPressed;

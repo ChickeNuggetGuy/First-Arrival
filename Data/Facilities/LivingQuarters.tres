@@ -9,6 +9,5 @@ DisplayName = "Living Quarters"
 Purpose = "Increases the number of troops that can be stationed at this base."
 InitialCost = 175000
 MonthlyCost = 3000
-ScientistCapacity = null
 GridSize = Vector2i(2, 1)
 BuildTimeDays = 10

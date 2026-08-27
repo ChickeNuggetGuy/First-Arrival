@@ -42,15 +42,28 @@ public partial class MouseHeldInventoryUI : InventoryGridUI
 		if (@event is InputEventMouseButton mouseEvent)
 		{
 			if (mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Right)
-			{
-				if(!InventoryGrid.TryGetItemAt(0,0, out (Item item, int count) item)) return;
-				if (InventoryGrid.TryTransferItem(InventoryGrid, previousInventory, item.item, item.count))
-				{
-					previousInventory = null;
-				}
-			}
+				TryReturnHeldItem();
 		}
 		base._UnhandledInput(@event);
+	}
+
+	public bool TryReturnHeldItem()
+	{
+		if (InventoryGrid == null || !InventoryGrid.TryGetItemAt(
+			    0,
+			    0,
+			    out (Item item, int count) heldItem))
+			return true;
+		if (previousInventory == null) return false;
+
+		bool returned = InventoryGrid.TryTransferItem(
+			InventoryGrid,
+			previousInventory,
+			heldItem.item,
+			heldItem.count);
+		if (returned && !InventoryGrid.HasItemAt(0, 0))
+			previousInventory = null;
+		return returned;
 	}
 
 	protected override void _Hide()

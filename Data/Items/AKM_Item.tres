@@ -5,31 +5,26 @@
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
 [ext_resource type="Texture2D" uid="uid://dnpkskgaqhk2i" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Rifle_Assault_01_BattleRoyale_Side.png" id="4_icon"]
 [ext_resource type="ArrayMesh" uid="uid://da36we716jvwp" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Rifle_01.obj" id="5_mesh"]
+[ext_resource type="Resource" uid="uid://dt0ncw3y17kn6" path="res://Data/Items/Ammo_7_62x39mm_Item.tres" id="6_ammo"]
 
 [sub_resource type="Resource" id="Snap"]
 script = ExtResource("1_ranged")
 range = 15
-damage = 27
 accuracy = -30.0
-timeUnitCost = 25
 
 [sub_resource type="Resource" id="Aim"]
 script = ExtResource("1_ranged")
 Type = 1
 range = 22
-damage = 27
 accuracy = -8.0
-timeUnitCost = 37
 
 [sub_resource type="Resource" id="Auto"]
 script = ExtResource("1_ranged")
 Type = 2
 attackCount = 3
+ammoCost = 3
 range = 17
-damage = 27
 accuracy = -42.0
-timeUnitCost = 44
-staminaCost = 6
 confirmClick = true
 
 [sub_resource type="Resource" id="Shape"]
@@ -52,5 +47,8 @@ ItemShape = SubResource("Shape")
 weight = 13
 ItemMesh = ExtResource("5_mesh")
 ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim"), SubResource("Auto")])
+AmmoItem = ExtResource("6_ammo")
+MagazineCapacity = 30
+ReloadTimeUnitCost = 30
 buyPrice = 700
 sellPrice = 490

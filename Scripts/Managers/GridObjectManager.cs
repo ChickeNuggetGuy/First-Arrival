@@ -13,6 +13,9 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, int> spawnCounts = new();
 	[Export] Godot.Collections.Dictionary<Enums.UnitTeam, GridObjectTeamHolder> gridObjectTeams = new();
 	[Export] private StartingEuipmentUI startingEuipmentUI;
+	private readonly System.Collections.Generic.Dictionary<
+		Enums.UnitTeam,
+		Godot.Collections.Dictionary<string, Variant>> _loadedTeamData = new();
 
 
 	public GridObject CurrentPlayerGridObject
@@ -73,7 +76,15 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	{
 		if (HasLoadedData)
 		{
-			//loaded saved units for this scene
+			foreach (var pair in gridObjectTeams)
+			{
+				if (_loadedTeamData.TryGetValue(pair.Key, out var holderData))
+					await pair.Value.LoadAsync(holderData);
+				else
+					pair.Value.Setup();
+			}
+			_loadedTeamData.Clear();
+
 			GridObjectTeamHolder teamHolder = GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 			if (teamHolder != null)
 			{
@@ -232,7 +243,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 	#region Manager Data
 	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-
+		_loadedTeamData.Clear();
 		gridObjectTeams.Clear();
 		foreach (Node child in GetChildren())
 		{
@@ -247,7 +258,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			if (Enum.TryParse(dataKVP.Key, out Enums.UnitTeam team) && gridObjectTeams.ContainsKey(team))
 			{
 				var holderData = (Godot.Collections.Dictionary<string, Variant>)dataKVP.Value;
-				gridObjectTeams[team].Load(holderData);
+				_loadedTeamData[team] = holderData;
 			}
 		}
 		return Task.CompletedTask;

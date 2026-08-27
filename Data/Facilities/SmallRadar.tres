@@ -9,6 +9,5 @@ DisplayName = "Radar Facility"
 Purpose = "Expands this base's detection radius on the globe."
 InitialCost = 250000
 MonthlyCost = 7500
-ScientistCapacity = null
 GridSize = Vector2i(2, 2)
 BuildTimeDays = 14

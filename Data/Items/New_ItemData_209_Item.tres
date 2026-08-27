@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://53tnf5aai3ya"]
+
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="1_giryb"]
+
+[resource]
+script = ExtResource("1_giryb")
+ItemID = 209
+ItemName = "New ItemData"
+ActionDefinitions = []

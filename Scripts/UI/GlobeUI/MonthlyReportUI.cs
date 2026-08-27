@@ -29,6 +29,8 @@ public partial class MonthlyReportUI : UIWindow
 
 	protected override async Task _Setup()
 	{
+		MissionUITheme.Apply(this);
+		MissionUITheme.StyleTitle(reportTitleLabel, 28);
 		ProcessMode = ProcessModeEnum.Always;
 
 		if (continueButton != null &&

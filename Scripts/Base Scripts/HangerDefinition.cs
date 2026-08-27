@@ -13,4 +13,7 @@ public partial class HangerDefinition : FacilityDefinition
 	{
 		baseDefinition?.AddCraftCapacity(CraftCapacityBonus);
 	}
+
+	public override string GetEffectsSummary() =>
+		$"Craft capacity: +{Mathf.Max(0, CraftCapacityBonus):N0}";
 }

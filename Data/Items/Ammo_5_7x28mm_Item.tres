@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://0umwyvgw4kax"]
+
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="1_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="2_item"]
+[ext_resource type="Texture2D" uid="uid://kota21f66t3g" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Resources/ICON_SM_Wep_Bullet_Ammo_02_BattleRoyale.png" id="3_icon"]
+[ext_resource type="ArrayMesh" uid="uid://b0y8wk8xxxv40" path="res://Third-Party Assets/Synty/PolygonBattleRoyale/Models/extracted/SM_Wep_Bullet_Ammo_02.res" id="4_mesh"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("1_shape")
+
+[resource]
+resource_name = "5.7x28 mm Full Load"
+script = ExtResource("2_item")
+ItemID = 202
+ItemName = "5.7x28 mm Full Load"
+ItemDescription = "One complete 5.7x28 mm reload for a compatible personal-defense weapon. Each count is one full magazine."
+ItemIcon = ExtResource("3_icon")
+ResearchTier = 3
+RequiredResearch = "personal_defense_weapons"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 1
+ItemMesh = ExtResource("4_mesh")
+ActionDefinitions = []
+IsAmmunition = true
+AmmoDamage = 40
+MagazineCapacity = 10
+MaxStackSize = 8
+buyPrice = 110
+sellPrice = 55

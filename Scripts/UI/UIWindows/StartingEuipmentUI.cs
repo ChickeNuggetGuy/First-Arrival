@@ -28,11 +28,27 @@ public partial class StartingEuipmentUI : UIWindow
 	private Array<GridObject> playerUnits = new Array<GridObject>();
 	private int currentUnitIndex = 0;
 
+	public InventoryGrid GetInventoryGrid(Enums.InventoryType inventoryType) =>
+		inventoryGrids.TryGetValue(inventoryType, out InventoryGrid inventory)
+			? inventory
+			: null;
+
 	[Signal]
 	public delegate void AcceptPressedEventHandler();
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.StylePanel(GetNodeOrNull<Panel>("Panel"));
+		MissionUITheme.InsetPanelContent(this, 20);
+		MissionUITheme.StyleTitle(unitNameLabel, 24);
+		MissionUITheme.StyleButton(acceptButton);
+		MissionUITheme.StyleButton(previousButton);
+		MissionUITheme.StyleButton(nextButton);
+		VBoxContainer statsContainer = GetNodeOrNull<VBoxContainer>(
+			"Panel/MarginContainer/VBoxContainer/Middle Section/Stats Container");
+		MissionUITheme.Apply(statsContainer);
+		MissionUITheme.StyleFirstTitle(statsContainer, 20);
+
 		InventoryManager inventoryManager = InventoryManager.Instance;
 		if (inventoryManager == null)
 		{
@@ -40,34 +56,38 @@ public partial class StartingEuipmentUI : UIWindow
 			return Task.CompletedTask;
 		}
 
-		if (inventoryManager.startingItems == null || inventoryManager.startingItems.Count == 0)
+		if (inventoryManager.startingItems == null)
 		{
 			GD.PrintErr("startingItems == null");
 			return Task.CompletedTask;
 		}
 
-		foreach (var inventoryGridKVP in inventoryGrids)
+		InventoryGrid groundInventory = GetInventoryGrid(
+			Enums.InventoryType.Ground);
+		if (groundInventory == null)
 		{
-			InventoryGrid inventoryGrid = inventoryGridKVP.Value == null
-				? inventoryManager.GetInventoryGrid(inventoryGridKVP.Key)
-				: inventoryGridKVP.Value;
-
-			if (inventoryGrid == null)
-			{
-				GD.PrintErr("inventoryGrid == null");
-				continue;
-			}
-
-			inventoryGrid.Initialize();
-			inventoryGrid.ClearInventory();
+			groundInventory = inventoryManager.GetInventoryGrid(
+				Enums.InventoryType.Ground);
+			if (groundInventory != null)
+				inventoryGrids[Enums.InventoryType.Ground] = groundInventory;
 		}
+		if (groundInventory == null)
+		{
+			GD.PrintErr("Ground inventory grid is not available.");
+			return Task.CompletedTask;
+		}
+
+		groundInventory.Initialize();
+		groundInventory.ClearInventory();
+		GameManager.Instance?.RestoreBattleDeploymentInventory(
+			groundInventory);
 
 		inventoryGridUIs.Clear();
 		if (this.TryGetAllComponentsInChildrenRecursive<InventoryGridUI>(out var inventoryGridUIList))
 		{
 			foreach (var inventoryGridUI in inventoryGridUIList)
 			{
-				inventoryGridUIs.Add(inventoryGridUI.inventoryType, inventoryGridUI);
+				inventoryGridUIs[inventoryGridUI.inventoryType] = inventoryGridUI;
 			}
 		}
 
@@ -166,25 +186,27 @@ public partial class StartingEuipmentUI : UIWindow
 
 		InventoryManager inventoryManager = InventoryManager.Instance;
 		populateInventoryGrid(Enums.InventoryType.Ground, inventoryManager.startingItems, inventoryManager);
+		GridObject currentUnit = playerUnits.Count > 0
+			? playerUnits[currentUnitIndex]
+			: null;
+		GridObjectInventory currentInventory = null;
+		currentUnit?.TryGetGridObjectNode(out currentInventory);
 
 		foreach (var pair in inventoryGridUIs)
 		{
-			// Safe-catch if Ground wasn't assigned in the Godot Editor Inspector
-			if (!inventoryGrids.ContainsKey(pair.Key))
+			InventoryGrid inventoryGrid = null;
+			if (pair.Key == Enums.InventoryType.Ground)
+				inventoryGrid = GetInventoryGrid(pair.Key);
+			else
+				currentInventory?.TryGetInventory(pair.Key, out inventoryGrid);
+
+			if (inventoryGrid == null)
 			{
-				InventoryGrid groundGrid = inventoryManager.GetInventoryGrid(pair.Key);
-				if (groundGrid != null)
-				{
-					inventoryGrids.Add(pair.Key, groundGrid);
-				}
-				else
-				{
-					GD.PrintErr($"InventoryGrid not found globally or locally: {pair.Key}");
-					continue;
-				}
+				GD.PrintErr($"Selected unit has no {pair.Key} inventory grid.");
+				continue;
 			}
 
-			pair.Value.SetInventroyGrid(inventoryGrids[pair.Key]);
+			pair.Value.SetInventroyGrid(inventoryGrid);
 			pair.Value.AutoFetchGround = false;
 			await pair.Value.ShowCall();
 		}

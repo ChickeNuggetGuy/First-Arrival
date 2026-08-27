@@ -15,6 +15,8 @@ public partial class UIManager : Manager<UIManager>
 	[Export] private LoadingScreenUI loadingSCcreenUI;
 	
 	[Export]public MouseHeldInventoryUI  mouseHeldInventoryUI {get; protected set;}
+	private Godot.Collections.Dictionary<string, Variant>
+		_loadedMouseHeldInventory;
 	#region Functions
 
 	public void ShowLoadingScreen()
@@ -91,6 +93,15 @@ public partial class UIManager : Manager<UIManager>
 		{
 			await window.SetupCall();
 		}
+
+		if (_loadedMouseHeldInventory != null &&
+		    mouseHeldInventoryUI?.InventoryGrid != null)
+		{
+			mouseHeldInventoryUI.previousInventory = null;
+			mouseHeldInventoryUI.InventoryGrid.LoadContents(
+				_loadedMouseHeldInventory);
+			_loadedMouseHeldInventory = null;
+		}
 		
 		EmitSignal(SignalName.ExecuteCompleted);
 		await Task.CompletedTask;
@@ -122,17 +133,44 @@ public partial class UIManager : Manager<UIManager>
 		BlockingInput = false;
 		return true;
 	}
+
+	/// <summary>Returns the first registered window of the requested type.</summary>
+	public T GetWindow<T>() where T : UIWindow
+	{
+		foreach (UIWindow window in _windows)
+		{
+			if (window is T typedWindow && GodotObject.IsInstanceValid(typedWindow))
+				return typedWindow;
+		}
+
+		return null;
+	}
 	
 	#region manager Data
 	public override Task Load(Godot.Collections.Dictionary<string,Variant> data)
 	{
-		if(!HasLoadedData)  return Task.CompletedTask;
+		_loadedMouseHeldInventory = null;
+		if (data != null && data.TryGetValue(
+			    "mouseHeldInventory",
+			    out Variant inventoryValue) &&
+		    inventoryValue.VariantType == Variant.Type.Dictionary)
+		{
+			_loadedMouseHeldInventory = inventoryValue
+				.AsGodotDictionary<string, Variant>();
+		}
 		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string,Variant> Save()
 	{
-		return null;
+		var data = new Godot.Collections.Dictionary<string, Variant>();
+		mouseHeldInventoryUI?.TryReturnHeldItem();
+		if (mouseHeldInventoryUI?.InventoryGrid?.UniqueItems.Count > 0)
+		{
+			data["mouseHeldInventory"] =
+				mouseHeldInventoryUI.InventoryGrid.SaveContents();
+		}
+		return data;
 	}
 	#endregion
 

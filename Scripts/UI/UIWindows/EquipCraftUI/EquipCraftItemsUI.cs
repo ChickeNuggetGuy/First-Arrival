@@ -19,6 +19,10 @@ public partial class EquipCraftItemsUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this);
+		MissionUITheme.StyleFirstTitle(this, 24);
+		MissionUITheme.NormalizeButtonText(this);
 		if (addButton != null)
 			addButton.Pressed += AddButtonOnPressed;
 

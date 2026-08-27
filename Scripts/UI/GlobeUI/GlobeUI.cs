@@ -8,16 +8,16 @@ using Godot.Collections;
 [GlobalClass]
 public partial class GlobeUI : UIWindow
 {
-	[Export] private Label currentFundsUI;
+	[Export] private CustomLabel currentFundsUI;
+	[Export] private CustomLabel currentTimeUI;
 	[Export] private Button buildBaseButton;
 	[Export] private Button sendMissionButton;
 	[Export] private Button researchButton;
 	[Export] private Button monthlyReportButton;
 	[Export] private MonthlyReportUI monthlyReportUI;
 	[Export] private SelectCraftUI selectCraftUI;
-	[Export] private Label monthlyScoreLabel;
+	[Export] private CustomLabel monthlyScoreLabel;
 	
-	[ExportGroup("Time"), Export] private Label currentDateUI;
 	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
 
 	[ExportGroup("Bases"), Export] private Control baseButtonHolder;
@@ -25,10 +25,18 @@ public partial class GlobeUI : UIWindow
 	private Dictionary<int, HBoxContainer> baseButtons = new Dictionary<int, HBoxContainer>();
 	private ResearchWindowUI researchWindow;
 	private GameManager researchRequestManager;
+	private GlobeTimeManager subscribedTimeManager;
 	private bool isOpeningBase;
 	protected override Task _Setup()
 	{
-		
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this, 16);
+		StyleStatusLabel(currentFundsUI.Label);
+		StyleStatusLabel(currentTimeUI.Label);
+		StyleStatusLabel(monthlyScoreLabel.Label);
+		ConnectTimeManager();
+
+
 		if (buildBaseButton != null && !buildBaseButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(BuildBaseButtonOnPressed)))
 		{
 			buildBaseButton.Pressed += BuildBaseButtonOnPressed;
@@ -38,9 +46,6 @@ public partial class GlobeUI : UIWindow
 		{
 			sendMissionButton.Pressed += sendMissionButtonOnPressed;
 		}
-		
-
-		GlobeTimeManager.Instance.DateChanged += TimeManagerOnDateChanged;
 		
 		
 
@@ -71,7 +76,7 @@ public partial class GlobeUI : UIWindow
 				return Task.CompletedTask;
 			}
 
-			currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
+			currentFundsUI.Text = teamHolder.funds.ToString("N0");
 			UpdateMonthlyScoreLabel(teamHolder.TotalMonthlyScore);
 			teamHolder.FundsChanged += TeamHolderOnFundsChanged;
 			teamHolder.MonthlyScoreChanged += TeamHolderOnMonthlyScoreChanged;
@@ -99,6 +104,14 @@ public partial class GlobeUI : UIWindow
 		if (gameManager?.ConsumeResearchWindowRequest() == true)
 			QueueRequestedResearchWindow(gameManager);
 		return Task.CompletedTask;
+	}
+
+	private static void StyleStatusLabel(Label label)
+	{
+		if (label == null) return;
+		label.AddThemeFontSizeOverride("font_size", 18);
+		label.AddThemeColorOverride("font_color", MissionUITheme.AccentColor.Lightened(0.2f));
+		label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 	}
 
 	private void QueueRequestedResearchWindow(GameManager gameManager)
@@ -145,9 +158,53 @@ public partial class GlobeUI : UIWindow
 		researchRequestManager = null;
 	}
 
+	private void ConnectTimeManager()
+	{
+		GlobeTimeManager timeManager = GlobeTimeManager.Instance;
+		if (timeManager == null || !GodotObject.IsInstanceValid(timeManager)) return;
+
+		if (subscribedTimeManager != timeManager)
+		{
+			DisconnectTimeManager();
+			subscribedTimeManager = timeManager;
+			subscribedTimeManager.TimeChanged += TimeManagerOnTimeChanged;
+		}
+
+		UpdateTimeUI(timeManager);
+	}
+
+	private void DisconnectTimeManager()
+	{
+		if (subscribedTimeManager != null &&
+		    GodotObject.IsInstanceValid(subscribedTimeManager))
+		{
+			subscribedTimeManager.TimeChanged -= TimeManagerOnTimeChanged;
+		}
+
+		subscribedTimeManager = null;
+	}
+
+	private void TimeManagerOnTimeChanged(int hour, int minute, int second)
+	{
+		if (subscribedTimeManager != null)
+			UpdateTimeUI(subscribedTimeManager);
+	}
+
+	private void UpdateTimeUI(GlobeTimeManager timeManager)
+	{
+		if (currentTimeUI == null) return;
+
+		currentTimeUI.Text =
+			$"{timeManager.CurrentHour:D2}:{timeManager.CurrentMinute:D2}:" +
+			$"{timeManager.CurrentSeconds:D2}\n" +
+			$"Date: {timeManager.CurrentMonth} " +
+			$"{timeManager.CurrentDayOfMonth:D2}, {timeManager.CurrentYear}";
+	}
+
 	public override void _ExitTree()
 	{
 		DisconnectResearchLoadSignal();
+		DisconnectTimeManager();
 		base._ExitTree();
 	}
 
@@ -163,7 +220,7 @@ public partial class GlobeUI : UIWindow
 	private void UpdateMonthlyScoreLabel(int score)
 	{
 		if (monthlyScoreLabel != null)
-			monthlyScoreLabel.Text = $"Monthly Score: {score:N0}";
+			monthlyScoreLabel.Text = score.ToString("N0");
 	}
 
 	protected override Task DrawUI()
@@ -244,7 +301,7 @@ public partial class GlobeUI : UIWindow
 
 	private void sendMissionButtonOnPressed()
 	{
-		selectCraftUI.ShowCall();
+		selectCraftUI.ShowForDestination(-1);
 	}
 	
 	private void ResearchButtonOnPressed()
@@ -351,11 +408,6 @@ public partial class GlobeUI : UIWindow
 			_ = monthlyReportUI.ShowLatestReport();
 	}
 	
-	private void TimeManagerOnDateChanged(int year, Enums.Month month, int date, Enums.Day day)
-	{
-		currentDateUI.Text = $"Current Time: {month}, {date},{year}";
-	}
-
 	private void TeamHolderOnFundsChanged(GlobeTeamHolder teamHolder, long currentFunds)
 	{
 		GD.Print("Team funds changed: " + teamHolder.funds);

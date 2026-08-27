@@ -5,21 +5,18 @@
 [ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
 [ext_resource type="Texture2D" uid="uid://dysq5eqf82g4a" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Weapons/ICON_SM_Wep_Pistol_Small_01_Military_Side.png" id="4_icon"]
 [ext_resource type="ArrayMesh" uid="uid://eoddwo6aujbm" path="res://Third-Party Assets/Polygon Prototype/OBJ/SM_Prop_Pistol_01.obj" id="5_mesh"]
+[ext_resource type="Resource" uid="uid://bymkq0i6q5ihv" path="res://Data/Items/Ammo_9x19mm_Item.tres" id="6_ammo"]
 
 [sub_resource type="Resource" id="Snap"]
 script = ExtResource("1_ranged")
 range = 11
-damage = 20
 accuracy = -13.0
-timeUnitCost = 15
 
 [sub_resource type="Resource" id="Aim"]
 script = ExtResource("1_ranged")
 Type = 1
 range = 15
-damage = 20
 accuracy = 8.0
-timeUnitCost = 24
 
 [sub_resource type="Resource" id="Shape"]
 script = ExtResource("2_shape")
@@ -45,5 +42,8 @@ weight = 4
 ItemMesh = ExtResource("5_mesh")
 visualScale = Vector3(0.009, 0.009, 0.009)
 ActionDefinitions = Array[Object]([SubResource("Snap"), SubResource("Aim")])
+AmmoItem = ExtResource("6_ammo")
+MagazineCapacity = 17
+ReloadTimeUnitCost = 16
 buyPrice = 850
 sellPrice = 595

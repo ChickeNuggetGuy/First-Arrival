@@ -5,6 +5,7 @@ using FirstArrival.Scripts.Managers;
 
 public partial class CellDefinitionVisual : Node3D, IContextUser<CellDefinitionVisual>
 {
+	public const string ContextUserGroup = "globe_cell_definition_visuals";
 	public int CellIndex;
 	public HexCellDefinition parentCellDefinition;
 	[Export] private CollisionObject3D collisionObject;
@@ -27,15 +28,20 @@ public partial class CellDefinitionVisual : Node3D, IContextUser<CellDefinitionV
 
 	public virtual Dictionary<string, Callable> GetContextActions()
 	{
-		Dictionary<string, Callable> contectActions = new Dictionary<string, Callable>();
-		// contectActions.Add("Focus", Callable.From(GlobeC));
-		return contectActions;
+		return parentCellDefinition?.GetContextActions() ??
+		       new Dictionary<string, Callable>();
 	}
 
 	public override void _Ready()
 	{
 		ConnectInputManager();
 		RefreshLabelVisibility();
+	}
+
+	public override void _EnterTree()
+	{
+		AddToGroup(ContextUserGroup);
+		base._EnterTree();
 	}
 
 	public void BindDefinition(HexCellDefinition definition)

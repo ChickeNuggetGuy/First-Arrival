@@ -162,9 +162,25 @@ public partial class GlobeInputManager : Manager<GlobeInputManager>
 		{
 			return null;
 		}
-		else if (result["collider"].AsGodotObject() == globeMesh)
+		GodotObject collider = result["collider"].AsGodotObject();
+		if (collider == globeMesh)
 		{
 			return result["position"].AsVector3();
+		}
+
+		// Definition markers have their own colliders and can be hit before the
+		// globe mesh. Resolve their owning visual back to its underlying hex.
+		Node colliderNode = collider as Node;
+		while (colliderNode != null)
+		{
+			if (colliderNode is CellDefinitionVisual definitionVisual &&
+			    definitionVisual.CellIndex >= 0)
+			{
+				return GlobeHexGridManager.Instance?
+					.GetCellFromIndex(definitionVisual.CellIndex)?.Center;
+			}
+
+			colliderNode = colliderNode.GetParent();
 		}
 
 		return null;

@@ -13,7 +13,13 @@ public partial class MainInventoryWindow : UIWindow
 
 	protected override Task _Setup()
 	{
-		
+		MissionUITheme.StylePanel(GetNodeOrNull<Panel>("Panel"));
+		MissionUITheme.InsetPanelContent(this, 12);
+		VBoxContainer statsContainer = GetNodeOrNull<VBoxContainer>(
+			"Panel/VBoxContainer/Top Half/HBoxContainer/Stats Container");
+		MissionUITheme.Apply(statsContainer);
+		MissionUITheme.StyleFirstTitle(statsContainer, 20);
+
 		GridObjectTeamHolder playerTeamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 
 		if (playerTeamHolder != null)

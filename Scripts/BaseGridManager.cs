@@ -13,8 +13,6 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 	private const float CELLSPACING = CELLSIZE;
 	
 	private BaseCell[,] cells;
-	private PopupMenu facilityMenu;
-	private readonly System.Collections.Generic.Dictionary<long, string> facilityNamesById = new();
 	private PackedScene selectedFacilityScene;
 	private FacilityDefinition selectedFacilityDefinition;
 	private BaseCell placementGhost;
@@ -61,7 +59,6 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 
 	protected override async Task _Setup(bool loadingData)
 	{
-		CreateFacilityMenu();
 		await Task.CompletedTask;
 	}
 
@@ -190,12 +187,9 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 		if (mouseEvent.ButtonIndex != MouseButton.Left)
 			return;
 
-		// A facility must be chosen before the grid accepts placement clicks.
-		// If the popup was dismissed without a choice, reopen it.
 		if (selectedFacilityScene == null)
 		{
-			ShowFacilitySelectionMenu();
-			GetViewport().SetInputAsHandled();
+			SetBuildFacilityMode(false);
 			return;
 		}
 
@@ -239,46 +233,43 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 			BaseCamera camera = BaseCamera.Instance;
 			if (camera != null && GodotObject.IsInstanceValid(camera))
 				camera.FocusOn(cellsArray);
-			ShowFacilitySelectionMenu();
 		}
 		else
 		{
-			HideFacilityMenu();
 			ClearPlacementSelection();
 		}
 	}
 
-	private void CreateFacilityMenu()
+	public sealed class FacilityBuildOption
 	{
-		if (facilityMenu != null)
-			return;
+		public string FacilityKey { get; }
+		public FacilityDefinition Definition { get; }
+		public bool CanAfford { get; }
 
-		facilityMenu = new PopupMenu
+		public FacilityBuildOption(
+			string facilityKey,
+			FacilityDefinition definition,
+			bool canAfford)
 		{
-			Name = "FacilityMenu",
-			MinSize = new Vector2I(220, 0)
-		};
-		facilityMenu.IdPressed += SelectFacilityForPlacement;
-		AddChild(facilityMenu);
+			FacilityKey = facilityKey;
+			Definition = definition;
+			CanAfford = canAfford;
+		}
 	}
 
-	private void ShowFacilitySelectionMenu()
+	/// <summary>
+	/// Returns the facilities that may be added to the current base. The UI owns
+	/// how these options are displayed; this manager remains responsible for
+	/// validating affordability and placement when an option is chosen.
+	/// </summary>
+	public System.Collections.Generic.IReadOnlyList<FacilityBuildOption>
+		GetAvailableFacilityOptions()
 	{
-		CreateFacilityMenu();
-		facilityMenu.Clear();
-		facilityNamesById.Clear();
-
-		var facilityNames = new System.Collections.Generic.List<string>();
+		var options =
+			new System.Collections.Generic.List<FacilityBuildOption>();
 		foreach (String facilityName in facilityScenes.Keys)
 		{
-			if (!string.IsNullOrWhiteSpace(facilityName))
-				facilityNames.Add(facilityName);
-		}
-
-		facilityNames.Sort(StringComparer.OrdinalIgnoreCase);
-		long id = 0;
-		foreach (string facilityName in facilityNames)
-		{
+			if (string.IsNullOrWhiteSpace(facilityName)) continue;
 			if (!facilityScenes.TryGetValue(facilityName, out PackedScene scene) ||
 			    scene == null ||
 			    !TryCreateFacilityCell(scene, out BaseCell facilityCell))
@@ -289,44 +280,19 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 			FacilityDefinition definition = facilityCell.FacilityDefinition;
 			bool selectable = IsFacilitySelectable(definition);
 			facilityCell.Free();
-			if (!selectable)
-			{
-				continue;
-			}
+			if (!selectable) continue;
 
-			facilityNamesById[id] = facilityName;
-			Vector2I gridSize = definition.GetValidatedGridSize();
-
-			facilityMenu.AddItem(
-				$"{definition.DisplayName} — ${definition.InitialCost:N0} upfront, " +
-				$"${definition.MonthlyCost:N0}/mo, {definition.BuildTimeDays} days, " +
-				(int)id);
-			bool canAfford = CanAffordFacility(definition);
-			facilityMenu.SetItemDisabled(
-				facilityMenu.ItemCount - 1,
-				!canAfford);
-			facilityMenu.SetItemTooltip(
-				facilityMenu.ItemCount - 1,
-				canAfford
-					? definition.Purpose
-					: $"{definition.Purpose}\nInsufficient funds.");
-			id++;
+			options.Add(new FacilityBuildOption(
+				facilityName,
+				definition,
+				CanAffordFacility(definition)));
 		}
 
-		if (facilityNamesById.Count == 0)
-			AddDisabledMenuItem("No facilities available");
-
-		Vector2 mousePosition = GetViewport().GetMousePosition();
-		facilityMenu.Position = new Vector2I(
-			Mathf.RoundToInt(mousePosition.X),
-			Mathf.RoundToInt(mousePosition.Y));
-		facilityMenu.Popup();
-	}
-
-	private void AddDisabledMenuItem(string text)
-	{
-		facilityMenu.AddItem(text);
-		facilityMenu.SetItemDisabled(facilityMenu.ItemCount - 1, true);
+		options.Sort((left, right) => string.Compare(
+			left.Definition.DisplayName,
+			right.Definition.DisplayName,
+			StringComparison.OrdinalIgnoreCase));
+		return options;
 	}
 
 	private bool IsFacilitySelectable(FacilityDefinition definition)
@@ -351,15 +317,29 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 		GameManager.Instance != null &&
 		GameManager.Instance.currentBaseFunds >= Mathf.Max(0, definition.InitialCost);
 
-	private void SelectFacilityForPlacement(long id)
+	public bool BeginFacilityPlacement(string facilityKey)
 	{
-		if (!facilityNamesById.TryGetValue(id, out string facilityName) ||
-		    !facilityScenes.TryGetValue(facilityName, out PackedScene facilityScene))
-			return;
+		if (cells == null ||
+		    string.IsNullOrWhiteSpace(facilityKey) ||
+		    !facilityScenes.TryGetValue(facilityKey, out PackedScene facilityScene) ||
+		    facilityScene == null ||
+		    !TryCreateFacilityCell(facilityScene, out BaseCell validationCell))
+		{
+			return false;
+		}
 
-		ClearPlacementSelection();
+		FacilityDefinition definition = validationCell.FacilityDefinition;
+		validationCell.Free();
+		if (!IsFacilitySelectable(definition) || !CanAffordFacility(definition))
+			return false;
+
+		SetBuildFacilityMode(true);
+
 		if (!TryCreateFacilityCell(facilityScene, out BaseCell ghost))
-			return;
+		{
+			SetBuildFacilityMode(false);
+			return false;
+		}
 
 		selectedFacilityScene = facilityScene;
 		selectedFacilityDefinition = ghost.FacilityDefinition;
@@ -385,6 +365,7 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 		invalidGhostMaterial ??= CreateGhostMaterial(
 			new Color(1.0f, 0.16f, 0.12f, 0.48f));
 		UpdatePlacementPreview(GetCellFromMouse());
+		return true;
 	}
 
 	private static StandardMaterial3D CreateGhostMaterial(Color color) => new()
@@ -707,12 +688,6 @@ public partial class BaseGridManager : Manager<BaseGridManager>
 			construction.DisplayName,
 			cell);
 		GameManager.Instance.SyncCurrentBaseToGlobeState();
-	}
-
-	private void HideFacilityMenu()
-	{
-		if (facilityMenu?.Visible == true)
-			facilityMenu.Hide();
 	}
 
 	private void ClearPlacementSelection()

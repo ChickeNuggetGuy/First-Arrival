@@ -14,6 +14,15 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		"res://Scenes/BaseCells/HQCell.tscn";
 	public static readonly Vector2I HeadquartersGridOrigin = new(4, 4);
 
+	public const string HangerDefinitionPath =
+		"res://Data/Facilities/Hanger.tres";
+	public const string HangerScenePath =
+		"res://Scenes/BaseCells/HangerCell.tscn";
+	public const string StartingTransportCraftPath =
+		"res://Data/Items/Troop_Transport_Item.tres";
+	public static readonly Vector2I TransportHangerGridOrigin = new(3, 5);
+	public static readonly Vector2I FighterHangerGridOrigin = new(6, 5);
+
 	public Enums.UnitTeam teamAffiliation = Enums.UnitTeam.None;
 	public GlobeTeamHolder parentTeamHolder;
 	public int DetectionRadius { get; set; } = 0;
@@ -21,8 +30,9 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	public bool ShowDetectionRadius { get; set; } = true;
 	public int BaseTroopCapacity { get; private set; } = 0;
 	public int FacilityTroopCapacity { get; private set; }
-	
+
 	public int ScientistCapacity = 0;
+	public int ItemStorageCapacity { get; private set; }
 	
 	public int craftCapacity = 0;
 	
@@ -76,6 +86,29 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	}
 
 	public int CraftCapacity => craftCapacity;
+	public long CurrentItemStorageWeight
+	{
+		get
+		{
+			long totalWeight = 0;
+			foreach (KeyValuePair<int, int> itemPair in itemCounts)
+			{
+				if (itemPair.Value <= 0) continue;
+				ItemData itemData =
+					InventoryManager.Instance?.GetItemData(itemPair.Key);
+				if (itemData == null || itemData is Craft) continue;
+
+				long itemWeight = Math.Max(0, itemData.weight);
+				long stackWeight = itemWeight * itemPair.Value;
+				totalWeight = totalWeight > long.MaxValue - stackWeight
+					? long.MaxValue
+					: totalWeight + stackWeight;
+			}
+			return totalWeight;
+		}
+	}
+	public long RemainingItemStorageCapacity =>
+		Math.Max(0, (long)ItemStorageCapacity - CurrentItemStorageWeight);
 	public IReadOnlyList<FacilityConstruction> Facilities => facilities;
 
 	
@@ -97,29 +130,53 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	public event Action<FacilityConstruction> FacilityCompleted;
 	public event Action<TeamBaseCellDefinition> FacilityEffectsChanged;
 
+	public override Dictionary<string, Callable> GetContextActions()
+	{
+		var actions = base.GetContextActions();
+		if (teamAffiliation != Enums.UnitTeam.Player) return actions;
+
+		int targetCellIndex = cellIndex;
+		actions.Add("Enter Base", Callable.From(() =>
+		{
+			GlobeUI globeUI = UIManager.Instance?.GetWindow<GlobeUI>();
+			if (globeUI != null)
+				_ = globeUI.OpenBase(targetCellIndex);
+		}));
+
+		return actions;
+	}
+
 	public TeamBaseCellDefinition(int cellIndex, string name, Enums.UnitTeam team, List<Craft> craftList, GlobeTeamHolder parentTeam) : base(
 		cellIndex, name, true)
 	{
 		this.teamAffiliation = team;
 		SetParentTeamHolder(parentTeam);
 		RevealForTeam(team);
+		InitializeCraftCollections();
 		EnsureHeadquarters();
+		CreateDefaultHangers();
+		AddStartingTransportCraft();
 		if (craftList != null)
 		{
-			craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
-			craft.Add(Enums.CraftStatus.EnRoute, new Godot.Collections.Array<Craft>());
-			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
 			foreach (var c in craftList)
 			{
 				craft[c.Status].Add(c);
 			}
 		}
-		else
-		{
-			craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
-			craft.Add(Enums.CraftStatus.EnRoute, new Godot.Collections.Array<Craft>());
-			craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
-		}
+	}
+
+	private void InitializeCraftCollections()
+	{
+		craft.Clear();
+		craft.Add(
+			Enums.CraftStatus.Idle,
+			new Godot.Collections.Array<Craft>());
+		craft.Add(
+			Enums.CraftStatus.EnRoute,
+			new Godot.Collections.Array<Craft>());
+		craft.Add(
+			Enums.CraftStatus.Home,
+			new Godot.Collections.Array<Craft>());
 	}
 
 	public void SetParentTeamHolder(GlobeTeamHolder parentTeam)
@@ -179,6 +236,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		data["showDetectionRadius"] = ShowDetectionRadius;
 		data["baseTroopCapacity"] = BaseTroopCapacity;
 		data["facilityTroopCapacity"] = FacilityTroopCapacity;
+		data["itemStorageCapacity"] = ItemStorageCapacity;
 		data["pendingFacilityConstructionExpenditure"] =
 			pendingFacilityConstructionExpenditure;
 		data["pendingBaseIncome"] = SavePendingFinanceLedger(pendingBaseIncome);
@@ -215,6 +273,14 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			FacilityTroopCapacity = Mathf.Max(
 				0,
 				data["facilityTroopCapacity"].AsInt32());
+		bool hasSavedItemStorageCapacity =
+			data.ContainsKey("itemStorageCapacity");
+		if (hasSavedItemStorageCapacity)
+		{
+			ItemStorageCapacity = Mathf.Max(
+				0,
+				data["itemStorageCapacity"].AsInt32());
+		}
 		pendingFacilityConstructionExpenditure = data.TryGetValue(
 			"pendingFacilityConstructionExpenditure",
 			out Variant pendingExpenditure)
@@ -227,6 +293,8 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			pendingBaseExpenditure);
 
 		LoadFacilities(data);
+		if (!hasSavedItemStorageCapacity)
+			RecalculateItemStorageCapacity();
 	}
 
 	public async Task LoadAsync(
@@ -236,13 +304,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 	{
 		Load(data);
 
-		craft.Clear();
-		craft.Add(Enums.CraftStatus.Idle, new Godot.Collections.Array<Craft>());
-		craft.Add(
-			Enums.CraftStatus.EnRoute,
-			new Godot.Collections.Array<Craft>()
-		);
-		craft.Add(Enums.CraftStatus.Home, new Godot.Collections.Array<Craft>());
+		InitializeCraftCollections();
 
 		itemCounts.Clear();
 		if (data.ContainsKey("itemCounts"))
@@ -515,6 +577,25 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		FacilityEffectsChanged?.Invoke(this);
 	}
 
+	public void AddItemStorageCapacity(int amount)
+	{
+		if (amount <= 0) return;
+		ItemStorageCapacity = amount > int.MaxValue - ItemStorageCapacity
+			? int.MaxValue
+			: ItemStorageCapacity + amount;
+		FacilityEffectsChanged?.Invoke(this);
+	}
+
+	private void RecalculateItemStorageCapacity()
+	{
+		ItemStorageCapacity = 0;
+		foreach (FacilityConstruction facility in facilities)
+		{
+			if (facility.IsConstructed)
+				AddItemStorageCapacity(facility.ItemStorageCapacityBonus);
+		}
+	}
+
 	private void EnsureHeadquarters()
 	{
 		if (facilities.Count > 0) return;
@@ -535,6 +616,47 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			constructImmediately: true);
 		facilities.Add(headquarters);
 		CompleteFacility(headquarters);
+	}
+
+	private void CreateDefaultHangers()
+	{
+		FacilityDefinition definition =
+			ResourceLoader.Load<FacilityDefinition>(HangerDefinitionPath);
+		if (definition == null)
+		{
+			GD.PushError(
+				$"Could not load the default Hanger definition at {HangerDefinitionPath}.");
+			return;
+		}
+
+		CreateCompletedDefaultHanger(definition, TransportHangerGridOrigin);
+		CreateCompletedDefaultHanger(definition, FighterHangerGridOrigin);
+	}
+
+	private void CreateCompletedDefaultHanger(
+		FacilityDefinition definition,
+		Vector2I origin)
+	{
+		FacilityConstruction hanger = FacilityConstruction.Create(
+			definition,
+			origin,
+			HangerScenePath,
+			constructImmediately: true);
+		facilities.Add(hanger);
+		CompleteFacility(hanger);
+	}
+
+	private void AddStartingTransportCraft()
+	{
+		Craft transportTemplate =
+			ResourceLoader.Load<Craft>(StartingTransportCraftPath);
+		Craft transport = transportTemplate?.Duplicate(true) as Craft;
+		if (!TryAddCraftWithoutPurchase(Enums.CraftStatus.Home, transport))
+		{
+			GD.PushError(
+				$"Could not add the starting transport craft from " +
+				$"{StartingTransportCraftPath}.");
+		}
 	}
 
 	private void LoadFacilities(
@@ -767,6 +889,18 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			return false;
 		}
 
+		if (interactWithMission &&
+		    missionManager.GetActiveMissions().TryGetValue(
+			    targetCellIndex,
+			    out MissionCellDefinition targetMission) &&
+		    targetMission != null &&
+		    !targetMission.missionStatus.HasFlag(Enums.MissionStatus.Visited) &&
+		    !craft.HasDeployableUnits)
+		{
+			GD.PrintErr("Cannot send a craft with no units to a mission.");
+			return false;
+		}
+
 		// Only the destination must be land. The pathfinder remains unrestricted,
 		// allowing aircraft to cross water cells en route.
 		if (!manager.GetCellFromIndex(targetCellIndex, excludeWater: true).HasValue)
@@ -958,7 +1092,7 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 			// Arrived at a mission – go idle and launch the battle
 			TryChangeCraftStatus(Enums.CraftStatus.Idle, craft);
 
-			missionManager.LoadMissionScene(missionCellDefinition);
+			_ = missionManager.LoadMissionScene(missionCellDefinition);
 		}
 		else if (teamBaseCellDefinition != null)
 		{
@@ -1189,10 +1323,19 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 
 	public bool TryAddItem(int itemID, int count)
 	{
-		if (InventoryManager.Instance.GetItemData(itemID) == null)
+		ItemData itemData = InventoryManager.Instance?.GetItemData(itemID);
+		if (itemData == null || itemData is Craft)
 			return false;
 
 		if (count <= 0) return false;
+		int currentCount = itemCounts.GetValueOrDefault(itemID, 0);
+		if ((long)currentCount + count > int.MaxValue) return false;
+
+		long addedWeight = (long)Math.Max(0, itemData.weight) * count;
+		long currentWeight = CurrentItemStorageWeight;
+		if (currentWeight > ItemStorageCapacity ||
+		    addedWeight > ItemStorageCapacity - currentWeight)
+			return false;
 
 		AddItem(itemID, count);
 		return true;

@@ -22,6 +22,9 @@ public partial class RenameCraftUI : UIWindow
 
 	protected override async Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this, 4);
+		MissionUITheme.NormalizeButtonText(this);
 		if (renameEdit != null)
 		{
 			renameEdit.Text = "";

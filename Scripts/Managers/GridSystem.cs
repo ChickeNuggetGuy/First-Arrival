@@ -84,6 +84,8 @@ public partial class GridSystem : Manager<GridSystem>
 	private Dictionary<Vector3I, HashSet<Vector3I>> _adj;
 	private BoxShape3D _corridorBox;
 	private PhysicsShapeQueryParameters3D _corridorParams;
+	private Godot.Collections.Array<
+		Godot.Collections.Dictionary<string, Variant>> _savedCellInventories;
 	
 	
 	private readonly List<Vector3I> _tmpNeighbors = new(32);
@@ -162,6 +164,7 @@ public partial class GridSystem : Manager<GridSystem>
 			};
 
 			var foundGridObjects = await SetupGrid();
+			RestoreSavedCellInventories();
 
 			// Gather all grid objects
 			var allGridObjectsInScene = GetTree()
@@ -1682,13 +1685,61 @@ public partial class GridSystem : Manager<GridSystem>
 
 	public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
 	{
-		if (!HasLoadedData)  return Task.CompletedTask;
+		_savedCellInventories = null;
+		if (data != null && data.TryGetValue(
+			    "cellInventories",
+			    out Variant inventoriesValue) &&
+		    inventoriesValue.VariantType == Variant.Type.Array)
+		{
+			_savedCellInventories = inventoriesValue.AsGodotArray<
+				Godot.Collections.Dictionary<string, Variant>>();
+		}
 		return Task.CompletedTask;
 	}
 
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
-		return new Godot.Collections.Dictionary<string, Variant>();
+		var inventories = new Godot.Collections.Array<
+			Godot.Collections.Dictionary<string, Variant>>();
+		if (AllGridCells != null)
+		{
+			foreach (GridCell cell in AllGridCells)
+			{
+				if (cell?.InventoryGrid?.UniqueItems.Count is null or 0)
+					continue;
+				inventories.Add(
+					new Godot.Collections.Dictionary<string, Variant>
+					{
+						["coordinates"] = cell.GridCoordinates,
+						["inventory"] = cell.InventoryGrid.SaveContents()
+					});
+			}
+		}
+
+		return new Godot.Collections.Dictionary<string, Variant>
+		{
+			["cellInventories"] = inventories
+		};
+	}
+
+	private void RestoreSavedCellInventories()
+	{
+		if (_savedCellInventories == null) return;
+		foreach (Godot.Collections.Dictionary<string, Variant> entry in
+		         _savedCellInventories)
+		{
+			if (!entry.TryGetValue(
+				    "coordinates",
+				    out Variant coordinatesValue) ||
+			    !entry.TryGetValue("inventory", out Variant inventoryValue) ||
+			    inventoryValue.VariantType != Variant.Type.Dictionary)
+				continue;
+
+			GridCell cell = GetGridCell(coordinatesValue.AsVector3I());
+			cell?.InventoryGrid?.LoadContents(
+				inventoryValue.AsGodotDictionary<string, Variant>());
+		}
+		_savedCellInventories = null;
 	}
 
 	#endregion

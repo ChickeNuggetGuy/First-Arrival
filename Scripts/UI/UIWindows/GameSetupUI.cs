@@ -19,6 +19,9 @@ public partial class GameSetupUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this, 18);
+		MissionUITheme.StyleFirstTitle(this, 28);
 		startGameButton.Pressed += StartGameButtonOnPressed;
 		return Task.CompletedTask;
 	}

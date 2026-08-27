@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://dxckynqpmmatd"]
+
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="1_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="2_item"]
+[ext_resource type="Texture2D" uid="uid://cpkrxqhj4rmbg" path="res://Third-Party Assets/Synty/InterfaceMilitaryCombatHUD/Sprites/Icons_Resources/ICON_SM_Chr_Attach_Ammo_01_BattleRoyale.png" id="3_icon"]
+[ext_resource type="ArrayMesh" uid="uid://be0j58lmh28x8" path="res://Third-Party Assets/Synty/PolygonBattleRoyale/Models/extracted/SM_Chr_Attach_Ammo_01.res" id="4_mesh"]
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("1_shape")
+
+[resource]
+resource_name = "5.56x45 mm Ammunition Belt"
+script = ExtResource("2_item")
+ItemID = 207
+ItemName = "5.56x45 mm Ammunition Belt"
+ItemDescription = "One complete 5.56x45 mm belt-box reload for a compatible light machine gun. Each count is one full belt."
+ItemIcon = ExtResource("3_icon")
+ResearchTier = 1
+RequiredResearch = "squad_automatic_weapons"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Shape")
+weight = 4
+ItemMesh = ExtResource("4_mesh")
+ActionDefinitions = []
+IsAmmunition = true
+AmmoDamage = 30
+MagazineCapacity = 25
+MaxStackSize = 6
+buyPrice = 220
+sellPrice = 110

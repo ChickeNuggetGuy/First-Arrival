@@ -6,6 +6,9 @@ public partial class LivingQuartersFacilityDefinition : FacilityDefinition
 	[Export(PropertyHint.Range, "0,1000,1,or_greater")]
 	public int TroopCapacityBonus { get; set; } = 8;
 
+	public override string GetEffectsSummary() =>
+		$"Troop capacity: +{Mathf.Max(0, TroopCapacityBonus):N0}";
+
 	public override void OnPlaced(
 		TeamBaseCellDefinition baseDefinition,
 		FacilityConstruction construction)

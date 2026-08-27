@@ -16,13 +16,17 @@ public partial class MissionCellDefinition : HexCellDefinition
 	public int timeLeft {get; private set;}
 	private bool _isTrackingTimeout;
 	private bool _hasResolved;
+	public MissionScoreBreakdown BattleScore { get; private set; }
+	public long RecoverySaleProceeds { get; private set; }
+	public bool HasBattleResult => BattleScore != null;
 
 	[Export] public Dictionary<Enums.MissionStatus, int> scoreChange = new()
 	{
 		{ Enums.MissionStatus.None, 0 },
 		{ Enums.MissionStatus.Failed, -250 },
 		{ Enums.MissionStatus.Successful, 325 },
-		{Enums.MissionStatus.Timeout, -200}
+		{ Enums.MissionStatus.Timeout, -200 },
+		{ Enums.MissionStatus.Aborted, 0 }
 	};
 
 	public Craft onRouteCraft; 
@@ -69,6 +73,56 @@ public partial class MissionCellDefinition : HexCellDefinition
 		timeLeft = Math.Clamp(savedTimeLeft, 0, timeoutTime);
 	}
 
+	public void SetBattleResult(MissionBattleResult result)
+	{
+		if (result == null) return;
+		BattleScore = result.Score;
+		RecoverySaleProceeds = Math.Max(0, result.SaleProceeds);
+	}
+
+	public Dictionary<string, Variant> SaveBattleResult()
+	{
+		if (BattleScore == null) return new Dictionary<string, Variant>();
+		return new Dictionary<string, Variant>
+		{
+			{ "enemiesKilled", BattleScore.EnemiesKilled },
+			{ "unitsLost", BattleScore.UnitsLost },
+			{ "enemyKillPoints", BattleScore.EnemyKillPoints },
+			{ "unitLossPoints", BattleScore.UnitLossPoints },
+			{ "outcomePoints", BattleScore.OutcomePoints },
+			{ "totalPoints", BattleScore.TotalPoints },
+			{ "recoverySaleProceeds", RecoverySaleProceeds }
+		};
+	}
+
+	public void RestoreBattleResult(Dictionary<string, Variant> data)
+	{
+		if (data == null ||
+		    !data.TryGetValue("battleResult", out Variant resultValue) ||
+		    resultValue.VariantType != Variant.Type.Dictionary)
+			return;
+
+		var result = resultValue.AsGodotDictionary<string, Variant>();
+		if (result.Count == 0) return;
+		BattleScore = new MissionScoreBreakdown(
+			GetInt(result, "enemiesKilled"),
+			GetInt(result, "unitsLost"),
+			GetInt(result, "enemyKillPoints"),
+			GetInt(result, "unitLossPoints"),
+			GetInt(result, "outcomePoints"));
+		RecoverySaleProceeds = result.TryGetValue(
+			"recoverySaleProceeds",
+			out Variant proceeds)
+			? Math.Max(0, proceeds.AsInt64())
+			: 0;
+	}
+
+	private static int GetInt(
+		Dictionary<string, Variant> data,
+		string key) => data.TryGetValue(key, out Variant value)
+		? value.AsInt32()
+		: 0;
+
 	private void GlobeTimeManagerOnHourChanged(int hour, int hoursAdvanced)
 	{
 		if (_hasResolved || missionStatus.HasFlag(Enums.MissionStatus.OnRoute)) return;
@@ -96,9 +150,23 @@ public partial class MissionCellDefinition : HexCellDefinition
 		Enums.MissionStatus completedStatuses = Enums.MissionStatus.Visited |
 			Enums.MissionStatus.Successful |
 			Enums.MissionStatus.Failed |
-			Enums.MissionStatus.Timeout;
+			Enums.MissionStatus.Timeout |
+			Enums.MissionStatus.Aborted;
 		if ((missionStatus & completedStatuses) == Enums.MissionStatus.None)
 			missionStatus |= Enums.MissionStatus.OnRoute;
+	}
+
+	public override System.Collections.Generic.Dictionary<string, Callable> GetContextActions()
+	{
+		var actions = base.GetContextActions();
+		MissionCellDefinition targetMission = this;
+
+		actions.Add("Mission Details", Callable.From(() =>
+		{
+			UIManager.Instance?.GetWindow<MissionDetailsUI>()?.ShowMission(targetMission);
+		}));
+
+		return actions;
 	}
 	
 	
@@ -118,6 +186,7 @@ public partial class MissionCellDefinition : HexCellDefinition
 		data.Add("timeoutTime", timeoutTime);
 		data.Add("timeLeft", timeLeft);
 		data.Add("alienOperationId", alienOperationId);
+		data.Add("battleResult", SaveBattleResult());
 		return data;
 	}
 }

@@ -35,6 +35,11 @@ public partial class MissionButtonUI : UIElement
 			if (playerTeamHolder.SelectedCraft != null)
 			{
 				var selectedCraft = playerTeamHolder.SelectedCraft;
+				if (!selectedCraft.HasDeployableUnits)
+				{
+					teamManager.SetSendCraftMode(false, playerTeamHolder, null);
+					return;
+				}
 				TeamBaseCellDefinition baseDef = selectedCraft.GetBaseCellDefinition();
 					
 				if (baseDef == null)

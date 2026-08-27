@@ -47,6 +47,8 @@ public abstract partial class NotificationElement : UIElement
 	
 	protected override Task _Setup()
 	{
+		_button.MouseEntered += OnMouseEntered;
+		_button.MouseExited += OnMouseExited;
 		return Task.CompletedTask;
 	}
 
@@ -57,7 +59,23 @@ public abstract partial class NotificationElement : UIElement
 
 
 	protected abstract void OnClicked();
+	
+	
+	private void OnMouseEntered()
+	{
+		if (_timer != null)
+		{
+			_timer.Paused = true;
+		}
+	}
 
+	private void OnMouseExited()
+	{
+		if (_timer != null)
+		{
+			_timer.Paused = false;
+		}
+	}
 
 	protected void TimeOut()
 	{
@@ -73,6 +91,13 @@ public abstract partial class NotificationElement : UIElement
 		}
 		if (_button != null)
 			_button.Pressed -= OnClickedCall;
+		
+		if (_button != null)
+		{
+			_button.Pressed -= OnClickedCall;
+			_button.MouseEntered -= OnMouseEntered;
+			_button.MouseExited -= OnMouseExited;
+		}
 		base._ExitTree();
 
 	}

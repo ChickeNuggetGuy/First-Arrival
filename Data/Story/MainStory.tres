@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="StoryDefinition" format=3 uid="uid://cle37j1ygwbiw"]
+
+[ext_resource type="Script" uid="uid://43bt5w1qs6rb" path="res://Scripts/Managers/StoryManager/StoryDefinition.cs" id="2_pljfd"]
+[ext_resource type="Script" uid="uid://3hgwfmigll46" path="res://Scripts/Managers/StoryManager/StoryTrackDefinition.cs" id="6_story_track"]
+
+[resource]
+script = ExtResource("2_pljfd")
+StoryId = "MainStory"
+metadata/_custom_type_script = "uid://43bt5w1qs6rb"

@@ -22,7 +22,9 @@ public partial class BuySellUI : UIWindow
 	[Export] protected Label finalValueLabel;
 
 	private readonly Dictionary<int, int> currentItemChange = new();
-	private readonly Dictionary<int, TreeItem> treeItems = new();
+	// Ammunition can appear beneath more than one compatible weapon, so an item
+	// ID may have several synchronized rows in the tree.
+	private readonly Dictionary<int, List<TreeItem>> treeItems = new();
 	private Texture2D scaledBuyTexture;
 	private Texture2D scaledSellTexture;
 
@@ -32,6 +34,10 @@ public partial class BuySellUI : UIWindow
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this, true);
+		MissionUITheme.InsetPanelContent(this);
+		MissionUITheme.StyleFirstTitle(this);
+		MissionUITheme.NormalizeButtonText(this);
 		itemTreeUI.HideRoot = true;
 		itemTreeUI.SetColumnTitle(0, "Item");
 		itemTreeUI.SetColumnTitleAlignment(0, HorizontalAlignment.Center);
@@ -126,6 +132,16 @@ public partial class BuySellUI : UIWindow
 			int resultingCraftCount = teamBase.CraftCount + pendingCraftChange;
 			if (resultingCraftCount < 0 || resultingCraftCount > teamBase.CraftCapacity) return;
 		}
+		else
+		{
+			long itemWeight = Math.Max(0, itemData.weight);
+			long pendingWeight = GetPendingItemWeightChange()
+			                     - itemWeight * oldChange
+			                     + itemWeight * newChange;
+			if (teamBase.CurrentItemStorageWeight + pendingWeight >
+			    teamBase.ItemStorageCapacity)
+				return;
+		}
 
 		if (newChange == 0) currentItemChange.Remove(itemId);
 		else currentItemChange[itemId] = newChange;
@@ -144,6 +160,19 @@ public partial class BuySellUI : UIWindow
 				change += pair.Value;
 		}
 		return change;
+	}
+
+	private long GetPendingItemWeightChange()
+	{
+		long weightChange = 0;
+		foreach (KeyValuePair<int, int> pair in currentItemChange)
+		{
+			if (pair.Key == RecruitUnitTransactionId) continue;
+			ItemData itemData = InventoryManager.Instance?.GetItemData(pair.Key);
+			if (itemData == null || itemData is Craft) continue;
+			weightChange += (long)Math.Max(0, itemData.weight) * pair.Value;
+		}
+		return weightChange;
 	}
 
 	private int GetTransactionCost()
@@ -173,10 +202,17 @@ public partial class BuySellUI : UIWindow
 		long resultingFunds = GameManager.Instance.currentBaseFunds - cost;
 		if (finalValueLabel != null)
 			finalValueLabel.Text =
-				$"{(cost >= 0 ? "Cost" : "Credit")}: ${Math.Abs(cost):N0}\nFunds: ${resultingFunds:N0}";
+				$"{(cost >= 0 ? "Cost" : "Credit")}: ${Math.Abs(cost):N0}\n" +
+				$"Funds: ${resultingFunds:N0}\n" +
+				$"Storage: {GameManager.Instance.currentBase.CurrentItemStorageWeight + GetPendingItemWeightChange():N0} / " +
+				$"{GameManager.Instance.currentBase.ItemStorageCapacity:N0} weight";
 
 		if (confirmButton != null)
-			confirmButton.Disabled = currentItemChange.Count == 0 || resultingFunds < 0;
+			confirmButton.Disabled = currentItemChange.Count == 0 ||
+			                         resultingFunds < 0 ||
+			                         GameManager.Instance.currentBase.CurrentItemStorageWeight +
+			                         GetPendingItemWeightChange() >
+			                         GameManager.Instance.currentBase.ItemStorageCapacity;
 	}
 
 	private bool FinalizeTransaction()
@@ -241,6 +277,9 @@ public partial class BuySellUI : UIWindow
 	{
 		int finalCraftCount = teamBase.CraftCount + GetPendingCraftChange();
 		if (finalCraftCount < 0 || finalCraftCount > teamBase.CraftCapacity) return false;
+		if (teamBase.CurrentItemStorageWeight + GetPendingItemWeightChange() >
+		    teamBase.ItemStorageCapacity)
+			return false;
 		int unitsToHire = currentItemChange.GetValueOrDefault(
 			RecruitUnitTransactionId,
 			0);
@@ -294,36 +333,90 @@ public partial class BuySellUI : UIWindow
 
 		TreeItem root = itemTreeUI.CreateItem();
 		TreeItem unitItem = itemTreeUI.CreateItem(root);
-		treeItems[RecruitUnitTransactionId] = unitItem;
+		RegisterTreeItem(RecruitUnitTransactionId, unitItem);
 		unitItem.SetText(0, $"Unit Recruit  (${GameManager.UnitHiringCost:N0})");
 		unitItem.SetText(2, teamBase.GetStationedGridObjects().Count.ToString());
 		unitItem.AddButton(1, scaledBuyTexture, RecruitUnitTransactionId, false, "Hire unit");
 		unitItem.AddButton(3, scaledSellTexture, RecruitUnitTransactionId, true, "Remove pending hire");
 
+		var availableItems = new List<ItemData>();
+		var availableItemsById = new Dictionary<int, ItemData>();
 		foreach (ItemData itemData in inventoryManager.Database.GetAllItems())
 		{
 			if (itemData == null || !itemData.ShowInBuySellWindow) continue;
-			bool isUnlocked = IsItemAvailableForPurchase(itemData);
-			if (!isUnlocked) continue;
-			int ownedCount = GetOwnedCount(teamBase, itemData);
+			if (!IsItemAvailableForPurchase(itemData)) continue;
+			availableItems.Add(itemData);
+			availableItemsById[itemData.ItemID] = itemData;
+		}
 
-			TreeItem itemNode = itemTreeUI.CreateItem(root);
-			treeItems[itemData.ItemID] = itemNode;
+		var nestedAmmoIds = new HashSet<int>();
+		foreach (ItemData itemData in availableItems)
+		{
+			ItemData configuredAmmo = itemData.AmmoItem;
+			if (configuredAmmo != null &&
+			    availableItemsById.ContainsKey(configuredAmmo.ItemID))
+			{
+				nestedAmmoIds.Add(configuredAmmo.ItemID);
+			}
+		}
 
-			itemNode.SetText(0, $"{itemData.ItemName}");
-			itemNode.SetText(2, ownedCount.ToString());
+		foreach (ItemData itemData in availableItems)
+		{
+			// Compatible ammo is rendered as a child of every weapon that uses it.
+			// Only orphaned ammo remains at the root so it can never disappear from
+			// the store because of incomplete or future catalog data.
+			if (itemData.IsAmmunition && nestedAmmoIds.Contains(itemData.ItemID))
+				continue;
 
-			itemNode.AddButton(
-				1,
-				scaledBuyTexture,
-				itemData.ItemID,
-				false,
-				$"Buy {itemData.ItemName}");
+			TreeItem itemNode = CreateTransactionItem(root, itemData, teamBase);
+			if (itemData.AmmoItem == null ||
+			    !availableItemsById.TryGetValue(itemData.AmmoItem.ItemID, out ItemData ammoItem))
+				continue;
 
-			itemNode.AddButton(3, scaledSellTexture, itemData.ItemID, false, $"Sell {itemData.ItemName}");
+			CreateTransactionItem(itemNode, ammoItem, teamBase, true);
+			itemNode.Collapsed = false;
 		}
 
 		RefreshTransactionSummary();
+	}
+
+	private TreeItem CreateTransactionItem(
+		TreeItem parent,
+		ItemData itemData,
+		TeamBaseCellDefinition teamBase,
+		bool isAmmoChild = false)
+	{
+		TreeItem itemNode = itemTreeUI.CreateItem(parent);
+		RegisterTreeItem(itemData.ItemID, itemNode);
+
+		itemNode.SetText(
+			0,
+			isAmmoChild ? $"Ammo: {itemData.ItemName}" : itemData.ItemName);
+		itemNode.SetText(2, GetOwnedCount(teamBase, itemData).ToString());
+		itemNode.AddButton(
+			1,
+			scaledBuyTexture,
+			itemData.ItemID,
+			false,
+			$"Buy {itemData.ItemName}");
+		itemNode.AddButton(
+			3,
+			scaledSellTexture,
+			itemData.ItemID,
+			false,
+			$"Sell {itemData.ItemName}");
+
+		return itemNode;
+	}
+
+	private void RegisterTreeItem(int itemId, TreeItem treeItem)
+	{
+		if (!treeItems.TryGetValue(itemId, out List<TreeItem> rows))
+		{
+			rows = new List<TreeItem>();
+			treeItems[itemId] = rows;
+		}
+		rows.Add(treeItem);
 	}
 
 	private static Texture2D CreateButtonTexture(Texture2D source, int maxSize)
@@ -348,14 +441,17 @@ public partial class BuySellUI : UIWindow
 
 	private void UpdateDisplayedQuantity(int itemId)
 	{
-		if (!treeItems.TryGetValue(itemId, out TreeItem treeItem)) return;
+		if (!treeItems.TryGetValue(itemId, out List<TreeItem> itemRows)) return;
 		if (itemId == RecruitUnitTransactionId)
 		{
 			int pendingUnitCount = currentItemChange.GetValueOrDefault(itemId, 0);
 			int unitCount = GameManager.Instance.currentBase.GetStationedGridObjects().Count
 			                + pendingUnitCount;
-			treeItem.SetText(2, unitCount.ToString());
-			treeItem.SetButtonDisabled(3, 0, pendingUnitCount == 0);
+			foreach (TreeItem treeItem in itemRows)
+			{
+				treeItem.SetText(2, unitCount.ToString());
+				treeItem.SetButtonDisabled(3, 0, pendingUnitCount == 0);
+			}
 			return;
 		}
 
@@ -364,7 +460,8 @@ public partial class BuySellUI : UIWindow
 
 		int quantity = GetOwnedCount(GameManager.Instance.currentBase, itemData)
 		               + currentItemChange.GetValueOrDefault(itemId, 0);
-		treeItem.SetText(2, quantity.ToString());
+		foreach (TreeItem treeItem in itemRows)
+			treeItem.SetText(2, quantity.ToString());
 	}
 
 	private static int GetOwnedCount(TeamBaseCellDefinition teamBase, ItemData itemData)

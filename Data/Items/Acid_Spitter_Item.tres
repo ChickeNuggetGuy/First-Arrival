@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://b7kfb16iskwrh"]
+
+[ext_resource type="Script" path="res://Scripts/ActionSystem/ItemActions/RangedAttackAction/RangedAttackActionDefinition.cs" id="1_kqwqe"]
+[ext_resource type="Resource" uid="uid://bpiqt7yfmpj21" path="res://Data/Items/Acid_Item.tres" id="1_t0riw"]
+[ext_resource type="Texture2D" uid="uid://b68pm3045j51i" path="res://addons/fancy_folder_icons/samples/good.png" id="2_t0riw"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="3_e224d"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="4_3lwk0"]
+
+[sub_resource type="Resource" id="Resource_ln787"]
+script = ExtResource("1_kqwqe")
+range = 7
+ammoItem = ExtResource("1_t0riw")
+accuracy = 10.0
+damagingStats = Dictionary[int, int]({
+1: 45,
+3: 10
+})
+
+[sub_resource type="Resource" id="Resource_xo0hy"]
+script = ExtResource("1_kqwqe")
+Type = 1
+ammoItem = ExtResource("1_t0riw")
+
+[sub_resource type="Resource" id="Resource_bmk4s"]
+script = ExtResource("3_e224d")
+metadata/_custom_type_script = "uid://cdhdv6w5jignj"
+
+[resource]
+resource_name = "Acid Spitter_Item"
+script = ExtResource("4_3lwk0")
+ItemID = 209
+ItemName = "Acid Spitter"
+ItemDescription = "Oganic acid spitter
+"
+ItemIcon = ExtResource("2_t0riw")
+Category = 1
+WeaponClass = 2
+ResearchTier = 3
+RequiredResearch = "Organic Launchers"
+AvailableAtCampaignStart = false
+ItemShape = SubResource("Resource_bmk4s")
+weight = 15
+ActionDefinitions = Array[Object]([SubResource("Resource_ln787"), SubResource("Resource_xo0hy")])

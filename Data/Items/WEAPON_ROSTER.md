@@ -41,6 +41,12 @@ This catalog uses real military weapons, or military prototypes, that existed by
 - `damage` is per projectile or shotgun pellet.
 - `accuracy` is added to the unit's ranged-accuracy stat. Snap and automatic modes deliberately carry larger penalties than aimed fire.
 - `attackCount` is the number of projectiles or pellets produced by one action.
+- `ammoCost` is the number of loaded rounds consumed by an action. It matches
+  `attackCount` for bursts, while shotgun pellet patterns still consume one shell.
+- Every ammo-item count represents one complete magazine, belt, tube load, or
+  equivalent full reload. Reloading discards any rounds left in the weapon.
+- `MagazineCapacity`, `ReloadTimeUnitCost`, and `AmmoItem` are authored once on
+  the weapon's `ItemData`; loaded ammo is runtime state on each `Item` instance.
 - `timeUnitCost` and `staminaCost` apply once per trigger pull. They are independent of projectile count, allowing shotguns and automatic weapons to be balanced correctly.
 - `weight` remains inventory burden and still affects throwing actions.
 - Item IDs are permanent save-data identifiers. Add new items with new IDs; do not renumber existing entries.

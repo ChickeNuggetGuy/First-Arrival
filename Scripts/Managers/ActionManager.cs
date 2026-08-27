@@ -238,6 +238,65 @@ public partial class ActionManager : Manager<ActionManager>
 			GD.Print($"set selected action to {SelectedAction.GetActionName()}");
 	}
 
+	public List<Item> GetReloadableWeapons(Item ammoItem)
+	{
+		var weapons = new List<Item>();
+		GridObject gridObject = GridObjectManager.Instance?.CurrentPlayerGridObject;
+		if (ammoItem == null || gridObject == null ||
+		    !gridObject.TryGetGridObjectNode<GridObjectInventory>(out var inventory))
+			return weapons;
+
+		var seen = new HashSet<Item>();
+		foreach (InventoryGrid grid in inventory.InventoryGrids.Values)
+		{
+			if (grid == null) continue;
+			foreach (var entry in grid.UniqueItems)
+			{
+				Item weapon = entry.item;
+				if (weapon == null || !seen.Add(weapon)) continue;
+				if (weapon.CanReloadWith(ammoItem, out _))
+					weapons.Add(weapon);
+			}
+		}
+
+		return weapons;
+	}
+
+	public void RequestReload(Item weapon, Item ammoItem = null)
+	{
+		_ = TryReloadItem(weapon, ammoItem);
+	}
+
+	public async Task<bool> TryReloadItem(Item weapon, Item ammoItem = null)
+	{
+		if (IsBusy || weapon == null)
+			return false;
+
+		if (TurnManager.Instance?.CurrentTurn?.team != Enums.UnitTeam.Player)
+		{
+			GD.Print("Reload is only available during the player's turn");
+			return false;
+		}
+
+		GridObject gridObject = GridObjectManager.Instance?.CurrentPlayerGridObject;
+		GridCell cell = gridObject?.GridPositionData?.AnchorCell;
+		if (gridObject == null || cell == null)
+			return false;
+
+		var reloadDefinition = new ReloadActionDefinition
+		{
+			Item = weapon,
+			AmmoItem = ammoItem
+		};
+
+		return await TryTakeAction(
+			reloadDefinition,
+			gridObject,
+			cell,
+			cell
+		);
+	}
+
 	private void RefreshValidCellHighlights()
 	{
 		GridObject selectedGridObject = GridObjectManager.Instance?

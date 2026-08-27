@@ -1,0 +1,291 @@
+<section id="apartment-route-viz" aria-labelledby="apartment-route-title">
+  <style>
+    #apartment-route-viz {
+      width: 100%;
+      color: var(--foreground);
+      overflow: hidden;
+    }
+    #apartment-route-viz .route-summary {
+      margin-block: 0.75rem 1rem;
+    }
+    #apartment-route-viz .route-map-wrap {
+      width: 100%;
+      min-height: 440px;
+    }
+    #apartment-route-viz .route-map {
+      width: 100%;
+      height: auto;
+      display: block;
+      overflow: hidden;
+    }
+    #apartment-route-viz .route-map .map-frame {
+      fill: var(--card);
+      stroke: var(--border);
+      stroke-width: 1;
+    }
+    #apartment-route-viz .route-map .street {
+      fill: none;
+      stroke: var(--border);
+      vector-effect: non-scaling-stroke;
+    }
+    #apartment-route-viz .route-map .street-major {
+      stroke: var(--muted-foreground);
+      stroke-opacity: 0.42;
+      stroke-width: 1.15;
+    }
+    #apartment-route-viz .route-map .street-arterial {
+      stroke-opacity: 0.68;
+      stroke-width: 0.72;
+    }
+    #apartment-route-viz .route-map .route-underlay {
+      fill: none;
+      stroke: var(--background);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+    #apartment-route-viz .route-map .route-line {
+      fill: none;
+      stroke: var(--viz-series-1);
+      stroke-width: 3.25;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+    #apartment-route-viz .route-map .stop-marker circle {
+      fill: var(--background);
+      stroke: var(--viz-series-1);
+      stroke-width: 2.25;
+      vector-effect: non-scaling-stroke;
+    }
+    #apartment-route-viz .route-map .start-marker rect {
+      fill: var(--viz-series-2);
+      stroke: var(--background);
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+    #apartment-route-viz .route-map .stop-label {
+      fill: var(--foreground);
+      font-size: 11.5px;
+      font-weight: 500;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+    #apartment-route-viz .route-legend {
+      gap: 1rem;
+      margin-block: 0.5rem 0.75rem;
+      justify-content: flex-start;
+    }
+    #apartment-route-viz .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    #apartment-route-viz .legend-route {
+      width: 1.8rem;
+      border-top: 3px solid var(--viz-series-1);
+    }
+    #apartment-route-viz .legend-stop {
+      width: 0.85rem;
+      height: 0.85rem;
+      border-radius: 50%;
+      border: 2px solid var(--viz-series-1);
+      background: var(--background);
+    }
+    #apartment-route-viz .legend-start {
+      width: 0.85rem;
+      height: 0.85rem;
+      background: var(--viz-series-2);
+    }
+    #apartment-route-viz .route-source {
+      margin-block: 0.25rem 1rem;
+    }
+    #apartment-route-viz .route-table-wrap {
+      margin-top: 0.5rem;
+    }
+    #apartment-route-viz .route-table td:first-child {
+      font-weight: 500;
+    }
+    @media (max-width: 520px) {
+      #apartment-route-viz .route-map-wrap {
+        min-height: 520px;
+      }
+    }
+  </style>
+
+  <h2 id="apartment-route-title">Austin apartment tour — north to south</h2>
+
+  <div class="viz-grid route-summary" aria-label="Route summary">
+    <div class="card viz-stat">
+      <div class="text-muted">Apartment stops</div>
+      <div class="viz-stat-value">11</div>
+      <div class="text-small text-muted">One-way sweep</div>
+    </div>
+    <div class="card viz-stat">
+      <div class="text-muted">Estimated driving</div>
+      <div class="viz-stat-value">36.5 mi</div>
+      <div class="text-small text-muted">Before live-traffic adjustments</div>
+    </div>
+    <div class="card viz-stat">
+      <div class="text-muted">Wheel time</div>
+      <div class="viz-stat-value">1 hr 17 min</div>
+      <div class="text-small text-muted">Tours and parking not included</div>
+    </div>
+  </div>
+
+  <div class="route-map-wrap" id="route-map-wrap">
+    <svg class="route-map" id="route-map" role="img" aria-labelledby="route-map-title route-map-desc">
+      <title id="route-map-title">Optimized Austin apartment tour route</title>
+      <desc id="route-map-desc">A numbered route beginning near US 183 in northwest Austin, sweeping through eleven apartment properties, and ending at Bridge at South Point in south Austin.</desc>
+    </svg>
+  </div>
+
+  <div class="viz-row route-legend text-small" aria-label="Map legend">
+    <span class="legend-item"><span class="legend-start" aria-hidden="true"></span>Start</span>
+    <span class="legend-item"><span class="legend-stop" aria-hidden="true"></span>Apartment stop</span>
+    <span class="legend-item"><span class="legend-route" aria-hidden="true"></span>Driving route</span>
+  </div>
+  <p class="route-source text-small text-muted">Planning geometry: OSRM / OpenStreetMap contributors. Street centerlines: City of Austin.</p>
+
+  <div class="table-responsive route-table-wrap">
+    <table class="table table-sm route-table" aria-label="Apartment tour itinerary">
+      <thead>
+        <tr>
+          <th scope="col">Stop</th>
+          <th scope="col">Address</th>
+          <th scope="col" class="text-end">From prior</th>
+          <th scope="col" class="text-end">Drive</th>
+        </tr>
+      </thead>
+      <tbody id="route-table-body"></tbody>
+    </table>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script>
+    (() => {
+      const root = document.getElementById("apartment-route-viz");
+      const mapWrap = root.querySelector("#route-map-wrap");
+      const svg = d3.select(root.querySelector("#route-map"));
+      const tableBody = root.querySelector("#route-table-body");
+      const streets = __STREETS_GEOJSON__;
+      const routeGeometry = __ROUTE_GEOMETRY__;
+      const routeData = [
+        { order: 0, name: "Start", address: "13207 N US 183 SVRD NB, Austin, TX 78750", lon: -97.777523, lat: 30.439808, miles: null, minutes: null },
+        { order: 1, name: "Copperline at Village Oaks", address: "9811 Copper Creek Dr, Austin, TX 78729", lon: -97.787598, lat: 30.457835, miles: 2.1, minutes: 5 },
+        { order: 2, name: "Keystone Apartments", address: "5230 Thunder Creek Rd, Austin, TX 78759", lon: -97.744300, lat: 30.416372, miles: 5.5, minutes: 10 },
+        { order: 3, name: "Walnut Creek Crossing", address: "2000 Cedar Bend Dr, Austin, TX 78758", lon: -97.697899, lat: 30.409365, miles: 3.3, minutes: 8 },
+        { order: 4, name: "Creek’s Edge Apartments", address: "1124 Rutland Dr, Austin, TX 78758", lon: -97.702797, lat: 30.370188, miles: 3.3, minutes: 8 },
+        { order: 5, name: "Alma Apartments", address: "9220 N Interstate Hwy 35, Austin, TX 78753", lon: -97.690015, lat: 30.358061, miles: 1.6, minutes: 4 },
+        { order: 6, name: "Wildwood Apartments", address: "7610 Cameron Rd, Austin, TX 78752", lon: -97.688423, lat: 30.331877, miles: 2.6, minutes: 5 },
+        { order: 7, name: "Patton Apartments — Unit 102", address: "1706 Patton Ln Apt 102, Austin, TX 78723", lon: -97.689240, lat: 30.319116, miles: 1.1, minutes: 3 },
+        { order: 8, name: "San Gabriel Square", address: "2212 San Gabriel St, Austin, TX 78705", lon: -97.748659, lat: 30.286453, miles: 6.1, minutes: 12 },
+        { order: 9, name: "The Brook Apartments", address: "1824 S I-35 Frontage Rd, Austin, TX 78704", lon: -97.738543, lat: 30.239884, miles: 4.2, minutes: 9 },
+        { order: 10, name: "Chevy Chase Downs", address: "2504 Huntwick Dr, Austin, TX 78741", lon: -97.727874, lat: 30.224883, miles: 1.8, minutes: 4 },
+        { order: 11, name: "Bridge at South Point", address: "6808 S I-35 Frontage Rd, Austin, TX 78745", lon: -97.772956, lat: 30.187950, miles: 5.0, minutes: 9 }
+      ];
+
+      const routeFeature = { type: "Feature", properties: {}, geometry: routeGeometry };
+      const pointFeatures = routeData.map((stop) => ({
+        type: "Feature",
+        properties: { order: stop.order },
+        geometry: { type: "Point", coordinates: [stop.lon, stop.lat] }
+      }));
+      const boundsCollection = {
+        type: "FeatureCollection",
+        features: [...streets.features, routeFeature, ...pointFeatures]
+      };
+
+      tableBody.innerHTML = routeData.map((stop) => `
+        <tr>
+          <td>${stop.order === 0 ? "Start" : `${stop.order}. ${stop.name}`}</td>
+          <td>${stop.address}</td>
+          <td class="text-end text-nowrap">${stop.miles == null ? "—" : `${stop.miles.toFixed(1)} mi`}</td>
+          <td class="text-end text-nowrap">${stop.minutes == null ? "—" : `${stop.minutes} min`}</td>
+        </tr>
+      `).join("");
+
+      const projection = d3.geoMercator();
+      const path = d3.geoPath(projection);
+      const defs = svg.append("defs");
+      defs.append("marker")
+        .attr("id", "route-arrow")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 8)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", "var(--viz-series-1)");
+
+      const frame = svg.append("rect").attr("class", "map-frame");
+      const roadsLayer = svg.append("g").attr("aria-hidden", "true");
+      const routeLayer = svg.append("g").attr("aria-hidden", "true");
+      const stopsLayer = svg.append("g").attr("aria-hidden", "true");
+
+      function draw() {
+        const width = Math.max(320, Math.round(mapWrap.getBoundingClientRect().width));
+        const height = width < 520 ? 520 : Math.min(570, Math.max(450, Math.round(width * 0.66)));
+        svg.attr("viewBox", `0 0 ${width} ${height}`);
+        frame.attr("x", 0.5).attr("y", 0.5).attr("width", width - 1).attr("height", height - 1);
+        const projectionExtent = {
+          type: "FeatureCollection",
+          features: [routeFeature, ...pointFeatures]
+        };
+        projection.fitExtent([[30, 22], [width - 30, height - 22]], projectionExtent);
+
+        roadsLayer.selectAll("path")
+          .data(streets.features)
+          .join("path")
+          .attr("class", (feature) => `street ${feature.properties.c <= 2 ? "street-major" : "street-arterial"}`)
+          .attr("d", path);
+
+        routeLayer.selectAll("path")
+          .data([routeFeature])
+          .join("path")
+          .attr("class", "route-underlay")
+          .attr("d", path);
+        routeLayer.selectAll("path.route-line")
+          .data([routeFeature])
+          .join("path")
+          .attr("class", "route-line")
+          .attr("marker-end", "url(#route-arrow)")
+          .attr("d", path);
+
+        const markers = stopsLayer.selectAll("g")
+          .data(routeData, (stop) => stop.order)
+          .join((enter) => {
+            const group = enter.append("g");
+            group.filter((stop) => stop.order === 0)
+              .attr("class", "start-marker")
+              .append("rect")
+              .attr("x", -10)
+              .attr("y", -10)
+              .attr("width", 20)
+              .attr("height", 20);
+            group.filter((stop) => stop.order !== 0)
+              .attr("class", "stop-marker")
+              .append("circle")
+              .attr("r", 10.5);
+            group.append("text")
+              .attr("class", "stop-label")
+              .text((stop) => stop.order === 0 ? "S" : stop.order);
+            return group;
+          });
+
+        markers.attr("transform", (stop) => {
+          const [x, y] = projection([stop.lon, stop.lat]);
+          return `translate(${x},${y})`;
+        });
+      }
+
+      draw();
+      const resizeObserver = new ResizeObserver(draw);
+      resizeObserver.observe(mapWrap);
+    })();
+  </script>
+</section>

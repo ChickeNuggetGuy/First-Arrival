@@ -17,6 +17,7 @@ dest_files=["res://.godot/imported/Instruct2.png-4e8664e49d00a397bbd539f7dee976f
 
 compress/mode=0
 compress/high_quality=false
+compress/high_quality_mode=0
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

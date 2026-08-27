@@ -80,6 +80,16 @@ public partial class ItemData : Resource
 
 	[Export]
 	public Array<ActionDefinition> ActionDefinitions;
+
+	[ExportGroup("Ammunition")]
+	[Export] public bool IsAmmunition { get; protected set; }
+	[Export(PropertyHint.Range, "0,500,1")]
+	public int AmmoDamage { get; protected set; }
+	[Export] public ItemData AmmoItem { get; protected set; }
+	[Export(PropertyHint.Range, "0,500,1")]
+	public int MagazineCapacity { get; protected set; }
+	[Export(PropertyHint.Range, "0,100,1")]
+	public int ReloadTimeUnitCost { get; protected set; } = 25;
 	
 	[Export] public int MaxStackSize { get; protected set; } = 1;
 	
@@ -128,15 +138,21 @@ public partial class ItemData : Resource
 		if (ItemIcon == null || ItemShape == null) return new Rect2();
 
 		Vector2 texSize = ItemIcon.GetSize();
-    
-		float cellW = texSize.X / Mathf.Max(1, ItemShape.SizeX);
-		float cellH = texSize.Y / Mathf.Max(1, ItemShape.SizeZ);
+		int columns = Mathf.Max(1, ItemShape.SizeX);
+		int rows = Mathf.Max(1, ItemShape.SizeZ);
+
+		// Snap both edges independently so textures whose dimensions are not evenly
+		// divisible by the item shape still produce adjoining, non-overlapping regions.
+		float left = Mathf.Round(texSize.X * localX / columns);
+		float top = Mathf.Round(texSize.Y * localZ / rows);
+		float right = Mathf.Round(texSize.X * (localX + 1) / columns);
+		float bottom = Mathf.Round(texSize.Y * (localZ + 1) / rows);
 
 		return new Rect2(
-			localX * cellW,
-			localZ * cellH,
-			cellW,
-			cellH
+			left,
+			top,
+			right - left,
+			bottom - top
 		);
 	}
 

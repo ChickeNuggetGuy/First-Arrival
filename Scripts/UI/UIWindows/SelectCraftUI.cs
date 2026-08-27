@@ -11,9 +11,32 @@ public partial class SelectCraftUI : UIWindow
 	[Export] private PackedScene CraftButtonScene;
 	[Export] private Button AcceptButton;
 	[Export] private Texture2D buttonTexture;
+	private int _destinationCellIndex = -1;
+
+	/// <summary>
+	/// Opens the picker and sends the chosen craft directly to the supplied cell.
+	/// Passing -1 retains the existing choose-a-craft-then-click-a-destination flow.
+	/// </summary>
+	public void ShowForDestination(int cellIndex)
+	{
+		bool requiresDeployableUnits = IsMissionDestination(cellIndex);
+		if (GlobeTeamManager.Instance?.HasAvailableCraft(
+			    Enums.UnitTeam.Player,
+			    requiresDeployableUnits) != true)
+		{
+			_destinationCellIndex = -1;
+			return;
+		}
+
+		_destinationCellIndex = cellIndex;
+		_ = ShowCall();
+	}
 
 	protected override Task _Setup()
 	{
+		MissionUITheme.Apply(this);
+		MissionUITheme.InsetPanelContent(this);
+		MissionUITheme.StyleFirstTitle(this);
 		treeUI.HideRoot = true;
 		if(!AcceptButton.IsConnected(BaseButton.SignalName.Pressed, Callable.From(AcceptButtonOnPressed)))
 		{
@@ -33,10 +56,11 @@ public partial class SelectCraftUI : UIWindow
 	}
 
 	
-	protected override async Task DrawUI()
+	protected override Task DrawUI()
 	{
 		SetupTree();
 		base._Show();
+		return Task.CompletedTask;
 	}
 
 	#region Signal Listeners
@@ -84,6 +108,8 @@ public partial class SelectCraftUI : UIWindow
 		}
 
 		var root = treeUI.CreateItem();
+		bool requiresDeployableUnits = IsMissionDestination(
+			_destinationCellIndex);
 		foreach (var teamHolderBase in teamHolder.Bases)
 		{
 			if (teamHolderBase == null) continue;
@@ -92,6 +118,11 @@ public partial class SelectCraftUI : UIWindow
 
 			foreach (var craft in teamHolderBase.CraftList)
 			{
+				if (craft == null ||
+				    craft.Status == Enums.CraftStatus.None ||
+				    (requiresDeployableUnits && !craft.HasDeployableUnits))
+					continue;
+
 				var treeSubChild = treeUI.CreateItem(treeChild, craft.Index);
 				treeSubChild.SetText(0, $"{craft.ItemName} ({craft.Status})");
 
@@ -139,9 +170,47 @@ public partial class SelectCraftUI : UIWindow
 			GD.PrintErr("Craft not found");
 			return;
 		}
+		if (IsMissionDestination(_destinationCellIndex) &&
+		    !oraft.HasDeployableUnits)
+		{
+			SetupTree();
+			return;
+		}
 
-		GD.Print("Setting Send Craft Mode to true");
-		teamManager.SetSendCraftMode(true,teamHolder ,oraft);
-		HideCall();
+		if (_destinationCellIndex >= 0)
+		{
+			int destinationCellIndex = _destinationCellIndex;
+			_destinationCellIndex = -1;
+			_ = teamBase.SendCraft(
+				oraft.CurrentCellIndex,
+				destinationCellIndex,
+				oraft,
+				teamManager);
+		}
+		else
+		{
+			GD.Print("Setting Send Craft Mode to true");
+			teamManager.SetSendCraftMode(true, teamHolder, oraft);
+		}
+
+		_ = HideCall();
+	}
+
+	private static bool IsMissionDestination(int cellIndex)
+	{
+		if (cellIndex < 0) return false;
+		GlobeMissionManager missionManager = GlobeMissionManager.Instance;
+		return missionManager != null &&
+		       missionManager.GetActiveMissions().TryGetValue(
+			       cellIndex,
+			       out MissionCellDefinition mission) &&
+		       mission != null &&
+		       !mission.missionStatus.HasFlag(Enums.MissionStatus.Visited);
+	}
+
+	protected override void _Hide()
+	{
+		_destinationCellIndex = -1;
+		base._Hide();
 	}
 }
