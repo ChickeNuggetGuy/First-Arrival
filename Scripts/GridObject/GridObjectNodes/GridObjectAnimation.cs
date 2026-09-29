@@ -12,10 +12,13 @@ public partial class GridObjectAnimation : GridObjectNode
 	[Export] public bool isMoving;
 	[Export] public bool isIdle;
 	[Export]public Enums.WeaponState WeaponState { get; protected set; } = Enums.WeaponState.None;
+	private static readonly System.Collections.Generic.HashSet<ulong>
+		NormalizedLocomotionAnimations = new();
 	
 	
 	protected override void Setup()
 	{
+		NormalizeLocomotionRootTranslation();
 		ApplyAnimationSpeed();
 		isMoving = false;
 		isIdle = true;
@@ -45,6 +48,63 @@ public partial class GridObjectAnimation : GridObjectNode
 	}
 
 	#region Animation Functions
+
+	/// <summary>
+	/// Keeps imported walk/run clips in place. The GridObject itself owns world
+	/// movement; horizontal translation on the Hips track would otherwise be
+	/// added visually and then snap back when the state machine returns to idle.
+	/// </summary>
+	private void NormalizeLocomotionRootTranslation()
+	{
+		if (animationPlayer == null) return;
+
+		foreach (StringName animationName in animationPlayer.GetAnimationList())
+		{
+			string name = animationName.ToString();
+			if (!IsLocomotionAnimation(name)) continue;
+
+			Animation animation = animationPlayer.GetAnimation(animationName);
+			if (animation == null ||
+			    !NormalizedLocomotionAnimations.Add(animation.GetInstanceId()))
+				continue;
+
+			for (int trackIndex = 0;
+			     trackIndex < animation.GetTrackCount();
+			     trackIndex++)
+			{
+				if (animation.TrackGetType(trackIndex) !=
+				    Animation.TrackType.Position3D)
+					continue;
+
+				string trackPath = animation.TrackGetPath(trackIndex).ToString();
+				if (!trackPath.EndsWith(":Hips", StringComparison.OrdinalIgnoreCase))
+					continue;
+
+				int keyCount = animation.TrackGetKeyCount(trackIndex);
+				if (keyCount == 0) continue;
+
+				Vector3 anchor = animation
+					.TrackGetKeyValue(trackIndex, 0)
+					.AsVector3();
+				for (int keyIndex = 0; keyIndex < keyCount; keyIndex++)
+				{
+					Vector3 position = animation
+						.TrackGetKeyValue(trackIndex, keyIndex)
+						.AsVector3();
+					position.X = anchor.X;
+					position.Z = anchor.Z;
+					animation.TrackSetKeyValue(trackIndex, keyIndex, position);
+				}
+			}
+		}
+	}
+
+	private static bool IsLocomotionAnimation(string animationName)
+	{
+		return animationName.StartsWith("walk_", StringComparison.OrdinalIgnoreCase) ||
+		       animationName.StartsWith("run_", StringComparison.OrdinalIgnoreCase) ||
+		       animationName.StartsWith("sprint_", StringComparison.OrdinalIgnoreCase);
+	}
 
 	private void ApplyAnimationSpeed()
 	{

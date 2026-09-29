@@ -45,6 +45,11 @@ public partial class GridObjectStatHolder : GridObjectNode
 		else return true;
 	}
 
+	public void RegisterStat(GridObjectStat stat)
+	{
+		_stats[stat.Stat] = stat;
+	}
+
 	public float GetEffectiveMaxValue(Enums.Stat statType)
 	{
 		if (!TryGetStat(statType, out GridObjectStat stat)) return 0;

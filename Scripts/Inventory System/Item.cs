@@ -19,7 +19,16 @@ public partial class Item : Node3D, IContextUser<Item>
 	) == true;
 
 
-	public InventoryGrid currentGrid{get;set;}
+	private InventoryGrid _currentGrid;
+	public InventoryGrid currentGrid
+	{
+		get => _currentGrid;
+		set
+		{
+			if (this is UnitBodyItem body) body.OnInventoryChanging(_currentGrid, value);
+			_currentGrid = value;
+		}
+	}
 	public void Init(ItemData itemData)
 	{
 		ItemData = itemData;
@@ -132,7 +141,7 @@ public partial class Item : Node3D, IContextUser<Item>
 		currentGrid?.NotifyItemChanged();
 	}
 
-	public void ShowVisual(BoneAttachment3D attachment)
+	public virtual void ShowVisual(BoneAttachment3D attachment)
 	{
 		if (attachment != null)
 		{
@@ -147,7 +156,7 @@ public partial class Item : Node3D, IContextUser<Item>
 		}
 	}
 	
-	public void HideVisual(BoneAttachment3D attachment)
+	public virtual void HideVisual(BoneAttachment3D attachment)
 	{
 		if (attachment != null)
 		{

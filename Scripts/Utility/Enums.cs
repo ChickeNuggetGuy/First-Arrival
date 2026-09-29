@@ -12,6 +12,13 @@ public class Enums
 		Active,
 		Inactive,
 	}
+
+	public enum UnitCondition
+	{
+		Conscious,
+		Unconscious,
+		Dead
+	}
 	
 	[System.Flags]
 	public enum GridObjectSettings
@@ -72,7 +79,8 @@ public class Enums
 		Stamina,
 		Bravery,
 		TimeUnits,
-		RangedAccuracy
+		RangedAccuracy,
+		Stun
 	}
 
 	public enum BodyPart
@@ -89,6 +97,7 @@ public class Enums
 	public static Dictionary<Stat, Color> statColors = new()
 	{
 		{ Stat.Health, new Color(0.82f, 0.18f, 0.22f) },
+		{ Stat.Stun, new Color(0.65f, 0.65f, 0.65f) },
 		{ Stat.Stamina, new Color(0.95f, 0.75f, 0.16f) },
 		{ Stat.Bravery, new Color(0.6f, 0.3f, 0.82f) },
 		{ Stat.TimeUnits, new Color(0.2f, 0.72f, 0.32f) },

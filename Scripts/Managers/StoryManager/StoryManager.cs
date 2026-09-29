@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Threading;
 using FirstArrival.Scripts.Managers;
+using FirstArrival.Scripts.Utility;
 using Godot;
 using Godot.Collections;
 
@@ -29,7 +31,7 @@ public partial class StoryManager : Manager<StoryManager>
     [Signal]
     public delegate void StoryEventExecutionStoppedEventHandler(
         string eventId,
-        StoryEventExecutionResult result
+        EventExecutionResult result
     );
 
     [Export]
@@ -38,6 +40,8 @@ public partial class StoryManager : Manager<StoryManager>
     [Export(PropertyHint.Range, "0.05,10.0,0.05")]
     public double AutomaticCheckIntervalSeconds { get; private set; } = 0.25;
 
+    private CancellationTokenSource _executionCancellation;
+    private readonly HashSet<string> _startedEventIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _completedEventIds = new(StringComparer.Ordinal);
     private readonly System.Collections.Generic.Dictionary<string, StoryEventRegistration>
         _eventsById = new(StringComparer.Ordinal);
@@ -45,6 +49,11 @@ public partial class StoryManager : Manager<StoryManager>
         _tracksById = new(StringComparer.Ordinal);
     private readonly System.Collections.Generic.Dictionary<string, string> _linearCurrentEventIds =
         new(StringComparer.Ordinal);
+    private readonly System.Collections.Generic.Dictionary<string, int>
+        _selectedStoryMissionCells = new(StringComparer.Ordinal);
+    private readonly System.Collections.Generic.Dictionary<string, Enums.MissionStatus>
+        _selectedStoryMissionOutcomes = new(StringComparer.Ordinal);
+    private string _lastSelectedStoryMissionEventId = string.Empty;
 
     private double _automaticCheckTimer;
     private bool _isExecuting;
@@ -69,6 +78,10 @@ public partial class StoryManager : Manager<StoryManager>
 
     protected override Task _Setup(bool loadingData)
     {
+        _executionCancellation?.Cancel();
+        _executionCancellation?.Dispose();
+        _executionCancellation = new CancellationTokenSource();
+        _isExecuting = false;
         _deinitializing = false;
         _readyForChecks = false;
         _automaticCheckTimer = 0.0;
@@ -78,8 +91,12 @@ public partial class StoryManager : Manager<StoryManager>
 
         if (!loadingData)
         {
+            _startedEventIds.Clear();
             _completedEventIds.Clear();
             _linearCurrentEventIds.Clear();
+            _selectedStoryMissionCells.Clear();
+            _selectedStoryMissionOutcomes.Clear();
+            _lastSelectedStoryMissionEventId = string.Empty;
         }
 
         BuildStoryIndex();
@@ -93,7 +110,7 @@ public partial class StoryManager : Manager<StoryManager>
     protected override Task _Execute(bool loadingData)
     {
         // Story events can await player interaction. They must not be part of the
-        // manager-loading task, or a popup could keep the loading screen open forever.
+        // manager loading task, or a popup could keep the loading screen open forever.
         if (_loadingCoordinator == null)
             _readyForChecks = true;
 
@@ -102,6 +119,9 @@ public partial class StoryManager : Manager<StoryManager>
 
     public override void Deinitialize()
     {
+        _executionCancellation?.Cancel();
+        _isExecuting = false;
+        SetIsBusy(false);
         _deinitializing = true;
         _readyForChecks = false;
         DisconnectLoadingCoordinator();
@@ -109,22 +129,86 @@ public partial class StoryManager : Manager<StoryManager>
 
     public override void _ExitTree()
     {
-        DisconnectLoadingCoordinator();
+        Deinitialize();
+        _executionCancellation?.Dispose();
         base._ExitTree();
     }
+
+    public bool IsEventStarted(string eventId) =>
+        !string.IsNullOrWhiteSpace(eventId) && _startedEventIds.Contains(eventId);
 
     public bool IsEventCompleted(string eventId)
     {
         return !string.IsNullOrWhiteSpace(eventId) && _completedEventIds.Contains(eventId);
     }
 
-    public async Task<StoryEventExecutionResult> TriggerEventAsync(
+    /// <summary>
+    /// Records which member of a story-mission choice the player committed to.
+    /// This state is saved before entering battle and can be consumed by later
+    /// story events, such as constructing the first base at that city.
+    /// </summary>
+    public void RecordSelectedStoryMission(string storyEventId, int cellIndex)
+    {
+        if (string.IsNullOrWhiteSpace(storyEventId) || cellIndex < 0) return;
+
+        _selectedStoryMissionCells[storyEventId] = cellIndex;
+        _selectedStoryMissionOutcomes.Remove(storyEventId);
+        _lastSelectedStoryMissionEventId = storyEventId;
+    }
+
+    public void ClearSelectedStoryMission(string storyEventId, int cellIndex)
+    {
+        if (string.IsNullOrWhiteSpace(storyEventId) ||
+            !_selectedStoryMissionCells.TryGetValue(storyEventId, out int selectedCell) ||
+            selectedCell != cellIndex)
+            return;
+
+        _selectedStoryMissionCells.Remove(storyEventId);
+        _selectedStoryMissionOutcomes.Remove(storyEventId);
+        if (_lastSelectedStoryMissionEventId == storyEventId)
+            _lastSelectedStoryMissionEventId = string.Empty;
+    }
+
+    public bool TryGetSelectedStoryMissionCell(
+        string storyEventId,
+        out int cellIndex)
+    {
+        string resolvedEventId = string.IsNullOrWhiteSpace(storyEventId)
+            ? _lastSelectedStoryMissionEventId
+            : storyEventId;
+        return _selectedStoryMissionCells.TryGetValue(resolvedEventId, out cellIndex);
+    }
+
+    public void RecordStoryMissionOutcome(
+        string storyEventId,
+        int cellIndex,
+        Enums.MissionStatus outcome)
+    {
+        if (outcome == Enums.MissionStatus.None ||
+            !TryGetSelectedStoryMissionCell(storyEventId, out int selectedCell) ||
+            selectedCell != cellIndex)
+            return;
+
+        _selectedStoryMissionOutcomes[storyEventId] = outcome;
+    }
+
+    public bool TryGetSelectedStoryMissionOutcome(
+        string storyEventId,
+        out Enums.MissionStatus outcome)
+    {
+        string resolvedEventId = string.IsNullOrWhiteSpace(storyEventId)
+            ? _lastSelectedStoryMissionEventId
+            : storyEventId;
+        return _selectedStoryMissionOutcomes.TryGetValue(resolvedEventId, out outcome);
+    }
+
+    public async Task<EventExecutionResult> TriggerEventAsync(
         string eventId,
         bool ignoreConditions = false
     )
     {
         if (string.IsNullOrWhiteSpace(eventId))
-            return StoryEventExecutionResult.Failed;
+            return EventExecutionResult.Failed;
 
         if (_eventsById.Count == 0)
             BuildStoryIndex();
@@ -132,21 +216,21 @@ public partial class StoryManager : Manager<StoryManager>
         if (!_eventsById.TryGetValue(eventId, out StoryEventRegistration registration))
         {
             GD.PushWarning($"Story event '{eventId}' was not found in the loaded story.");
-            return StoryEventExecutionResult.Failed;
+            return EventExecutionResult.Failed;
         }
 
         if (IsEventCompleted(eventId))
-            return StoryEventExecutionResult.Completed;
+            return EventExecutionResult.Completed;
 
         if (_isExecuting)
-            return StoryEventExecutionResult.Blocked;
+            return EventExecutionResult.Blocked;
 
         if (
             registration.Track.Mode == StoryTrackMode.Linear
             && GetCurrentLinearEvent(registration.Track) != registration.Event
         )
         {
-            return StoryEventExecutionResult.Blocked;
+            return EventExecutionResult.Blocked;
         }
 
         return await ExecuteStoryEventAsync(registration, ignoreConditions);
@@ -170,18 +254,38 @@ public partial class StoryManager : Manager<StoryManager>
             linearTrackPositions[entry.Key] = currentEvent?.EventId ?? string.Empty;
         }
 
+        Godot.Collections.Dictionary<string, Variant> selectedMissionCells = new();
+        foreach (KeyValuePair<string, int> entry in _selectedStoryMissionCells)
+            selectedMissionCells[entry.Key] = entry.Value;
+
+        Godot.Collections.Dictionary<string, Variant> selectedMissionOutcomes = new();
+        foreach (KeyValuePair<string, Enums.MissionStatus> entry in
+                 _selectedStoryMissionOutcomes)
+        {
+            selectedMissionOutcomes[entry.Key] = (int)entry.Value;
+        }
+
         return new Godot.Collections.Dictionary<string, Variant>
         {
             ["story_id"] = Story?.StoryId ?? string.Empty,
             ["completed_event_ids"] = completedEventIds,
+            ["started_event_ids"] = new Array<string>(new SortedSet<string>(_startedEventIds, StringComparer.Ordinal)),
             ["linear_track_positions"] = linearTrackPositions,
+            ["selected_story_mission_cells"] = selectedMissionCells,
+            ["selected_story_mission_outcomes"] = selectedMissionOutcomes,
+            ["last_selected_story_mission_event_id"] =
+                _lastSelectedStoryMissionEventId,
         };
     }
 
     public override Task Load(Godot.Collections.Dictionary<string, Variant> data)
     {
+        _startedEventIds.Clear();
         _completedEventIds.Clear();
         _linearCurrentEventIds.Clear();
+        _selectedStoryMissionCells.Clear();
+        _selectedStoryMissionOutcomes.Clear();
+        _lastSelectedStoryMissionEventId = string.Empty;
 
         if (data == null)
             return Task.CompletedTask;
@@ -195,6 +299,15 @@ public partial class StoryManager : Manager<StoryManager>
                     _completedEventIds.Add(eventId);
             }
         }
+
+        if (data.TryGetValue("started_event_ids", out Variant startedVariant))
+        {
+            foreach (string eventId in startedVariant.AsGodotArray<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(eventId)) _startedEventIds.Add(eventId);
+            }
+        }
+        _startedEventIds.UnionWith(_completedEventIds);
 
         if (data.TryGetValue("linear_track_positions", out Variant positionsVariant))
         {
@@ -210,6 +323,44 @@ public partial class StoryManager : Manager<StoryManager>
                     _linearCurrentEventIds[entry.Key] = eventId;
             }
         }
+
+		if (data.TryGetValue(
+			    "selected_story_mission_cells",
+			    out Variant selectedCellsVariant) &&
+		    selectedCellsVariant.VariantType == Variant.Type.Dictionary)
+		{
+			var selectedCells = selectedCellsVariant
+				.AsGodotDictionary<string, Variant>();
+			foreach (KeyValuePair<string, Variant> entry in selectedCells)
+			{
+				if (!string.IsNullOrWhiteSpace(entry.Key))
+					_selectedStoryMissionCells[entry.Key] = entry.Value.AsInt32();
+			}
+		}
+
+		if (data.TryGetValue(
+			    "selected_story_mission_outcomes",
+			    out Variant selectedOutcomesVariant) &&
+		    selectedOutcomesVariant.VariantType == Variant.Type.Dictionary)
+		{
+			var selectedOutcomes = selectedOutcomesVariant
+				.AsGodotDictionary<string, Variant>();
+			foreach (KeyValuePair<string, Variant> entry in selectedOutcomes)
+			{
+				if (!string.IsNullOrWhiteSpace(entry.Key))
+				{
+					_selectedStoryMissionOutcomes[entry.Key] =
+						(Enums.MissionStatus)entry.Value.AsInt32();
+				}
+			}
+		}
+
+		if (data.TryGetValue(
+			    "last_selected_story_mission_event_id",
+			    out Variant lastSelectedVariant))
+		{
+			_lastSelectedStoryMissionEventId = lastSelectedVariant.AsString();
+		}
 
         return Task.CompletedTask;
     }
@@ -354,46 +505,64 @@ public partial class StoryManager : Manager<StoryManager>
             && storyEvent.CanAutomaticallyTrigger();
     }
 
-    private async Task<StoryEventExecutionResult> ExecuteStoryEventAsync(
+    private async Task<EventExecutionResult> ExecuteStoryEventAsync(
         StoryEventRegistration registration,
         bool ignoreConditions
     )
     {
         if (_isExecuting)
-            return StoryEventExecutionResult.Blocked;
+            return EventExecutionResult.Blocked;
 
         StoryEvent storyEvent = registration.Event;
         if (!ignoreConditions && !storyEvent.CheckTriggerConditions())
-            return StoryEventExecutionResult.Blocked;
+            return EventExecutionResult.Blocked;
 
         _isExecuting = true;
         SetIsBusy(true);
-        EmitSignal(SignalName.StoryEventStarted, storyEvent.EventId);
+        CancellationToken token = _executionCancellation?.Token ?? CancellationToken.None;
 
-        StoryEventExecutionResult result;
+        EventExecutionResult result;
         try
         {
-            result = await storyEvent.ExecuteCall(ignoreConditions);
+            result = await storyEvent.ExecuteCall(ignoreConditions, new EventExecutionContext
+            {
+                Owner = this,
+                CancellationToken = token,
+                IsCompleted = IsEventCompleted,
+                Started = eventId =>
+                {
+                    if (!string.IsNullOrWhiteSpace(eventId) && _startedEventIds.Add(eventId))
+                        EmitSignal(SignalName.StoryEventStarted, eventId);
+                },
+                Completed = eventId =>
+                {
+                    if (!string.IsNullOrWhiteSpace(eventId) && _completedEventIds.Add(eventId))
+                        EmitSignal(SignalName.StoryEventCompleted, eventId);
+                }
+            });
         }
         catch (Exception exception)
         {
             GD.PushError($"Story event '{storyEvent.EventId}' failed: {exception}");
-            result = StoryEventExecutionResult.Failed;
+            result = EventExecutionResult.Failed;
         }
         finally
         {
-            _isExecuting = false;
-            SetIsBusy(false);
+            if (!token.IsCancellationRequested)
+            {
+                _isExecuting = false;
+                SetIsBusy(false);
+            }
         }
 
-        if (result == StoryEventExecutionResult.Completed)
+        if (token.IsCancellationRequested) return EventExecutionResult.Cancelled;
+
+        if (result == EventExecutionResult.Completed)
         {
             _completedEventIds.Add(storyEvent.EventId);
 
             if (registration.Track.Mode == StoryTrackMode.Linear)
                 AdvanceLinearTrack(registration.Track, storyEvent);
-
-            EmitSignal(SignalName.StoryEventCompleted, storyEvent.EventId);
         }
         else
         {

@@ -23,6 +23,7 @@ public abstract partial class ActionBase
 	public bool IsCancellationRequested { get; private set; }
 	public bool WasInterruptedByNewEnemy { get; private set; }
 	public GridObject ActingGridObject => parentGridObject;
+	internal HashSet<GridObject> VisibleEnemiesAtStart { get; private set; }
 
 	protected void SetParent(ActionBase parent) => Parent = parent;
 
@@ -125,6 +126,15 @@ public abstract partial class ActionBase
 	{
 		try
 		{
+			if (parentGridObject != null && !parentGridObject.CanAct)
+			{
+				await CancelCall();
+				return;
+			}
+			if (ActionManager.Instance != null)
+				await ActionManager.Instance.YieldIfActionBudgetExceeded();
+			if (IsCancellationRequested) return;
+			VisibleEnemiesAtStart = ActionManager.Instance?.CaptureVisibleEnemies(parentGridObject);
 			await SetupCall();
 			if (IsCancellationRequested) return;
 
@@ -161,6 +171,11 @@ public abstract partial class ActionBase
 						// The completed child has already committed its state (for
 						// example, a movement step has entered its new cell). Cancel only
 						// after it returns so cancellation cannot roll that state back.
+						await CancelCall();
+						return;
+					}
+					if (parentGridObject != null && !parentGridObject.CanAct)
+					{
 						await CancelCall();
 						return;
 					}
@@ -251,16 +266,25 @@ public abstract partial class ActionBase
 	/// Waits for a tween while allowing a cancellation-aware action to stop it.
 	/// Returns false when cancellation interrupted the tween.
 	/// </summary>
-	protected async Task<bool> WaitForTween(Tween tween)
+	protected async Task<bool> WaitForTween(Tween tween, bool allowCancellation = true)
 	{
 		if (tween == null) return false;
 
 		while (GodotObject.IsInstanceValid(tween) && tween.IsRunning())
 		{
-			if (IsCancellationRequested)
+			if (allowCancellation && IsCancellationRequested)
 			{
 				tween.Kill();
 				return false;
+			}
+
+			// The camera can leave an action while it is playing. The caller
+			// commits its final state when true is returned, just as for a tween
+			// that finished normally; skipping visuals is not cancellation.
+			if (!ShouldAnimate())
+			{
+				tween.Kill();
+				return true;
 			}
 
 			SceneTree tree = parentGridObject?.GetTree();
@@ -269,7 +293,7 @@ public abstract partial class ActionBase
 			await parentGridObject.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
 		}
 
-		return !IsCancellationRequested;
+		return !allowCancellation || !IsCancellationRequested;
 	}
 
 	/// <summary>
@@ -300,11 +324,13 @@ public abstract partial class ActionBase
 		GridCell visibilityCell = startingGridCell
 		                          ?? parentGridObject.GridPositionData?.AnchorCell;
 		bool isPlayerUnit = parentGridObject.Team == Enums.UnitTeam.Player;
+		bool occupiesVisibleCell = parentGridObject.GridPositionData?.OccupiedCells
+			?.Any(cell => cell != null && cell.fogState == Enums.FogState.Visible)
+			?? (visibilityCell?.fogState == Enums.FogState.Visible);
 
 		if (
 			!isPlayerUnit
-			&& (visibilityCell == null
-			    || visibilityCell.fogState != Enums.FogState.Visible)
+			&& !occupiesVisibleCell
 		)
 			return false;
 

@@ -26,6 +26,28 @@ public partial class ActionManager : Manager<ActionManager>
 
 	private List<(ActionBase action, GridObject gridObject)> delayedActions = new();
 
+	private const ulong ActionWorkBudgetUsec = 4000;
+	private ulong _actionWorkFrame = ulong.MaxValue;
+	private ulong _actionWorkStartedAt;
+
+	// Completed Tasks continue synchronously. Without a frame budget an entire
+	// off-screen path/scan can monopolize the main thread despite using await.
+	public async Task YieldIfActionBudgetExceeded()
+	{
+		if (!IsInsideTree()) return;
+		ulong frame = Engine.GetProcessFrames();
+		if (_actionWorkFrame != frame)
+		{
+			_actionWorkFrame = frame;
+			_actionWorkStartedAt = Time.GetTicksUsec();
+			return;
+		}
+		if (Time.GetTicksUsec() - _actionWorkStartedAt < ActionWorkBudgetUsec) return;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		_actionWorkFrame = Engine.GetProcessFrames();
+		_actionWorkStartedAt = Time.GetTicksUsec();
+	}
+
 	[Signal]
 	public delegate void ActionCompletedEventHandler(ActionDefinition actionCompleted, ActionDefinition currentAction);
 	[Signal]
@@ -518,7 +540,10 @@ public partial class ActionManager : Manager<ActionManager>
 			var teamHolder = GridObjectManager.Instance.GetGridObjectTeamHolder(actingObject.Team);
 			if (teamHolder != null)
 			{
-				var visibleEnemiesBeforeAction = GetVisibleEnemies(teamHolder, actingObject.Team);
+				// Direction changes publish sight during the animation. Compare with
+				// the start of this action, before those intermediate updates occurred.
+				var visibleEnemiesBeforeAction = actionBaseInst?.VisibleEnemiesAtStart
+					?? GetVisibleEnemies(teamHolder, actingObject.Team);
 				teamHolder.UpdateGridObjects(actionDef, SelectedAction);
 
 				if (GetVisibleEnemies(teamHolder, actingObject.Team)
@@ -579,6 +604,13 @@ public partial class ActionManager : Manager<ActionManager>
 		}
 	}
 
+	internal HashSet<GridObject> CaptureVisibleEnemies(GridObject actingObject)
+	{
+		if (actingObject == null) return null;
+		var holder = GridObjectManager.Instance?.GetGridObjectTeamHolder(actingObject.Team);
+		return GetVisibleEnemies(holder, actingObject.Team);
+	}
+
 	private static HashSet<GridObject> GetVisibleEnemies(
 		GridObjectTeamHolder viewerTeam,
 		Enums.UnitTeam viewerTeamId
@@ -596,10 +628,13 @@ public partial class ActionManager : Manager<ActionManager>
 
 			foreach (var gridObject in teamHolder.GridObjects[Enums.GridObjectState.Active])
 			{
-				GridCell anchorCell = gridObject?.GridPositionData?.AnchorCell;
-				if (gridObject != null && gridObject.IsActive && !gridObject.scenery &&
-					anchorCell != null && viewerTeam.TeamVisibleCells.Contains(anchorCell))
-					visibleEnemies.Add(gridObject);
+					List<GridCell> occupiedCells = gridObject?.GridPositionData?.OccupiedCells;
+					bool occupiesVisibleCell = occupiedCells?.Any(
+						cell => cell != null && viewerTeam.TeamVisibleCells.Contains(cell)
+					) ?? false;
+					if (gridObject != null && gridObject.IsActive && !gridObject.scenery &&
+						occupiesVisibleCell)
+						visibleEnemies.Add(gridObject);
 			}
 		}
 

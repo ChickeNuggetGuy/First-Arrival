@@ -1,9 +1,60 @@
 [gd_resource type="Resource" script_class="StoryDefinition" format=3 uid="uid://cle37j1ygwbiw"]
 
+[ext_resource type="Script" uid="uid://07ki5imxfspc" path="res://Scripts/Managers/StoryManager/StoryEvent.cs" id="2_jluaw"]
 [ext_resource type="Script" uid="uid://43bt5w1qs6rb" path="res://Scripts/Managers/StoryManager/StoryDefinition.cs" id="2_pljfd"]
+[ext_resource type="Script" uid="uid://ccqan4wrbxmhj" path="res://Scripts/Managers/StoryManager/EventCondition.cs" id="3_hk5dm"]
+[ext_resource type="Script" uid="uid://dr47hx0swf4aa" path="res://Scripts/Managers/StoryManager/Events/MissionStoryEvent.cs" id="4_snh27"]
+[ext_resource type="Script" uid="uid://16b2o3eds0l7" path="res://Scripts/Managers/StoryManager/Events/BuildBaseStoryEvent.cs" id="5_build_base"]
 [ext_resource type="Script" uid="uid://3hgwfmigll46" path="res://Scripts/Managers/StoryManager/StoryTrackDefinition.cs" id="6_story_track"]
+[ext_resource type="Script" uid="uid://dj8hcc2tpls1g" path="res://Scripts/Managers/StoryManager/Events/PopupStoryEvent.cs" id="7_popup"]
+[ext_resource type="Script" uid="uid://ck22qkna53hb6" path="res://Scripts/Event System/Event.cs" id="8_event"]
+[ext_resource type="Script" uid="uid://dfoceac0nocxj" path="res://Scripts/Event System/EventStatusCondition.cs" id="9_status"]
+
+[sub_resource type="Resource" id="Condition_controls_complete"]
+script = ExtResource("9_status")
+EventId = "controls_tutorial"
+Source = 1
+
+[sub_resource type="Resource" id="Resource_intro_invasion_popup"]
+script = ExtResource("7_popup")
+PopupTitle = "Multiple Alien Incursions Reported"
+PopupText = "Emergency services in several cities are reporting hostile extraterrestrial activity. Review the affected cities, then select one mission site as the location of humanity's first response."
+ContinueButtonText = "Choose a City"
+EventId = "intro_alien_invasions_briefing"
+EventName = "Alien Incursion Briefing"
+EventDescription = "Review the cities reporting alien activity."
+metadata/_custom_type_script = "uid://dj8hcc2tpls1g"
+
+[sub_resource type="Resource" id="Resource_k0qj1"]
+script = ExtResource("4_snh27")
+TargetMode = 2
+MissionCount = 3
+MissionType = 5
+AllowLocalResponse = true
+EventId = "intro_alien_invasions"
+EventName = "Alien Activity Reported"
+EventDescription = "Police departments in several cities are reporting hostile extraterrestrial activity. Choose one city for the first response."
+Conditions = Array[ExtResource("3_hk5dm")]([SubResource("Condition_controls_complete")])
+SubEvents = Array[ExtResource("8_event")]([SubResource("Resource_intro_invasion_popup")])
+metadata/_custom_type_script = "uid://dr47hx0swf4aa"
+
+[sub_resource type="Resource" id="Resource_first_base"]
+script = ExtResource("5_build_base")
+SourceStoryMissionEventId = "intro_alien_invasions"
+BaseName = "First Arrival Headquarters"
+EventId = "intro_build_first_base"
+EventName = "Establish the First Base"
+EventDescription = "Retrofit the responding police station into a makeshift headquarters."
+metadata/_custom_type_script = "uid://16b2o3eds0l7"
+
+[sub_resource type="Resource" id="Resource_1p0md"]
+script = ExtResource("6_story_track")
+TrackId = "Intro"
+Events = Array[ExtResource("2_jluaw")]([SubResource("Resource_k0qj1"), SubResource("Resource_first_base")])
+metadata/_custom_type_script = "uid://3hgwfmigll46"
 
 [resource]
 script = ExtResource("2_pljfd")
 StoryId = "MainStory"
+Tracks = Array[ExtResource("6_story_track")]([SubResource("Resource_1p0md")])
 metadata/_custom_type_script = "uid://43bt5w1qs6rb"

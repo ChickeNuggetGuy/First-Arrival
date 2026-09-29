@@ -18,7 +18,6 @@ public partial class GlobeUI : UIWindow
 	[Export] private SelectCraftUI selectCraftUI;
 	[Export] private CustomLabel monthlyScoreLabel;
 	
-	[ExportGroup("Time"), Export] private Dictionary<int, SpeedButtonUI> TimeSpeedButtons;
 
 	[ExportGroup("Bases"), Export] private Control baseButtonHolder;
 	[ExportGroup("Bases"), Export] private Texture2D focusButtonTexture;
@@ -411,7 +410,7 @@ public partial class GlobeUI : UIWindow
 	private void TeamHolderOnFundsChanged(GlobeTeamHolder teamHolder, long currentFunds)
 	{
 		GD.Print("Team funds changed: " + teamHolder.funds);
-		currentFundsUI.Text = $"Current Funds: {teamHolder.funds}";
+		currentFundsUI.Text = $"{teamHolder.funds}";
 
 		if (currentFunds < teamHolder.newbaseCost)
 		{

@@ -40,7 +40,16 @@ public partial class ModifyStatAction : ActionBase, ICompositeAction
 
 		GridCell currentCell = parentGridObject?.GridPositionData?.AnchorCell
 			?? startingGridCell;
-		if (definition.IsWithinAdjacencyRange(currentCell, targetGridCell))
+		definition.TryGetTargetGridObject(
+			parentGridObject,
+			targetGridCell,
+			out GridObject targetGridObject
+		);
+		if (definition.IsWithinAdjacencyRange(
+			    parentGridObject,
+			    targetGridObject,
+			    currentCell,
+			    targetGridCell))
 		{
 			_setupSucceeded = true;
 			return Task.CompletedTask;
@@ -96,10 +105,16 @@ public partial class ModifyStatAction : ActionBase, ICompositeAction
 
 		if (
 			definition.targetRequirement == ModifyStatTargetRequirement.Adjacency
-			&& !definition.IsWithinAdjacencyRange(
-				parentGridObject?.GridPositionData?.AnchorCell,
-				targetGridCell
-			)
+			&& (!definition.TryGetTargetGridObject(
+				    parentGridObject,
+				    targetGridCell,
+				    out GridObject adjacencyTarget
+			) || !definition.IsWithinAdjacencyRange(
+				    parentGridObject,
+				    adjacencyTarget,
+				    parentGridObject?.GridPositionData?.AnchorCell,
+				    targetGridCell
+			))
 		)
 		{
 			GD.Print("ModifyStatAction: acting unit did not reach the target");

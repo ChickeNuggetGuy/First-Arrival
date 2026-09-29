@@ -149,6 +149,29 @@ public partial class GlobeCityManager : Manager<GlobeCityManager>
 	/// </summary>
 	public int[] GetCityCellIndices() => _cityCellIndices;
 
+	/// <summary>
+	/// Returns city cells inside one atlas country. Passing zero returns every city.
+	/// </summary>
+	public int[] GetCityCellIndicesForCountry(uint countryKey)
+	{
+		GlobeHexGridManager gridManager = GlobeHexGridManager.Instance;
+		if (gridManager == null || _cityCellIndices.Length == 0)
+			return System.Array.Empty<int>();
+
+		var matchingIndices = new System.Collections.Generic.List<int>();
+		foreach (int cellIndex in _cityCellIndices)
+		{
+			if (!gridManager.GetCellFromIndex(cellIndex, excludeWater: true).HasValue)
+				continue;
+			if (countryKey != 0 &&
+			    gridManager.GetCountryKeyForIndex(cellIndex) != countryKey)
+				continue;
+			matchingIndices.Add(cellIndex);
+		}
+
+		return matchingIndices.ToArray();
+	}
+
 	/// <summary>Gets the persistent city definition assigned to a hex.</summary>
 	public bool TryGetCityDefinition(int cellIndex, out CityCellDefinition definition)
 		=> _cityDefinitions.TryGetValue(cellIndex, out definition);

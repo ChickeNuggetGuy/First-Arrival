@@ -49,14 +49,21 @@ public partial class MissionDetailsUI : UIWindow
 		missionDifficultyLabel.Text = currentMission.missionDifficulty.ToString();
 		if (sendCraftButton != null)
 		{
+			bool canRespondLocally = currentMissionDefinition?.AllowsLocalResponse == true &&
+			                         !currentMissionDefinition.missionStatus.HasFlag(
+				                         Enums.MissionStatus.Visited);
 			bool hasAvailableCraft = GlobeTeamManager.Instance?.HasAvailableCraft(
 				Enums.UnitTeam.Player,
 				requireDeployableUnits: true) == true;
-			bool canSendCraft = hasAvailableCraft &&
+			bool canSendCraft = !canRespondLocally && hasAvailableCraft &&
 			                    currentMissionDefinition?.onRouteCraft == null;
-			sendCraftButton.Visible = hasAvailableCraft;
-			sendCraftButton.Disabled = !canSendCraft;
-			sendCraftButton.Text = canSendCraft ? "Send Craft" : "Craft En Route";
+			sendCraftButton.Visible = canRespondLocally || hasAvailableCraft;
+			sendCraftButton.Disabled = !canRespondLocally && !canSendCraft;
+			sendCraftButton.Text = canRespondLocally
+				? "Respond with Local Police"
+				: canSendCraft
+					? "Send Craft"
+					: "Craft En Route";
 		}
 
 		return Task.CompletedTask;
@@ -66,6 +73,13 @@ public partial class MissionDetailsUI : UIWindow
 	{
 		if (currentMissionDefinition == null ||
 		    currentMissionDefinition.onRouteCraft != null) return;
+		if (currentMissionDefinition.AllowsLocalResponse)
+		{
+			_ = GlobeMissionManager.Instance?.LoadLocalResponseMissionScene(
+				currentMissionDefinition);
+			_ = HideCall();
+			return;
+		}
 
 		UIManager.Instance?.GetWindow<SelectCraftUI>()?.ShowForDestination(
 			currentMissionDefinition.cellIndex);

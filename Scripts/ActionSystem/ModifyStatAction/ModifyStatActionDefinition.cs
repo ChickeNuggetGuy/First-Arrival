@@ -14,6 +14,8 @@ public enum ModifyStatTargetRequirement
 [GlobalClass]
 public partial class ModifyStatActionDefinition : ActionDefinition
 {
+	protected override bool TargetsGridObjects => true;
+
 	[ExportGroup("Stat Modifiers")]
 	[Export]
 	public Godot.Collections.Dictionary<Enums.Stat, int> targetStats = new();
@@ -63,7 +65,10 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 			return false;
 		}
 
-		if (!TryGetTargetGridObject(gridObject, targetGridCell, out _))
+		if (!TryGetTargetGridObject(
+			    gridObject,
+			    targetGridCell,
+			    out GridObject targetGridObject))
 		{
 			reason = "No active grid object in the target cell has a configured stat";
 			return false;
@@ -71,7 +76,11 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 
 		if (targetRequirement == ModifyStatTargetRequirement.Adjacency)
 		{
-			if (!IsWithinAdjacencyRange(startingGridCell, targetGridCell))
+			if (!IsWithinAdjacencyRange(
+				    gridObject,
+				    targetGridObject,
+				    startingGridCell,
+				    targetGridCell))
 			{
 				if (!TryBuildMoveToTargetAdjacency(
 					gridObject,
@@ -143,13 +152,6 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 				&& TryGetTargetGridObject(gridObject, cell, out _)
 			)
 			.Distinct()
-			.Where(cell => CanTakeAction(
-				gridObject,
-				startingGridCell,
-				cell,
-				out _,
-				out _
-			))
 			.ToList();
 	}
 
@@ -241,6 +243,8 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 	}
 
 	internal bool IsWithinAdjacencyRange(
+		GridObject actingGridObject,
+		GridObject targetGridObject,
 		GridCell startingGridCell,
 		GridCell targetGridCell
 	)
@@ -252,18 +256,17 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 		)
 			return false;
 
-		// Same-cell targeting permits a unit to use an adjacent-range support
+		// Same-object targeting permits a unit to use an adjacent-range support
 		// action on itself without stepping away first.
-		if (startingGridCell.GridCoordinates == targetGridCell.GridCoordinates)
+		if (actingGridObject == targetGridObject)
 			return true;
 
-		return GridSystem.Instance.TryGetGridCellNeighbors(
-			targetGridCell,
-			false,
-			false,
-			out List<GridCell> neighbors
-		) && neighbors.Any(cell =>
-			cell.GridCoordinates == startingGridCell.GridCoordinates
+		return GridFootprintUtility.AreAdjacent(
+			GridFootprintUtility.GetOccupiedCells(
+				actingGridObject,
+				startingGridCell
+			),
+			new[] { targetGridCell }
 		);
 	}
 
@@ -302,26 +305,23 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 			return false;
 		}
 
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(
-			targetGridCell,
-			false,
-			false,
-			out List<GridCell> neighbors
-		))
+		if (!TryGetTargetGridObject(
+			    gridObject,
+			    targetGridCell,
+			    out GridObject targetGridObject))
 		{
-			reason = "Target has no neighboring grid cells";
+			reason = "Target grid object is unavailable";
 			return false;
 		}
+		var targetCells = new List<GridCell> { targetGridCell };
 
 		int bestCombinedCost = int.MaxValue;
 		int bestTimeUnitCost = int.MaxValue;
-		foreach (GridCell candidate in neighbors)
+		foreach (GridCell candidate in GridFootprintUtility
+		         .GetNearbyAnchorCandidates(gridObject, targetCells))
 		{
-			if (
-				candidate == null
-				|| !candidate.IsWalkable
-				|| candidate.HasMovementBlockingGridObject()
-			)
+			if (!candidate.IsWalkable ||
+			    candidate.HasMovementBlockingGridObject(gridObject))
 				continue;
 
 			if (!moveDefinition.TryBuildCostsOnly(
@@ -331,6 +331,20 @@ public partial class ModifyStatActionDefinition : ActionDefinition
 				out var candidateCosts,
 				out _
 			))
+				continue;
+
+			Enums.Direction arrivalDirection = moveDefinition.path?.Count >= 2
+				? RotationHelperFunctions.GetDirectionBetweenCells(
+					moveDefinition.path[^2],
+					moveDefinition.path[^1]
+				)
+				: gridObject.GridPositionData.Direction;
+			if (!GridFootprintUtility.AreAdjacent(
+				    gridObject.GridPositionData.GetGridCellsAt(
+					    candidate,
+					    arrivalDirection
+				    ),
+				    targetCells))
 				continue;
 
 			int candidateTimeUnits = candidateCosts.GetValueOrDefault(

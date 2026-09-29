@@ -84,6 +84,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 					pair.Value.Setup();
 			}
 			_loadedTeamData.Clear();
+			RestoreBodyLinks();
 
 			GridObjectTeamHolder teamHolder = GetGridObjectTeamHolder(Enums.UnitTeam.Player);
 			if (teamHolder != null)
@@ -113,7 +114,7 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 				else
 				{
 					for (int i = 0; i < kvp.Value; i++)
-						await TrySpawnGridObject(GetGridObjectTeamHolder(kvp.Key).unitPrefab, kvp.Key);
+						await TrySpawnGridObject(GetGridObjectTeamHolder(kvp.Key).unitPrefabs.PickRandom(), kvp.Key);
 				}
 
 				if (gridObjectTeams[kvp.Key].GridObjects[Enums.GridObjectState.Active].Count > 0)
@@ -143,12 +144,6 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		Godot.Collections.Dictionary<string, Variant> unitData,
 		Enums.UnitTeam team)
 	{
-		if (!TryGetSpawnCell(team, out GridCell cell))
-		{
-			GD.PrintErr($"No valid spawn cell found for saved {team} unit.");
-			return;
-		}
-
 		var battleUnitData = new Godot.Collections.Dictionary<string, Variant>();
 		foreach (var pair in unitData)
 			battleUnitData[pair.Key] = pair.Value;
@@ -166,6 +161,12 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			false
 		);
 		if (instance == null) return;
+		if (!TryGetFootprintSpawnCell(instance, team, out GridCell cell))
+		{
+			GD.PrintErr($"No spawn area can fit the saved {team} unit's footprint.");
+			instance.QueueFree();
+			return;
+		}
 
 		instance.GlobalPosition = cell.WorldCenter;
 		instance.SetIsActive(true);
@@ -193,16 +194,46 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 		);
 	}
 
-	private async Task TrySpawnGridObject(PackedScene gridObjectScene, Enums.UnitTeam team)
+	private bool TryGetFootprintSpawnCell(
+		GridObject gridObject,
+		Enums.UnitTeam team,
+		out GridCell cell
+	)
 	{
-		bool success = TryGetSpawnCell(team, out GridCell cell);
+		cell = null;
+		GridPositionData positionData = gridObject?.GridPositionData
+		                                ?? gridObject?.GetNodeOrNull<GridPositionData>(
+			                                "GridPositionData"
+		                                );
+		if (positionData == null)
+			return TryGetSpawnCell(team, out cell);
 
-		if (!success)
+		IEnumerable<GridCell> candidates = GridSystem.Instance.AllGridCells.Where(
+			candidate => candidate != null &&
+			             candidate.IsWalkable &&
+			             !candidate.HasSpawnBlockingGridObject()
+		);
+		if (team.HasFlag(Enums.UnitTeam.Player))
 		{
-			GD.Print("Grid Cell Not Found");
-			return;
+			candidates = candidates.Where(
+				candidate => candidate.UnitTeamSpawn == Enums.UnitTeam.Player
+			);
 		}
 
+		foreach (GridCell candidate in candidates.OrderBy(_ => GD.Randf()))
+		{
+			if (!positionData.CanOccupyAt(candidate, positionData.Direction))
+				continue;
+
+			cell = candidate;
+			return true;
+		}
+
+		return false;
+	}
+
+	private async Task TrySpawnGridObject(PackedScene gridObjectScene, Enums.UnitTeam team)
+	{
 		GridObject gridObjectInstance = gridObjectScene.Instantiate() as GridObject;
 		if (gridObjectInstance == null)
 		{
@@ -210,13 +241,20 @@ public partial class GridObjectManager : Manager<GridObjectManager>
 			return;
 		}
 
-		gridObjectTeams[team].AddGridObject(gridObjectInstance);
+		if (!TryGetFootprintSpawnCell(gridObjectInstance, team, out GridCell cell))
+		{
+			GD.Print("No spawn area can fit the grid object's footprint");
+			gridObjectInstance.Free();
+			return;
+		}
+
 		gridObjectTeams[team].AddChild(gridObjectInstance);
 		gridObjectInstance.GlobalPosition = cell.WorldCenter;
 
 		gridObjectInstance.Name = UnitNameGenerator.Generate();
 		GD.PrintErr("Initalizing Grid Object");
 		await gridObjectInstance.Initialize(team, cell);
+		await gridObjectTeams[team].AddGridObject(gridObjectInstance);
 	}
 
 

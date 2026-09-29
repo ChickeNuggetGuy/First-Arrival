@@ -12,6 +12,7 @@ public partial class GridPositionData : GridObjectNode
 	public GridShape Shape { get; set; }
 
 	[Export] public bool AutoCalculateShape { get; set; } = false;
+	[Export] public bool RotateShapeWithDirection { get; set; } = false;
 	[Export] public bool RecursiveShapeDetection { get; set; } = true;
 
 	[ExportGroup("Shape Configuration")]
@@ -135,6 +136,165 @@ public partial class GridPositionData : GridObjectNode
 
 	#region Grid Placement
 
+	public List<Vector3I> GetWorldCoordinatesAt(
+		Vector3I anchorCoords,
+		Enums.Direction direction
+	)
+	{
+		if (Shape == null)
+			return new List<Vector3I>();
+
+		// Auto-calculated collision bounds are already generated in their current
+		// world orientation. Opt-in directional shapes use an authored South-facing
+		// raster and rotate it from gameplay direction.
+		return !AutoCalculateShape && RotateShapeWithDirection
+			? Shape.GetWorldCoordinates(anchorCoords, direction)
+			: Shape.GetWorldCoordinates(anchorCoords);
+	}
+
+	public List<GridCell> GetGridCellsAt(
+		GridCell anchorCell,
+		Enums.Direction direction
+	)
+	{
+		var cells = new List<GridCell>();
+		if (anchorCell == null || GridSystem.Instance == null)
+			return cells;
+
+		foreach (Vector3I coordinate in GetWorldCoordinatesAt(
+			         anchorCell.GridCoordinates,
+			         direction))
+		{
+			GridCell cell = GridSystem.Instance.GetGridCell(coordinate);
+			if (cell != null)
+				cells.Add(cell);
+		}
+
+		return cells;
+	}
+
+	/// <summary>
+	/// Validates the entire footprint without treating this object's currently
+	/// occupied cells as blockers. Support is required only beneath the lowest
+	/// occupied cell in each X/Z column, allowing vertical unit volumes.
+	/// </summary>
+	public bool CanOccupyAt(
+		GridCell anchorCell,
+		Enums.Direction direction,
+		out string reason
+	)
+	{
+		if (anchorCell == null || Shape == null || GridSystem.Instance == null)
+		{
+			reason = "Anchor, shape, or grid is unavailable";
+			return false;
+		}
+
+		Enums.Direction shapeDirection = !AutoCalculateShape && RotateShapeWithDirection
+			? direction
+			: Enums.Direction.None;
+		List<Vector3I> occupiedCoordinates = Shape.GetWorldCoordinates(
+			anchorCell.GridCoordinates,
+			shapeDirection
+		);
+		if (occupiedCoordinates.Count == 0)
+		{
+			reason = "Footprint contains no occupied cells";
+			return false;
+		}
+
+		var supportCoordinates = new HashSet<Vector3I>(
+			Shape.GetSupportWorldCoordinates(
+				anchorCell.GridCoordinates,
+				shapeDirection
+			)
+		);
+
+		foreach (Vector3I coordinate in occupiedCoordinates)
+		{
+			GridCell cell = GridSystem.Instance.GetGridCell(coordinate);
+			if (cell == null)
+			{
+				reason = $"Footprint leaves the grid at {coordinate}";
+				return false;
+			}
+
+			if (supportCoordinates.Contains(coordinate) &&
+			    !cell.state.HasFlag(Enums.GridCellState.Ground))
+			{
+				reason = $"Footprint has no ground support at {coordinate}";
+				return false;
+			}
+
+			if (cell.state.HasFlag(Enums.GridCellState.Disabled))
+			{
+				reason = $"Footprint enters a disabled cell at {coordinate}";
+				return false;
+			}
+
+			if (IsBlockedByAnotherObject(cell))
+			{
+				reason = $"Footprint is blocked at {coordinate}";
+				return false;
+			}
+		}
+
+		reason = "Success!";
+		return true;
+	}
+
+	public bool CanOccupyAt(
+		GridCell anchorCell,
+		Enums.Direction direction
+	)
+	{
+		return CanOccupyAt(anchorCell, direction, out _);
+	}
+
+	private bool IsBlockedByAnotherObject(GridCell cell)
+	{
+		if (cell == null) return true;
+
+		bool containsSelf = cell.gridObjects?.Contains(parentGridObject) ?? false;
+		if (cell.state.HasFlag(Enums.GridCellState.Obstructed))
+		{
+			// An object's old footprint is allowed during an atomic move/rotation,
+			// but original terrain obstruction and any other occupant still block it.
+			if (!containsSelf || cell.originalState.HasFlag(Enums.GridCellState.Obstructed))
+				return true;
+		}
+
+		if (cell.gridObjects == null)
+			return false;
+
+		foreach (GridObject gridObject in cell.gridObjects)
+		{
+			if (gridObject == null || gridObject == parentGridObject ||
+			    gridObject is GridCellStateOverride)
+				continue;
+
+			if (gridObject.IsActive && !gridObject.scenery)
+				return true;
+		}
+
+		return false;
+	}
+
+	public bool TrySetGridCell(GridCell newAnchor)
+	{
+		if (newAnchor == null)
+		{
+			SetGridCell(null);
+			return true;
+		}
+
+		if (!CanOccupyAt(newAnchor, Direction, out _))
+			return false;
+
+		SetGridCell(newAnchor);
+		return true;
+	}
+
 	public void SetGridCell(GridCell newAnchor)
 	{
 		ClearOccupation();
@@ -144,7 +304,10 @@ public partial class GridPositionData : GridObjectNode
 
 		_config ??= GridConfiguration.GetActive();
 
-		var worldCoords = Shape.GetWorldCoordinates(AnchorCell.GridCoordinates);
+		var worldCoords = GetWorldCoordinatesAt(
+			AnchorCell.GridCoordinates,
+			Direction
+		);
 		bool isWalkThrough = parentGridObject?.gridObjectSettings
 			.HasFlag(Enums.GridObjectSettings.CanWalkThrough) ?? false;
 
@@ -174,7 +337,22 @@ public partial class GridPositionData : GridObjectNode
 
 	public void SetDirection(Enums.Direction newDirection)
 	{
-		if (Direction == newDirection) return;
+		if (!TrySetDirection(newDirection))
+		{
+			GD.PushWarning(
+				$"{parentGridObject?.Name ?? Name}: cannot rotate footprint to " +
+				$"{newDirection} at {AnchorCell?.GridCoordinates}"
+			);
+		}
+	}
+
+	public bool TrySetDirection(Enums.Direction newDirection)
+	{
+		if (Direction == newDirection) return true;
+		if (newDirection == Enums.Direction.None) return false;
+
+		if (AnchorCell != null && !CanOccupyAt(AnchorCell, newDirection, out _))
+			return false;
 
 		Direction = newDirection;
 		ApplyDirectionToVisualMesh();
@@ -185,6 +363,7 @@ public partial class GridPositionData : GridObjectNode
 			SetGridCell(AnchorCell);
 
 		EmitSignal(SignalName.DirectionChanged, (int)newDirection);
+		return true;
 	}
 
 	private void ClearOccupation()
@@ -242,7 +421,7 @@ public partial class GridPositionData : GridObjectNode
 		Vector3 boundsCenter = _config.GridWorldOrigin + (boundsSize / 2.0f);
 		DebugDraw3D.DrawBox(boundsCenter, Quaternion.Identity, boundsSize, new Color(1, 1, 1, 0.1f), true);
 
-		var worldCoords = Shape.GetWorldCoordinates(anchorCoords);
+		var worldCoords = GetWorldCoordinatesAt(anchorCoords, Direction);
 
 		foreach (var coord in worldCoords)
 		{
@@ -273,32 +452,29 @@ public partial class GridPositionData : GridObjectNode
 
 	public bool CanPlaceAt(Vector3I anchorCoords)
 	{
-		if (GridSystem.Instance == null) return false;
-
-		var worldCoords = Shape.GetWorldCoordinates(anchorCoords);
-
-		foreach (var coord in worldCoords)
-		{
-			var cell = GridSystem.Instance.GetGridCell(coord);
-			if (cell == null) return false;
-			if (cell.state.HasFlag(Enums.GridCellState.Obstructed)) return false;
-			if (!cell.state.HasFlag(Enums.GridCellState.Ground)) return false;
-		}
-
-		return true;
+		GridCell anchorCell = GridSystem.Instance?.GetGridCell(anchorCoords);
+		return CanOccupyAt(anchorCell, Direction, out _);
 	}
 
 	public List<Vector3I> GetInvalidCells(Vector3I anchorCoords)
 	{
 		var invalid = new List<Vector3I>();
-		var worldCoords = Shape.GetWorldCoordinates(anchorCoords);
+		Enums.Direction shapeDirection = !AutoCalculateShape && RotateShapeWithDirection
+			? Direction
+			: Enums.Direction.None;
+		var worldCoords = Shape.GetWorldCoordinates(anchorCoords, shapeDirection);
+		var supportCoordinates = new HashSet<Vector3I>(
+			Shape.GetSupportWorldCoordinates(anchorCoords, shapeDirection)
+		);
 
 		foreach (var coord in worldCoords)
 		{
 			var cell = GridSystem.Instance?.GetGridCell(coord);
 			if (cell == null ||
-			    cell.state.HasFlag(Enums.GridCellState.Obstructed) ||
-			    !cell.state.HasFlag(Enums.GridCellState.Ground))
+			    cell.state.HasFlag(Enums.GridCellState.Disabled) ||
+			    IsBlockedByAnotherObject(cell) ||
+			    (supportCoordinates.Contains(coord) &&
+			     !cell.state.HasFlag(Enums.GridCellState.Ground)))
 			{
 				invalid.Add(coord);
 			}
@@ -316,6 +492,7 @@ public partial class GridPositionData : GridObjectNode
 		var data = new Godot.Collections.Dictionary<string, Variant>();
 
 		data["AutoCalculateShape"] = AutoCalculateShape;
+		data["RotateShapeWithDirection"] = RotateShapeWithDirection;
 		data["RecursiveShapeDetection"] = RecursiveShapeDetection;
 		data["Direction"] = (int)Direction;
 
@@ -341,6 +518,9 @@ public partial class GridPositionData : GridObjectNode
 	{
 		if (data.TryGetValue("AutoCalculateShape", out var autoCalcVar))
 			AutoCalculateShape = autoCalcVar.AsBool();
+
+		if (data.TryGetValue("RotateShapeWithDirection", out var rotateShapeVar))
+			RotateShapeWithDirection = rotateShapeVar.AsBool();
 
 		if (data.TryGetValue("RecursiveShapeDetection", out var recursiveVar))
 			RecursiveShapeDetection = recursiveVar.AsBool();

@@ -77,15 +77,9 @@ public partial class InventoryGridUI : UIWindow
 	{
 		DetachInventoryEvents();
 
-		if (inventory != null)
-			ClearSlots();
-		else
-		{
-			GD.Print("Error: Inventory is null!!!");
-			return;
-		}
-
+		ClearSlots();
 		InventoryGrid = inventory;
+		if (inventory == null) return;
 		if (InventoryGrid?.GridShape == null)
 		{
 			GD.PrintErr("Error: InventoryGrid or its GridShape is not assigned!");

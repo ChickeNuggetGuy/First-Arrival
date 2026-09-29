@@ -16,6 +16,29 @@ public sealed class PopupResult
 }
 
 /// <summary>
+/// An optional non-closing popup action. The popup temporarily gets out of the
+/// way while the action runs, then returns so the player can inspect more items.
+/// </summary>
+public sealed class PopupAction
+{
+	public string ActionId { get; }
+	public string ButtonText { get; }
+	private Func<Task> ExecuteAsync { get; }
+
+	public PopupAction(
+		string actionId,
+		string buttonText,
+		Func<Task> executeAsync)
+	{
+		ActionId = actionId ?? string.Empty;
+		ButtonText = buttonText ?? string.Empty;
+		ExecuteAsync = executeAsync;
+	}
+
+	public Task InvokeAsync() => ExecuteAsync?.Invoke() ?? Task.CompletedTask;
+}
+
+/// <summary>
 /// A single reusable popup renderer. Callers provide content; the window creates
 /// the required controls and completes the returned task after player input.
 /// </summary>
@@ -25,6 +48,7 @@ public partial class PopupWindowUI : UIWindow
 	{
 		public string Title { get; init; } = string.Empty;
 		public string[] TextBlocks { get; init; } = Array.Empty<string>();
+		public PopupAction[] Actions { get; init; } = Array.Empty<PopupAction>();
 		public string ContinueButtonText { get; init; } = "Continue";
 		public TaskCompletionSource<PopupResult> Completion { get; } = new();
 	}
@@ -36,6 +60,7 @@ public partial class PopupWindowUI : UIWindow
 	private Button _continueButton;
 	private bool _setupComplete;
 	private bool _changingPopup;
+	private bool _executingAction;
 
 	/// <summary>
 	/// Queues a popup containing one dynamically generated text element.
@@ -48,6 +73,7 @@ public partial class PopupWindowUI : UIWindow
 		return ShowTextPopupAsync(
 			title,
 			new[] { text ?? string.Empty },
+			actions: null,
 			continueButtonText);
 	}
 
@@ -60,6 +86,23 @@ public partial class PopupWindowUI : UIWindow
 		IEnumerable<string> textBlocks,
 		string continueButtonText = "Continue")
 	{
+		return ShowTextPopupAsync(
+			title,
+			textBlocks,
+			actions: null,
+			continueButtonText);
+	}
+
+	/// <summary>
+	/// Queues a popup with text and optional actions that can temporarily reveal
+	/// the game view without completing the popup.
+	/// </summary>
+	public Task<PopupResult> ShowTextPopupAsync(
+		string title,
+		IEnumerable<string> textBlocks,
+		IEnumerable<PopupAction> actions,
+		string continueButtonText = "Continue")
+	{
 		var blocks = new List<string>();
 		if (textBlocks != null)
 		{
@@ -67,11 +110,21 @@ public partial class PopupWindowUI : UIWindow
 				blocks.Add(block ?? string.Empty);
 		}
 		if (blocks.Count == 0) blocks.Add(string.Empty);
+		var popupActions = new List<PopupAction>();
+		if (actions != null)
+		{
+			foreach (PopupAction action in actions)
+			{
+				if (action != null && !string.IsNullOrWhiteSpace(action.ButtonText))
+					popupActions.Add(action);
+			}
+		}
 
 		var pending = new PendingPopup
 		{
 			Title = title ?? string.Empty,
 			TextBlocks = blocks.ToArray(),
+			Actions = popupActions.ToArray(),
 			ContinueButtonText = string.IsNullOrWhiteSpace(continueButtonText)
 				? "Continue"
 				: continueButtonText.Trim()
@@ -109,6 +162,36 @@ public partial class PopupWindowUI : UIWindow
 			element.SetText(text);
 			popupContainer.AddChild(element);
 			await element.SetupCall();
+		}
+
+		if (_currentPopup.Actions.Length > 0)
+		{
+			var locationLabel = new Label
+			{
+				Name = "PopupActionsLabel",
+				Text = "Reported locations",
+				SizeFlagsHorizontal = SizeFlags.ExpandFill
+			};
+			locationLabel.AddThemeColorOverride(
+				"font_color",
+				MissionUITheme.MutedTextColor);
+			popupContainer.AddChild(locationLabel);
+
+			foreach (PopupAction action in _currentPopup.Actions)
+			{
+				PopupAction capturedAction = action;
+				var actionButton = new Button
+				{
+					Name = $"PopupAction_{action.ActionId}",
+					Text = action.ButtonText,
+					CustomMinimumSize = new Vector2(0, 44),
+					SizeFlagsHorizontal = SizeFlags.ExpandFill
+				};
+				MissionUITheme.StyleButton(actionButton);
+				actionButton.Pressed += () =>
+					_ = ExecutePopupActionAsync(capturedAction);
+				popupContainer.AddChild(actionButton);
+			}
 		}
 	}
 
@@ -227,7 +310,7 @@ public partial class PopupWindowUI : UIWindow
 
 	private async void ContinueButtonOnPressed()
 	{
-		if (_currentPopup == null || _changingPopup) return;
+		if (_currentPopup == null || _changingPopup || _executingAction) return;
 
 		_changingPopup = true;
 		_continueButton.Disabled = true;
@@ -242,6 +325,39 @@ public partial class PopupWindowUI : UIWindow
 			_changingPopup = false;
 			completedPopup.Completion.TrySetResult(new PopupResult("continue"));
 			_ = TryShowNextPopupAsync();
+		}
+	}
+
+	private async Task ExecutePopupActionAsync(PopupAction action)
+	{
+		if (action == null || _currentPopup == null ||
+		    _changingPopup || _executingAction)
+			return;
+
+		_executingAction = true;
+		try
+		{
+			// Reveal the globe while the camera moves. The same popup is redrawn
+			// afterward, allowing the player to inspect every reported location.
+			await HideCall(playAnimation: false);
+			await action.InvokeAsync();
+		}
+		catch (Exception exception)
+		{
+			GD.PushError(
+				$"Popup action '{action.ActionId}' failed: {exception.Message}");
+		}
+		finally
+		{
+			try
+			{
+				if (_currentPopup != null && IsInsideTree())
+					await ShowCall(playAnimation: false);
+			}
+			finally
+			{
+				_executingAction = false;
+			}
 		}
 	}
 

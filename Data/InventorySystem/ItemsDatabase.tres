@@ -39,6 +39,7 @@
 [ext_resource type="Resource" uid="uid://dxckynqpmmatd" path="res://Data/Items/Ammo_5_56Belt_Item.tres" id="36_belt556"]
 [ext_resource type="Resource" uid="uid://cpluvr615efv6" path="res://Data/Items/Ammo_7_62Belt_Item.tres" id="37_belt762"]
 [ext_resource type="Resource" uid="uid://b7kfb16iskwrh" path="res://Data/Items/Acid_Spitter_Item.tres" id="38_bmk4s"]
+[ext_resource type="Resource" path="res://Data/Items/Stun_Rod_Item.tres" id="stun_rod"]
 
 [sub_resource type="Resource" id="Resource_ln787"]
 script = ExtResource("1_m8kqt")
@@ -58,6 +59,7 @@ Items = Dictionary[int, ExtResource("1_m8kqt")]({
 110: ExtResource("8_yc2nx"),
 111: ExtResource("9_6mn25"),
 112: ExtResource("10_ibyl6"),
+113: ExtResource("stun_rod"),
 120: ExtResource("11_q3ina"),
 121: ExtResource("12_2j20g"),
 122: ExtResource("13_3dltv"),

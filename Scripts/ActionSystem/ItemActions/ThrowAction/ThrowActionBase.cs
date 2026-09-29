@@ -92,11 +92,12 @@ public class ThrowActionBase : ActionBase, ICompositeAction, IItemAction
 
       foreach (Vector3 position in vectorPath)
       {
+        if (!ShouldAnimate()) break;
         Tween tween = ApplyAnimationSpeed(parentGridObject.CreateTween());
         tween.SetTrans(Tween.TransitionType.Linear);
         tween.SetEase(Tween.EaseType.InOut);
         tween.TweenProperty(visual, "position", position, 0.05);
-        await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+        await WaitForTween(tween, allowCancellation: false);
       }
     }
 

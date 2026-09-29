@@ -1011,7 +1011,10 @@ public partial class TeamBaseCellDefinition : HexCellDefinition
 		}
 
 		if (missionCellDefinition != null)
+		{
 			missionCellDefinition.SetOnRouteCraft(craft);
+			missionManager.CommitStoryMissionChoice(missionCellDefinition);
+		}
 
 		for (int i = 1; i < path.Count; i++)
 		{

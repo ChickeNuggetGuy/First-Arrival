@@ -45,6 +45,16 @@ public partial class GridObjectSight : GridObjectNode
     private readonly HashSet<GridCell> _tempCellSet = new();
     private readonly HashSet<GridCell> _proximityCellSet = new();
     private GridPositionData _positionData;
+    private GridCell[][,] _calculatedGrid;
+    private ulong _calculatedNavigationRevision;
+    private GridCell _calculatedAnchor;
+    private Enums.Direction _calculatedDirection;
+    private Vector3 _calculatedEye;
+    private readonly PhysicsRayQueryParameters3D _rayQuery = new()
+    {
+        CollideWithBodies = true,
+        CollideWithAreas = false
+    };
 
     
     public bool HasCalculated { get; private set; }
@@ -54,7 +64,14 @@ public partial class GridObjectSight : GridObjectNode
 
     public void EnsureUpToDate()
     {
-	    if (!HasCalculated || IsDirty)
+        var grid = GridSystem.Instance;
+        var position = parentGridObject?.GridPositionData;
+        if (!HasCalculated || IsDirty || grid == null ||
+            !ReferenceEquals(_calculatedGrid, grid.GridCells) ||
+            _calculatedNavigationRevision != grid.NavigationRevision ||
+            _calculatedAnchor != position?.AnchorCell ||
+            _calculatedDirection != position?.Direction ||
+            _calculatedEye != GetViewerEyePosition())
 	    {
 		    CalculateSightArea();
 	    }
@@ -71,6 +88,18 @@ public partial class GridObjectSight : GridObjectNode
             _positionData.DirectionChanged += OnDirectionChanged;
 
         CalculateSightArea();
+    }
+
+    public override void _EnterTree()
+    {
+        base._EnterTree();
+        // Team registration reparents initialized units into ActiveUnits.
+        // Restore the subscription removed by _ExitTree during that reparent.
+        if (_positionData != null)
+        {
+            _positionData.DirectionChanged -= OnDirectionChanged;
+            _positionData.DirectionChanged += OnDirectionChanged;
+        }
     }
 
     public override void _ExitTree()
@@ -170,6 +199,7 @@ public partial class GridObjectSight : GridObjectNode
 
         // Viewer ray origin 
         Vector3 eye = GetViewerEyePosition();
+        PrepareRayQuery();
 
         foreach (var cell in _tempCellSet)
         {
@@ -217,6 +247,11 @@ public partial class GridObjectSight : GridObjectNode
         
         HasCalculated = true;
         IsDirty = false;
+        _calculatedGrid = gridSystem.GridCells;
+        _calculatedNavigationRevision = gridSystem.NavigationRevision;
+        _calculatedAnchor = startCell;
+        _calculatedDirection = parentGridObject.GridPositionData.Direction;
+        _calculatedEye = eye;
     }
 
     private void OnDirectionChanged(Enums.Direction _)
@@ -255,14 +290,8 @@ public partial class GridObjectSight : GridObjectNode
         return !IsLineBlocked(eye, aim);
     }
 
-    private bool IsLineBlocked(Vector3 from, Vector3 to)
+    private void PrepareRayQuery()
     {
-        var world = GetTree().Root.GetWorld3D();
-        if (world == null)
-            return false;
-
-        var space = world.DirectSpaceState;
-
         uint mask = _losBlockerMask;
         if (mask == 0)
         {
@@ -272,26 +301,26 @@ public partial class GridObjectSight : GridObjectNode
                 | (uint)PhysicsLayer.LOS_BLOCKER;
         }
 
-        var rayParams = new PhysicsRayQueryParameters3D
-        {
-            From = from,
-            To = to,
-            CollisionMask = mask,
-            CollideWithBodies = true,
-            CollideWithAreas = false
-        };
-        
-
-        rayParams.Exclude = new Godot.Collections.Array<Rid>
+        _rayQuery.CollisionMask = mask;
+        var excluded = new Godot.Collections.Array<Rid>
         {
             parentGridObject.GetRid()
         };
 
         if (parentGridObject.collisionShape != null &&
             parentGridObject.collisionShape != parentGridObject)
-            rayParams.Exclude.Add(parentGridObject.collisionShape.GetRid());
+            excluded.Add(parentGridObject.collisionShape.GetRid());
+        _rayQuery.Exclude = excluded;
+    }
 
-        var hit = space.IntersectRay(rayParams);
+    private bool IsLineBlocked(Vector3 from, Vector3 to)
+    {
+        var space = parentGridObject.GetWorld3D()?.DirectSpaceState;
+        if (space == null) return false;
+
+        _rayQuery.From = from;
+        _rayQuery.To = to;
+        var hit = space.IntersectRay(_rayQuery);
         return hit.Count > 0;
     }
 

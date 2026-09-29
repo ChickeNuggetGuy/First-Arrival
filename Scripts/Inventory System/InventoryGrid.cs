@@ -10,6 +10,8 @@ namespace FirstArrival.Scripts.Inventory_System;
 [GlobalClass, Tool]
 public partial class InventoryGrid : Resource
 {
+    public GridObject OwningUnit { get; set; }
+    public GridCell GroundCell { get; set; }
     [Export] public Enums.InventoryType InventoryType { get; protected set; }
 
     [Export(PropertyHint.ResourceType, "GridShape")] public GridShape GridShape { get; protected set; }
@@ -354,11 +356,13 @@ public partial class InventoryGrid : Resource
 
     public bool TryAddItem(Item item, int count)
     {
+        if (item is UnitBodyItem && item.currentGrid != null) return false;
         return AddItem(item, count);
     }
 
     public bool TryAddItemAt(Item item, Vector2I position, int count)
     {
+        if (item is UnitBodyItem && item.currentGrid != null) return false;
         if (CanAddItemAt(position.X, position.Y, item, count, out string reason))
         {
             AddItemAt(position.X, position.Y, item, count, _currentPageIndex);
@@ -414,6 +418,7 @@ public partial class InventoryGrid : Resource
 
     public bool TryRemoveItem(Item item, int count)
     {
+        if (item is UnitBodyItem && count != 1) return false;
         if (!HasItem(item)) return false;
         RemoveItem(item, count);
         return true;
@@ -485,6 +490,12 @@ public partial class InventoryGrid : Resource
                     };
                     if (itemInfo.item.IsRangedWeapon)
                         entry["loaded_ammo"] = itemInfo.item.CurrentAmmo;
+                    if (itemInfo.item is UnitBodyItem body)
+                    {
+                        entry["body_unit_id"] = body.UnitId;
+                        entry["body_unit_name"] = body.UnitName;
+                        entry["body_dead"] = body.IsDead;
+                    }
                     items.Add(entry);
                 }
             }
@@ -525,10 +536,20 @@ public partial class InventoryGrid : Resource
                 : 0;
             if (count <= 0 || pageIndex < 0) continue;
 
-            ItemData itemData = InventoryManager.Instance?.GetItemData(
-                itemId);
-            if (itemData == null) continue;
-            Item item = ItemData.CreateItem(itemData);
+            Item item;
+            if (entry.TryGetValue("body_unit_id", out Variant bodyId))
+            {
+                item = UnitBodyItem.CreateSaved(bodyId.AsString(),
+                    entry["body_unit_name"].AsString(), entry["body_dead"].AsBool());
+                count = 1;
+            }
+            else
+            {
+                var definition = InventoryManager.Instance?.GetItemData(itemId);
+                if (definition == null) continue;
+                item = ItemData.CreateItem(definition);
+            }
+            ItemData itemData = item.ItemData;
             if (item == null) continue;
             if (entry.TryGetValue("loaded_ammo", out Variant ammoValue))
                 item.RestoreAmmo(ammoValue.AsInt32());
@@ -876,6 +897,13 @@ public partial class InventoryGrid : Resource
         if (item?.ItemData == null || pageItems == null)
         {
             reason = "Item, ItemData, or inventory page is null.";
+            return false;
+        }
+
+        if (item is UnitBodyItem bodyItem && (count != 1 || OwningUnit?.UnitId == bodyItem.UnitId || HasItem(item) ||
+            UniqueItems.Exists(entry => entry.item is UnitBodyItem existing && existing.UnitId == bodyItem.UnitId)))
+        {
+            reason = "A body is a unique item and cannot be duplicated or stacked.";
             return false;
         }
 

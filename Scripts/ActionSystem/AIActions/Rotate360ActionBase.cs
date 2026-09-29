@@ -58,7 +58,7 @@ public class Rotate360ActionBase : ActionBase, ICompositeAction
 	protected override bool ShouldContinueAfterSubAction(ActionBase completedSubAction)
 	{
 		// RotateActionBase commits GridPositionData.Direction before this check.
-		// Recalculate explicitly so the scan responds to each completed step.
+		// Ensure the committed step is current without repeating its sight rays.
 		_foundVisibleEnemy = HasVisibleEnemy();
 		return !_foundVisibleEnemy;
 	}
@@ -80,7 +80,7 @@ public class Rotate360ActionBase : ActionBase, ICompositeAction
 		if (!parentGridObject.TryGetGridObjectNode<GridObjectSight>(out var sight))
 			return false;
 
-		sight.CalculateSightArea();
+		sight.EnsureUpToDate();
 
 		return sight.SeenGridObjects.Any(gridObject =>
 			gridObject != null

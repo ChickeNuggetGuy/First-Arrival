@@ -31,7 +31,17 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 	protected override async Task Setup()
 	{
 		ParentActionBase = this;
-		AddRotateSubActionIfNeeded(startingGridCell, targetGridCell);
+		GridObject targetObject = targetGridCell.gridObjects.FirstOrDefault(candidate =>
+			candidate != null &&
+			candidate.IsActive &&
+			candidate != parentGridObject &&
+			candidate.Team != parentGridObject.Team);
+		if (targetObject != null)
+		{
+			GridCell actionAnchor = parentGridObject.GridPositionData.AnchorCell
+									?? startingGridCell;
+			AddRotateSubActionIfNeeded(actionAnchor, targetGridCell);
+		}
 		await Task.CompletedTask;
 	}
 
@@ -133,11 +143,11 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 				tween.SetEase(Tween.EaseType.InOut);
 				float tweenDuration = origin.DistanceTo(tweenPos) / 100f;
 				tween.TweenProperty(visual, "global_position", tweenPos, tweenDuration);
-				await parentGridObject.ToSignal(tween, Tween.SignalName.Finished);
+				await WaitForTween(tween, allowCancellation: false);
 				visual.QueueFree();
 			}
 
-			if (targetGridObject == null)
+			if (targetGridObject == null || !targetGridObject.IsActive)
 			{
 				GD.Print("No target hit or target is not a GridObject");
 				continue;
@@ -148,6 +158,11 @@ public partial class RangedAttackActionBase : ActionBase, ICompositeAction, IIte
 				return;
 
 			targetStatHolder.TryRemoveStatCosts(rangedAttackActionDefinition.damagingStats);
+			if (rangedAttackActionDefinition.dealsStunDamage)
+			{
+				targetGridObject.Condition?.ApplyStun(damage);
+				continue;
+			}
 			if (!targetStatHolder.TryGetStat(Enums.Stat.Health, out var health))
 			{
 				GD.Print("Target Grid Object does not have Health stat");

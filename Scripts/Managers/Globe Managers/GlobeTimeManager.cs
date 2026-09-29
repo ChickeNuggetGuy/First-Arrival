@@ -9,14 +9,13 @@ using Godot.Collections;
 public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 {
 	private int _timeSpeed = 1;
-	[Export]
+	/// <summary>Game seconds advanced per real second; zero pauses the globe.</summary>
+	[Export(PropertyHint.Range, "0,86400,1,or_greater")]
 	public int timeSpeed
 	{
 		get => _timeSpeed;
 		set => SetTimeSpeed(value);
 	}
-	[Export(PropertyHint.Range, "1,3600,1,or_greater")]
-	private double simulatedSecondsPerRealSecond = 20.0;
 
 	[ExportGroup("Sun / Day-Night")]
 	[Export] private DirectionalLight3D sunLight;
@@ -178,7 +177,7 @@ public partial class GlobeTimeManager : Manager<GlobeTimeManager>
 		if (!clockRunning || timeSpeed <= 0 || delta <= 0.0) return;
 
 		accumulatedSimulatedSeconds +=
-			delta * simulatedSecondsPerRealSecond * timeSpeed;
+			delta * timeSpeed;
 
 		int wholeSeconds = (int)Math.Min(
 			Math.Floor(accumulatedSimulatedSeconds),

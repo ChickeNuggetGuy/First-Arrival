@@ -765,6 +765,29 @@ public partial class GlobeHexGridManager : Manager<GlobeHexGridManager>
 		return selected;
 	}
 
+	/// <summary>
+	/// Returns a detached list of cell indices suitable for story target selection.
+	/// A country key of zero includes every country.
+	/// </summary>
+	public int[] GetCellIndicesSnapshot(
+		bool excludeWater = false,
+		uint countryKey = 0)
+	{
+		if (_cellArray == null || _cellArray.Length == 0)
+			return Array.Empty<int>();
+
+		var indices = new List<int>();
+		foreach (HexCellData cell in _cellArray)
+		{
+			if (!IsAllowedCell(cell, excludeWater)) continue;
+			if (countryKey != 0 && GetCountryKeyForIndex(cell.Index) != countryKey)
+				continue;
+			indices.Add(cell.Index);
+		}
+
+		return indices.ToArray();
+	}
+
 	private static bool IsAllowedCell(HexCellData cell, bool excludeWater)
 		=> !excludeWater || cell.cellType != Enums.HexGridType.Water;
 

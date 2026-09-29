@@ -129,39 +129,41 @@ public partial class ExplodeActionBase : ActionBase, ICompositeAction, IDelayedA
         GD.Print($"BOOM! Grenade exploding at {targetGridCell.GridCoordinates}");
         
         var affectedCells = GetExplosionCells();
-        foreach (var cell in affectedCells)
+        var units = affectedCells.SelectMany(cell => cell.gridObjects)
+            .Where(unit => unit != null && unit.IsActive).Distinct().ToArray();
+        // Snapshot before damage can collapse units, change inventories and clear
+        // grid occupancy. A multi-cell unit receives each blast only once.
+        var bodies = new HashSet<UnitBodyItem>(affectedCells
+            .Where(cell => cell.InventoryGrid != null)
+            .SelectMany(cell => cell.InventoryGrid.UniqueItems)
+            .Select(entry => entry.item).OfType<UnitBodyItem>());
+        foreach (GridObject unit in units)
+            if (unit.TryGetGridObjectNode<GridObjectInventory>(out var inventory))
+                foreach (var grid in inventory.InventoryGrids.Values)
+                    bodies.UnionWith(grid.UniqueItems.Select(entry => entry.item).OfType<UnitBodyItem>());
+
+        foreach (GridObject unit in units)
         {
-            if (cell.HasGridObject())
+            if (!unit.TryGetGridObjectNode<GridObjectStatHolder>(out var stats)) continue;
+            foreach (var affectedStat in affectedStats)
             {
-                var gridObjects = cell.gridObjects;
-
-                for (int i = 0; i < gridObjects.Count; i++)
+                if (affectedStat.Key == Enums.Stat.Stun)
+                    unit.Condition?.ApplyStun(affectedStat.Value);
+                else if (stats.TryGetStat(affectedStat.Key, out var stat))
                 {
-	                GridObject gridObject = gridObjects[i];
-	                if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out var gridObjectStatHolder)) continue;
-	                
-	                //TODO: make the grenade decide which stats it affects (i.e emp grnades, falshbangs affecting accuracy etc)
-	                foreach (var affectedStat in affectedStats)
-	                {
-		                if (!gridObjectStatHolder.TryGetStat(affectedStat.Key, out var stat))
-			                continue;
-
-		                if (affectedStat.Key == Enums.Stat.Health)
-		                {
-			                stat.ApplyDamage(
-				                affectedStat.Value,
-				                canCauseFatalWounds
-			                );
-		                }
-		                else
-		                {
-			                stat.RemoveValue(affectedStat.Value);
-		                }
-	                }
+                    if (affectedStat.Key == Enums.Stat.Health)
+                        stat.ApplyDamage(affectedStat.Value, canCauseFatalWounds);
+                    else
+                        stat.RemoveValue(affectedStat.Value);
                 }
             }
         }
-        
+        // Health-damaging explosions destroy existing bodies. Stun-only blasts
+        // leave them intact, matching the reference game's body-item behavior.
+        if (affectedStats.TryGetValue(Enums.Stat.Health, out int damage) && damage > 0)
+            foreach (UnitBodyItem body in bodies)
+                body.LinkedUnit?.Condition?.DestroyBody();
+
         grenadeVisual?.QueueFree();
     }
 

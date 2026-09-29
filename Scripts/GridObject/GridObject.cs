@@ -100,6 +100,7 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 		}
 
 		InitializeGridObjectNodes();
+		InitializeCondition();
 
 		// Connections describe the static grid. A mobile object must not mark its
 		// own anchor cell obstructed, otherwise any nearby connection rebuild (for
@@ -286,6 +287,7 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 		var data = new Godot.Collections.Dictionary<string, Variant>();
 
 		data["Filename"] = SceneFilePath;
+		data["UnitId"] = UnitId;
 		data["Name"] = Name;
 		data["Team"] = (int)Team;
 		data["IsActive"] = IsActive;
@@ -334,6 +336,9 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 		Godot.Collections.Dictionary<string, Variant> data
 	)
 	{
+		IsRestoring = true;
+		if (data.TryGetValue("UnitId", out Variant unitId) && !string.IsNullOrEmpty(unitId.AsString()))
+			UnitId = unitId.AsString();
 		if (data.ContainsKey("Name")) Name = data["Name"].AsString();
 		if (data.ContainsKey("Settings"))
 		{
@@ -401,10 +406,16 @@ public partial class GridObject : StaticBody3D, IContextUser<GridObject>
 			}
 		}
 
-		if (hasPosition && cell != null)
+		if (isActive && hasPosition && cell != null)
 		{
 			GridPositionData.SetGridCell(cell);
 		}
+		else
+		{
+			GridPositionData.SetGridCell(null);
+		}
+		IsRestoring = false;
+		Condition?.RestorePresentation();
 	}
 
 

@@ -112,7 +112,7 @@ public partial class GridObjectStat : GridObjectNode
 			maxValue = GD.RandRange(50, 100);
 		}
 		
-		CurrentValue = MinMaxValue.max;
+		CurrentValue = Stat == Enums.Stat.Stun ? MinMaxValue.min : MinMaxValue.max;
 		EmitSignal(SignalName.CurrentValueChanged, CurrentValue,parentGridObject);
 	}
 

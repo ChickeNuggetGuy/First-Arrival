@@ -41,6 +41,7 @@ public partial class BTActionSegment : TurnSegment
 
         foreach (var unit in activeUnits)
         {
+            if (!unit.CanAct || unit.GridPositionData?.AnchorCell == null) continue;
 	        if( unit.GridPositionData.AnchorCell.fogState == Enums.FogState.Visible)
 				CameraController.Instance.FocusOn(unit); 
 
@@ -73,6 +74,7 @@ public partial class BTActionSegment : TurnSegment
         {
             do
             {
+                if (!unit.CanAct) { bt.Abort(); return; }
                 status = bt.TickTree();
 
                 if (status == BTStatus.Running)

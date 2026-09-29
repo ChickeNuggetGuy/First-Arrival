@@ -7,8 +7,9 @@ public partial class RotateActionBase : ActionBase
 {
   private Enums.Direction _targetDirection;
   private Tween _rotationTween;
-  private float _lastCommittedYaw;
+  private Quaternion _lastCommittedRotation;
   private bool _rotationStarted;
+  private bool _rotationBlocked;
 
   private const float TurnSpeedDegPerSec = 540f;
   private const bool UseTween = true;
@@ -50,21 +51,28 @@ public partial class RotateActionBase : ActionBase
 
     float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
     float finalYaw = currentYaw + delta;
+	Quaternion startRotation = new Quaternion(Vector3.Up, currentYaw).Normalized();
+	Quaternion targetRotation = new Quaternion(Vector3.Up, finalYaw).Normalized();
 
     if (Mathf.Abs(delta) >= 0.0001f && !UseTween)
     {
 	    tween.TweenCallback(Callable.From(() =>
       {
-        var r = parentGridObject.visualMesh.Rotation;
-        r.Y = finalYaw;
-        parentGridObject.visualMesh.Rotation = r;
+		parentGridObject.visualMesh.Quaternion = targetRotation;
       }));
     }
     else if (Mathf.Abs(delta) >= 0.0001f)
     {
       float duration = Mathf.Abs(delta) / Mathf.DegToRad(TurnSpeedDegPerSec);
 
-      var tw = tween.TweenProperty(parentGridObject.visualMesh, "rotation:y", finalYaw, duration);
+	  var tw = tween.TweenMethod(
+		  Callable.From<float>(weight =>
+			  parentGridObject.visualMesh.Quaternion = startRotation
+				  .Slerp(targetRotation, weight)
+				  .Normalized()),
+		  0.0f,
+		  1.0f,
+		  duration);
       tw.SetTrans(Tween.TransitionType.Sine);
       tw.SetEase(Tween.EaseType.InOut);
     }
@@ -87,7 +95,7 @@ public partial class RotateActionBase : ActionBase
 		  _targetDirection
 	  );
 	  float currentYaw = parentGridObject.visualMesh.Rotation.Y;
-	  _lastCommittedYaw = currentYaw;
+	  _lastCommittedRotation = parentGridObject.visualMesh.Quaternion;
 	  _rotationStarted = true;
 
 	  // Commit every 45-degree heading crossed by the turn. DirectionChanged
@@ -102,10 +110,15 @@ public partial class RotateActionBase : ActionBase
 				  RotationHelperFunctions.GetNextDirection(currentDirection, clockwise);
 			  if (!await RotateToDirection(nextDirection, currentYaw)) return;
 
-			  parentGridObject.GridPositionData.SetDirection(nextDirection);
+			  if (!parentGridObject.GridPositionData.TrySetDirection(nextDirection))
+			  {
+				  parentGridObject.visualMesh.Quaternion = _lastCommittedRotation;
+				  _rotationBlocked = true;
+				  return;
+			  }
 			  currentDirection = nextDirection;
 			  currentYaw = parentGridObject.visualMesh.Rotation.Y;
-			  _lastCommittedYaw = currentYaw;
+			  _lastCommittedRotation = parentGridObject.visualMesh.Quaternion;
 		  }
 
 		  return;
@@ -121,40 +134,51 @@ public partial class RotateActionBase : ActionBase
 	  float currentYaw
   )
   {
+	  if (FirstArrival.Scripts.Managers.ActionManager.Instance != null)
+		  await FirstArrival.Scripts.Managers.ActionManager.Instance.YieldIfActionBudgetExceeded();
+	  if (IsCancellationRequested) return false;
 	  float targetYawRad = RotationHelperFunctions.GetRotationRadians(direction);
 	  float delta = Mathf.Wrap(targetYawRad - currentYaw, -Mathf.Pi, Mathf.Pi);
 	  float finalYaw = currentYaw + delta;
 	  float duration = Mathf.Abs(delta) / Mathf.DegToRad(TurnSpeedDegPerSec);
+	  Quaternion targetRotation = new Quaternion(Vector3.Up, finalYaw).Normalized();
 
 	  if (!ShouldAnimate() || duration < 0.0001f)
 	  {
-		  var rotation = parentGridObject.visualMesh.Rotation;
-		  rotation.Y = finalYaw;
-		  parentGridObject.visualMesh.Rotation = rotation;
+		  parentGridObject.visualMesh.Quaternion = targetRotation;
 		  return !IsCancellationRequested;
 	  }
 
+	  Quaternion startRotation = parentGridObject.visualMesh.Quaternion.Normalized();
 	  _rotationTween = ApplyAnimationSpeed(parentGridObject.visualMesh.CreateTween());
 	  _rotationTween.SetTrans(Tween.TransitionType.Sine);
 	  _rotationTween.SetEase(Tween.EaseType.InOut);
-	  _rotationTween.TweenProperty(
-		  parentGridObject.visualMesh,
-		  "rotation:y",
-		  finalYaw,
-		  duration
-	  );
+	  _rotationTween.TweenMethod(
+		  Callable.From<float>(weight =>
+			  parentGridObject.visualMesh.Quaternion = startRotation
+				  .Slerp(targetRotation, weight)
+				  .Normalized()),
+		  0.0f,
+		  1.0f,
+		  duration);
 
 	  bool completed = await WaitForTween(_rotationTween);
 	  _rotationTween = null;
+	  if (completed)
+		  parentGridObject.visualMesh.Quaternion = targetRotation;
 	  return completed;
   }
 
   protected override Task ActionComplete()
   {
+	  if (_rotationBlocked)
+		  return CancelCall();
+
 	  // The action's target is the source of truth. Deriving this from a
 	  // transform reintroduces rounding/model-forward-offset errors.
-	  parentGridObject.GridPositionData.SetDirection(_targetDirection);
-	  return Task.CompletedTask;
+	  return parentGridObject.GridPositionData.TrySetDirection(_targetDirection)
+		  ? Task.CompletedTask
+		  : CancelCall();
   }
 
   protected override Task ActionCanceled()
@@ -169,11 +193,9 @@ public partial class RotateActionBase : ActionBase
 		  && GodotObject.IsInstanceValid(parentGridObject.visualMesh)
 	  )
 	  {
-		  Vector3 rotation = parentGridObject.visualMesh.Rotation;
 		  // Keep any fully completed intermediate steps and discard only the
 		  // partially animated step that was interrupted.
-		  rotation.Y = _lastCommittedYaw;
-		  parentGridObject.visualMesh.Rotation = rotation;
+		  parentGridObject.visualMesh.Quaternion = _lastCommittedRotation;
 	  }
 
 	  return Task.CompletedTask;

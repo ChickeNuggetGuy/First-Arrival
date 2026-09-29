@@ -29,39 +29,27 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 		ParentActionBase = this;
 
 
-		// Adjacency is geometric, not a walkability test. The attacker's current
-		// cell is occupied and therefore not walkable, but it must still count as
-		// adjacent on subsequent attacks.
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, false, false, out var neighbors))
-		{
-			GD.PrintErr("MeleeAttackAction.Setup: Could not find neighbors for target gridcell");
-			return;
-		}
+			if (!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectNodes)) return;
+            var definition = parentActionDefinition as MeleeAttackActionDefinition;
+            GridObject targetObject = definition?.GetTarget(parentGridObject, targetGridCell);
+			if (targetObject == null) return;
 
-		if (!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectNodes)) return;
+			var targetCells = new List<GridCell> { targetGridCell };
+			GridCell actionAnchor = parentGridObject.GridPositionData.AnchorCell
+			                        ?? startingGridCell;
+			if (GridFootprintUtility.TryGetAdjacentFacingTarget(
+				    parentGridObject,
+				    actionAnchor,
+				    targetCells,
+				    out GridCell facingTarget,
+				    out _))
+			{
+				AddRotateSubActionIfNeeded(actionAnchor, facingTarget);
+				return;
+			}
 
-		// Are we already adjacent?
-		bool isAdjacent = neighbors.Any(c => c.GridCoordinates == startingGridCell.GridCoordinates);
-
-		if (isAdjacent)
-		{
-			AddRotateSubActionIfNeeded(startingGridCell, targetGridCell);
-			return;
-		}
-
-		// Not adjacent. We need to move.
-		var walkableNeighbors = neighbors.Where(n => n.IsWalkable).ToList();
-		if (!walkableNeighbors.Any())
-		{
-			GD.PrintErr("MeleeAttackAction.Setup: No walkable cell near target to move to.");
-			return;
-		}
-
-		var moveDestination = walkableNeighbors
-			.OrderBy(n => startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)).First();
-
-		MoveActionDefinition moveActionDefinition =
-			gridObjectNodes.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
+			MoveActionDefinition moveActionDefinition =
+				gridObjectNodes.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
 
 		if (moveActionDefinition == null)
 		{
@@ -69,27 +57,53 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 			return;
 		}
 
-		MoveActionBase moveActionBase = moveActionDefinition.InstantiateAction(parentGridObject,
-			startingGridCell, moveDestination, 
-			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveActionBase;
-		AddSubAction(moveActionBase);
+			foreach (GridCell moveDestination in GridFootprintUtility
+			         .GetAdjacentAnchorCandidates(parentGridObject, targetCells))
+			{
+				if (!moveActionDefinition.TryBuildCostsOnly(
+					    parentGridObject,
+					    startingGridCell,
+					    moveDestination,
+					    out var executionMoveCosts,
+					    out _))
+					continue;
 
-		// This runs after movement, so force the final face-target rotation even
-		// when the unit happened to face the target before it started moving.
-		AddRotateSubActionIfNeeded(moveDestination, targetGridCell, force: true);
+				if (!GridFootprintUtility.TryGetAdjacentFacingTarget(
+					    parentGridObject,
+					    moveDestination,
+					    targetCells,
+					    out GridCell destinationFacingTarget,
+					    out _))
+					continue;
+
+				MoveActionBase moveActionBase = moveActionDefinition.InstantiateAction(
+					parentGridObject,
+					startingGridCell,
+					moveDestination,
+					new Godot.Collections.Dictionary<Enums.Stat, int>()
+				) as MoveActionBase;
+				AddSubAction(moveActionBase);
+				foreach (var moveCost in executionMoveCosts)
+				{
+					if (costs.ContainsKey(moveCost.Key))
+						costs[moveCost.Key] -= moveCost.Value;
+				}
+				AddRotateSubActionIfNeeded(
+					moveDestination,
+					destinationFacingTarget,
+					force: true
+				);
+				return;
+			}
+
+			GD.PrintErr("MeleeAttackAction.Setup: No reachable anchor fits the unit footprint.");
 	}
 
 	protected override async Task Execute()
 	{
 		GD.Print("Melee Attck Execute");
-		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
-		{
-			if (gridObject == null) return false;
-			if (!gridObject.IsActive) return false;
-			if (gridObject == parentGridObject) return false;
-			if (gridObject.Team == parentGridObject.Team) return false;
-			return true;
-		});
+        var meleeAttackActionDefinition = parentActionDefinition as MeleeAttackActionDefinition;
+        GridObject targetGridObject = meleeAttackActionDefinition?.GetTarget(parentGridObject, targetGridCell);
 
 		if (targetGridObject == null)
 		{
@@ -106,11 +120,18 @@ public partial class MeleeAttackActionBase : ActionBase, ICompositeAction, IItem
 			return;
 		}
 
-		Item.ItemData.TryGetItemActionDefinition<MeleeAttackActionDefinition>(
-			out MeleeAttackActionDefinition meleeAttackActionDefinition);
 
 
 		var damage = meleeAttackActionDefinition.damage;
+		if (meleeAttackActionDefinition.dealsStunDamage)
+		{
+            var condition = targetGridObject.Condition;
+            float previousStun = condition.Stun.CurrentValue;
+            condition.ApplyStun(damage);
+            GD.Print($"{targetGridObject.Name}: +{condition.Stun.CurrentValue - previousStun:0.#} stun " +
+                $"({condition.Stun.CurrentValue:0.#}/{health.CurrentValue:0.#} to knock out; {condition.State}).");
+            return;
+		}
 
 		GridObjectStat.DamageResult damageResult =
 			health.ApplyDamage(damage, meleeAttackActionDefinition.canCauseFatalWounds);

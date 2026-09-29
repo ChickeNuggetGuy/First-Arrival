@@ -154,11 +154,16 @@ public partial class ContextMenuUI : UIWindow
 			}
 			else if (GameManager.Instance.currentScene == GameManager.GameScene.GlobeScene)
 			{
-				HexCellData? hexCellData = GlobeInputManager.Instance?.CurrentCell;
+				if (UIManager.Instance?.BlockingInput == true ||
+				    GlobeInputManager.Instance?.MouseOverUI == true) return;
+				Vector3? position = GlobeInputManager.Instance?.GetMouseGlobePosition();
+				HexCellData? hexCellData = position.HasValue
+					? GlobeHexGridManager.Instance?.GetCellFromPosition(position.Value)
+					: null;
 				if (hexCellData.HasValue &&
 				    TryGenerateGlobeContextMenu(hexCellData.Value))
 				{
-						_ = ShowCall();
+					_ = ShowGlobeContextMenu();
 				}
 				else
 				{
@@ -178,6 +183,13 @@ public partial class ContextMenuUI : UIWindow
 					_ = HideCall();
 			}
 		}
+	}
+
+	private async Task ShowGlobeContextMenu()
+	{
+		await ShowCall();
+		if (IsInsideTree() && IsShown)
+			TutorialManager.Instance?.ReportControlAction(TutorialControlAction.OpenCellContextMenu);
 	}
 
 	private IContextUserBase GetHoveredContextUser()

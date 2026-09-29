@@ -144,11 +144,26 @@ public partial class GridShape : Resource
 
 	/// <summary>
 	/// Returns all occupied cells as world grid coordinates relative to anchor.
-	/// No rotation applied - shape is already in world orientation from collision calculation.
+	/// This legacy overload keeps the authored orientation unchanged.
 	/// </summary>
 	public List<Vector3I> GetWorldCoordinates(Vector3I anchorGridPos)
 	{
+		return GetWorldCoordinates(anchorGridPos, Enums.Direction.None);
+	}
+
+	/// <summary>
+	/// Returns the occupied cells for an authored shape at an eight-way facing.
+	/// Manual unit shapes are authored facing South (+Z). Rotating cell centers
+	/// and rounding them back onto the grid produces a deterministic rasterized
+	/// footprint for diagonal directions as well as exact cardinal rotations.
+	/// </summary>
+	public List<Vector3I> GetWorldCoordinates(
+		Vector3I anchorGridPos,
+		Enums.Direction direction
+	)
+	{
 		var results = new List<Vector3I>();
+		var uniqueCoordinates = new HashSet<Vector3I>();
 
 		for (int y = 0; y < _sizeY; y++)
 		{
@@ -161,17 +176,80 @@ public partial class GridShape : Resource
 					int relX = x - PivotCell.X;
 					int relY = y - PivotCell.Y;
 					int relZ = z - PivotCell.Z;
+					Vector2I rotated = RotateOffset(relX, relZ, direction);
 
-					results.Add(new Vector3I(
-						anchorGridPos.X + relX,
+					var worldCoordinate = new Vector3I(
+						anchorGridPos.X + rotated.X,
 						anchorGridPos.Y + relY,
-						anchorGridPos.Z + relZ
-					));
+						anchorGridPos.Z + rotated.Y
+					);
+					if (uniqueCoordinates.Add(worldCoordinate))
+						results.Add(worldCoordinate);
 				}
 			}
 		}
 
 		return results;
+	}
+
+	/// <summary>
+	/// Returns the lowest occupied cell in each horizontal footprint column.
+	/// Those cells require ground support; occupied cells above them only need
+	/// free grid volume.
+	/// </summary>
+	public List<Vector3I> GetSupportWorldCoordinates(
+		Vector3I anchorGridPos,
+		Enums.Direction direction = Enums.Direction.None
+	)
+	{
+		var lowestByColumn = new System.Collections.Generic.Dictionary<Vector2I, int>();
+
+		foreach (Vector3I localCell in GetOccupiedLocalCells())
+		{
+			int relX = localCell.X - PivotCell.X;
+			int relY = localCell.Y - PivotCell.Y;
+			int relZ = localCell.Z - PivotCell.Z;
+			Vector2I rotated = RotateOffset(relX, relZ, direction);
+
+			if (!lowestByColumn.TryGetValue(rotated, out int lowestY) || relY < lowestY)
+				lowestByColumn[rotated] = relY;
+		}
+
+		var results = new List<Vector3I>();
+		foreach (var pair in lowestByColumn)
+		{
+			results.Add(anchorGridPos + new Vector3I(
+				pair.Key.X,
+				pair.Value,
+				pair.Key.Y
+			));
+		}
+
+		return results;
+	}
+
+	private static Vector2I RotateOffset(
+		int x,
+		int z,
+		Enums.Direction direction
+	)
+	{
+		if (direction is Enums.Direction.None or Enums.Direction.South)
+			return new Vector2I(x, z);
+
+		Vector3 forward = RotationHelperFunctions
+			.GetWorldVector3FromDirection(direction);
+		if (forward == Vector3.Zero)
+			return new Vector2I(x, z);
+
+		float angle = Mathf.Atan2(forward.X, forward.Z);
+		float sin = Mathf.Sin(angle);
+		float cos = Mathf.Cos(angle);
+
+		return new Vector2I(
+			Mathf.RoundToInt((cos * x) + (sin * z)),
+			Mathf.RoundToInt((-sin * x) + (cos * z))
+		);
 	}
 
 	public IEnumerable<Vector3I> GetOccupiedLocalCells()
@@ -308,6 +386,16 @@ public partial class GridShape : Resource
 		int maxY = Mathf.FloorToInt((relMax.Y + halfY - eps) / cellSize.Y);
 		int maxZ = Mathf.FloorToInt((relMax.Z + halfZ - eps) / cellSize.Z);
 
+		// An authored anchor can sit outside the collider bounds (for example,
+		// beside a door frame). Include it in the raster instead of clamping the
+		// pivot to the nearest collider cell, which shifts the entire footprint.
+		minX = Mathf.Min(minX, 0);
+		minY = Mathf.Min(minY, 0);
+		minZ = Mathf.Min(minZ, 0);
+		maxX = Mathf.Max(maxX, 0);
+		maxY = Mathf.Max(maxY, 0);
+		maxZ = Mathf.Max(maxZ, 0);
+
 		int sizeX = Mathf.Max(1, maxX - minX + 1);
 		int sizeY = Mathf.Max(1, maxY - minY + 1);
 		int sizeZ = Mathf.Max(1, maxZ - minZ + 1);
@@ -317,11 +405,7 @@ public partial class GridShape : Resource
 			_sizeX = sizeX,
 			_sizeY = sizeY,
 			_sizeZ = sizeZ,
-			PivotCell = new Vector3I(
-				Mathf.Clamp(-minX, 0, sizeX - 1),
-				Mathf.Clamp(-minY, 0, sizeY - 1),
-				Mathf.Clamp(-minZ, 0, sizeZ - 1)
-			)
+			PivotCell = new Vector3I(-minX, -minY, -minZ)
 		};
 
 		int total = sizeX * sizeY * sizeZ;
@@ -363,15 +447,7 @@ public partial class GridShape : Resource
 			}
 		}
 
-		int pivotIdx = CoordToIndex(
-			result.PivotCell.X,
-			result.PivotCell.Y,
-			result.PivotCell.Z,
-			sizeX,
-			sizeZ
-		);
-		if (pivotIdx >= 0 && pivotIdx < result.OccupiedCells.Count)
-			result.OccupiedCells[pivotIdx] = true;
+		// The pivot is a reference point, not necessarily occupied geometry.
 
 		return result;
 	}

@@ -40,8 +40,12 @@ public partial class HexCellDefinition : IContextUserBase
 			int targetCellIndex = cellIndex;
 			actions.Add("Focus", Callable.From(() =>
 			{
-				if (OrbitalCamera.Instance != null)
+				if (OrbitalCamera.Instance != null &&
+				    GlobeHexGridManager.Instance?.GetCellFromIndex(targetCellIndex) != null)
+				{
 					_ = OrbitalCamera.Instance.FocusOnCell(targetCellIndex);
+					TutorialManager.Instance?.ReportControlAction(TutorialControlAction.FocusCell);
+				}
 			}));
 			GlobeTeamManager teamManager = GlobeTeamManager.Instance;
 			if (teamManager?.HasAvailableCraft(Enums.UnitTeam.Player) == true)

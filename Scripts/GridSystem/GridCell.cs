@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Linq;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
@@ -48,6 +49,7 @@ public partial class GridCell
         if (inventory != null)
         {
 	        InventoryGrid = inventory;
+	        InventoryGrid.GroundCell = this;
 	        InventoryGrid.Initialize();
         }
     }
@@ -75,13 +77,16 @@ public partial class GridCell
 
     // Mobile objects do not modify the static connection graph, so movement
     // checks handle their temporary occupancy separately.
-    public bool HasMovementBlockingGridObject()
+    public bool HasMovementBlockingGridObject(
+        GridObject ignoredGridObject = null
+    )
     {
         if (gridObjects == null) return false;
 
         foreach (var gridObject in gridObjects)
         {
             if (gridObject != null &&
+                gridObject != ignoredGridObject &&
                 gridObject.IsActive &&
                 !gridObject.scenery &&
                 gridObject is not GridCellStateOverride)
@@ -106,10 +111,12 @@ public partial class GridCell
 
         foreach (var gridObject in gridObjects)
         {
-            if (gridObject == null || gridObject.GridPositionData?.AnchorCell != this)
+            if (gridObject == null || gridObject.GridPositionData == null)
                 continue;
 
-            if (fogState == Enums.FogState.Visible)
+            bool anyOccupiedCellVisible = gridObject.GridPositionData.OccupiedCells
+                .Any(cell => cell != null && cell.fogState == Enums.FogState.Visible);
+            if (anyOccupiedCellVisible)
                 gridObject.Show();
             else if(!gridObject.scenery)
                 gridObject.Hide();
@@ -132,6 +139,7 @@ public partial class GridCell
             return;
 
         this.state = state;
+		GridSystem.Instance?.MarkNavigationChanged();
 
         GridSystem.Instance.UpdateGridCell(GridCoordinates);
         GridSystem.Instance.UpdateNeighborsConnections(this.GridCoordinates);
@@ -139,17 +147,23 @@ public partial class GridCell
     
     public void SetStateWithoutConnectionUpdate(Enums.GridCellState newState)
     {
+		if (state == newState) return;
 	    this.state = newState;
+		GridSystem.Instance?.MarkNavigationChanged();
     }
 
     public void AddGridObject(GridObject gridObject, Enums.GridCellState newState, bool rebuildConnections)
     {
         this.gridObjects ??= new List<GridObject>();
-        this.gridObjects.Add(gridObject);
+		bool alreadyPresent = this.gridObjects.Contains(gridObject);
+		if (alreadyPresent && state == newState) return;
+		if (!alreadyPresent)
+			this.gridObjects.Add(gridObject);
 
         bool stateChanged = this.state != newState;
         if (stateChanged)
             this.state = newState;
+		GridSystem.Instance?.MarkNavigationChanged();
         UpdateGridObjectVisibility();
     }
 
@@ -163,6 +177,7 @@ public partial class GridCell
         bool stateChanged = this.state != newState;
         if (stateChanged)
             this.state = newState;
+		GridSystem.Instance?.MarkNavigationChanged();
 
         if (rebuildConnections)
         {
@@ -174,18 +189,23 @@ public partial class GridCell
 
     public void RestoreOriginalState()
     {
+		if (state == originalState) return;
         state = originalState;
+		GridSystem.Instance?.MarkNavigationChanged();
     }
 
     public void ModifyOriginalState(Enums.GridCellState newState)
     {
+		if (originalState == newState) return;
         originalState = newState;
+		GridSystem.Instance?.MarkNavigationChanged();
     }
 
 
     public void SetInventory(InventoryGrid inventory)
     {
 	    InventoryGrid = inventory;
+	    InventoryGrid.GroundCell = this;
 	    InventoryGrid.Initialize();
     }
 }

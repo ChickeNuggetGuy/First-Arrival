@@ -87,9 +87,19 @@ public partial class MoveStepActionDefinition : ActionDefinition
     GridCell startingGridCell
   )
   {
+    if (gridObject?.GridPositionData == null || startingGridCell == null)
+      return new List<GridCell>();
+
     GridSystem.Instance.TryGetGridCellNeighbors(startingGridCell,true, false, out var neighbors);
     return neighbors?
-      .Where(cell => !cell.HasMovementBlockingGridObject())
+      .Where(cell =>
+      {
+        Enums.Direction direction = RotationHelperFunctions
+          .GetDirectionBetweenCells(startingGridCell, cell);
+        return direction != Enums.Direction.None &&
+               gridObject.GridPositionData.CanOccupyAt(startingGridCell, direction) &&
+               gridObject.GridPositionData.CanOccupyAt(cell, direction);
+      })
       .ToList() ?? new List<GridCell>();
   }
 

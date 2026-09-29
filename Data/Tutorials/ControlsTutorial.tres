@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="Event" format=3 uid="uid://c761w1lfpwqew"]
+
+[ext_resource type="Script" uid="uid://ck22qkna53hb6" path="res://Scripts/Event System/Event.cs" id="1_event"]
+[ext_resource type="Script" uid="uid://2rmjobmioqqw" path="res://Scripts/Event System/TutorialPromptEvent.cs" id="2_prompt"]
+[ext_resource type="Script" uid="uid://bna6hi4o2prvy" path="res://Scripts/Event System/PlayerActionCondition.cs" id="3_action"]
+[ext_resource type="Script" uid="uid://ccqan4wrbxmhj" path="res://Scripts/Managers/StoryManager/EventCondition.cs" id="4_condition"]
+
+[sub_resource type="Resource" id="Condition_keyboard"]
+script = ExtResource("3_action")
+RequiredAmount = 3.0
+
+[sub_resource type="Resource" id="Event_keyboard"]
+script = ExtResource("2_prompt")
+CompletionConditions = Array[ExtResource("4_condition")]([SubResource("Condition_keyboard")])
+EventId = "controls_keyboard_pan"
+EventName = "Controls 1 / 4: Move around the globe"
+EventDescription = "Hold W, A, S or D to pan the camera. Keep moving for 3 seconds to fill the bar."
+
+[sub_resource type="Resource" id="Condition_mouse"]
+script = ExtResource("3_action")
+Action = 1
+RequiredAmount = 3.0
+
+[sub_resource type="Resource" id="Event_mouse"]
+script = ExtResource("2_prompt")
+CompletionConditions = Array[ExtResource("4_condition")]([SubResource("Condition_mouse")])
+EventId = "controls_mouse_pan"
+EventName = "Controls 2 / 4: Drag to pan"
+EventDescription = "Hold the left mouse button and drag over the globe to pan the camera. Keep dragging for 3 seconds to fill the bar."
+
+[sub_resource type="Resource" id="Condition_context"]
+script = ExtResource("3_action")
+Action = 2
+RequiredAmount = 3.0
+
+[sub_resource type="Resource" id="Event_context"]
+script = ExtResource("2_prompt")
+CompletionConditions = Array[ExtResource("4_condition")]([SubResource("Condition_context")])
+EventId = "controls_context_menu"
+EventName = "Controls 3 / 4: Open a cell menu"
+EventDescription = "Right-click a cell on the globe to open its context menu. Take a moment to look at the available actions while the bar fills."
+
+[sub_resource type="Resource" id="Condition_focus"]
+script = ExtResource("3_action")
+Action = 3
+RequiredAmount = 3.0
+
+[sub_resource type="Resource" id="Event_focus"]
+script = ExtResource("2_prompt")
+CompletionConditions = Array[ExtResource("4_condition")]([SubResource("Condition_focus")])
+EventId = "controls_focus_cell"
+EventName = "Controls 4 / 4: Focus on a cell"
+EventDescription = "Select Focus in the cell's context menu to center the camera there. Watch the camera settle while the bar fills. Right-click a globe cell again if the menu has closed."
+
+[resource]
+script = ExtResource("1_event")
+EventId = "controls_tutorial"
+EventName = "Globe controls"
+SubEvents = Array[ExtResource("1_event")]([SubResource("Event_keyboard"), SubResource("Event_mouse"), SubResource("Event_context"), SubResource("Event_focus")])

@@ -59,7 +59,7 @@ public partial class ItemSlotUI : Button, IContextUser<ItemSlotUI>
 		else
 			itemCountLabel.Text = (isRoot && count > 1) ? count.ToString() : "";
 
-		TooltipText = item.IsRangedWeapon
+		TooltipText = item is UnitBodyItem body ? body.GetStatusText() : item.IsRangedWeapon
 			? $"{item.ItemData.ItemName} ({item.CurrentAmmo}/{item.AmmoCapacity} loaded)"
 			: item.ItemData.ItemName;
 

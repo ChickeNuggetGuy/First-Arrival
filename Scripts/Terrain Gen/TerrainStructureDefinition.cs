@@ -1,7 +1,7 @@
 using Godot;
 
 /// <summary>
-/// Describes a structure that can be placed on procedural terrain.
+/// Describes a structure that can be placed on procedural or handmade terrain.
 /// The terrain footprint uses the same cell and pivot conventions as GridShape,
 /// but it may be larger than a structure's separate gameplay footprint.
 /// </summary>
@@ -61,6 +61,7 @@ public partial class TerrainStructureDefinition : Resource
 	[ExportGroup("Placement")]
 	[Export] public LocationMode Location { get; set; } = LocationMode.Random;
 	[Export] public Vector2I FixedAnchorCell { get; set; } = Vector2I.Zero;
+	// Disable to allow placement on authored surfaces. These are never flattened.
 	[Export] public bool AvoidManMadeChunks { get; set; } = true;
 	[Export] public bool AllowQuarterTurns { get; set; } = false;
 

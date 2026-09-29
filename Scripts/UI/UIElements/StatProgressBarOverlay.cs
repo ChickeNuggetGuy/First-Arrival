@@ -7,14 +7,17 @@ public sealed class StatProgressBarOverlay
 	private readonly ColorRect _fatalWoundRange;
 	private readonly ColorRect _fatalWoundMarker;
 	private readonly ColorRect _unaffordablePreview;
+	private readonly ColorRect _stunRange;
 
 	private float _effectiveMaxRatio = 1f;
 	private float _fatalWoundRatio;
+	private float _stunRatio;
 
 	public StatProgressBarOverlay(ProgressBar progressBar)
 	{
 		_progressBar = progressBar;
 		_progressBar.ClipContents = true;
+		_stunRange = CreateOverlay("StunRange", new Color(0.65f, 0.65f, 0.65f, 0.92f));
 
 		_restrictedRange = CreateOverlay(
 			"RestrictedRange",
@@ -72,6 +75,11 @@ public sealed class StatProgressBarOverlay
 		bool showFatalWounds = fatalWounds > originalMin;
 		_fatalWoundRange.Visible = showFatalWounds;
 		_fatalWoundMarker.Visible = showFatalWounds;
+		float stun = stat.Stat == FirstArrival.Scripts.Utility.Enums.Stat.Health &&
+			statHolder.TryGetStat(FirstArrival.Scripts.Utility.Enums.Stat.Stun, out var stunStat)
+			? stunStat.CurrentValue : 0;
+		_stunRatio = Mathf.Clamp(stun / range, 0, 1);
+		_stunRange.Visible = stun > 0;
 
 		_progressBar.TooltipText = BuildTooltip(
 			stat,
@@ -81,6 +89,7 @@ public sealed class StatProgressBarOverlay
 			fatalWounds,
 			previewCost
 		);
+		if (stun > 0) _progressBar.TooltipText += $"\nStun: {stun:0.#} (unconscious at current health)";
 		LayoutOverlays();
 	}
 
@@ -108,6 +117,8 @@ public sealed class StatProgressBarOverlay
 		float height = _progressBar.Size.Y;
 		float effectiveMaxX = width * _effectiveMaxRatio;
 		float fatalWoundX = width * _fatalWoundRatio;
+		_stunRange.Position = Vector2.Zero;
+		_stunRange.Size = new Vector2(width * _stunRatio, height * 0.55f);
 
 		_restrictedRange.Position = new Vector2(effectiveMaxX, 0);
 		_restrictedRange.Size = new Vector2(

@@ -21,6 +21,285 @@ public partial class Pathfinder : Manager<Pathfinder>
 	}
 
 	/// <summary>
+	/// Finds a path for a shaped unit. Search state includes facing because each
+	/// movement step turns before translating, and both the turn and resulting
+	/// anchor must fit the unit's complete footprint.
+	/// </summary>
+	public List<GridCell> FindPathForGridObject(
+		GridObject gridObject,
+		GridCell start,
+		GridCell goal
+	)
+	{
+		if (gridObject?.GridPositionData == null || start == null || goal == null)
+			return new List<GridCell>();
+
+		if (start.GridCoordinates == goal.GridCoordinates)
+			return new List<GridCell> { start };
+
+		var openList = new List<FootprintNodeRecord>
+		{
+			new()
+			{
+				Cell = start,
+				Facing = gridObject.GridPositionData.Direction,
+				CostSoFar = 0f,
+				EstimatedTotalCost = Heuristic(start, goal)
+			}
+		};
+		var closed = new HashSet<(Vector3I Coordinates, Enums.Direction Facing)>();
+		FootprintNodeRecord targetRecord = null;
+
+		while (openList.Count > 0)
+		{
+			FootprintNodeRecord current = openList
+				.OrderBy(record => record.EstimatedTotalCost)
+				.First();
+			openList.Remove(current);
+
+			var currentKey = (current.Cell.GridCoordinates, current.Facing);
+			if (!closed.Add(currentKey))
+				continue;
+
+			if (current.Cell.GridCoordinates == goal.GridCoordinates)
+			{
+				targetRecord = current;
+				break;
+			}
+
+			if (!GridSystem.Instance.TryGetGridCellNeighbors(
+				    current.Cell,
+				    true,
+				    false,
+				    out List<GridCell> neighbors))
+				continue;
+
+			foreach (GridCell neighbor in neighbors)
+			{
+				Enums.Direction stepDirection = RotationHelperFunctions
+					.GetDirectionBetweenCells(current.Cell, neighbor);
+				if (stepDirection == Enums.Direction.None)
+					continue;
+
+				var neighborKey = (neighbor.GridCoordinates, stepDirection);
+				if (closed.Contains(neighborKey))
+					continue;
+
+				GridPositionData position = gridObject.GridPositionData;
+				if (!position.CanOccupyAt(current.Cell, stepDirection) ||
+				    !position.CanOccupyAt(neighbor, stepDirection))
+					continue;
+
+				float moveCost = GetShapedMovementCost(current.Cell, neighbor);
+				int rotationSteps = Mathf.Abs(
+					RotationHelperFunctions.GetRotationStepsBetweenDirections(
+						current.Facing,
+						stepDirection
+					)
+				);
+				float cost = current.CostSoFar + moveCost + rotationSteps;
+				FootprintNodeRecord existing = openList.FirstOrDefault(record =>
+					record.Cell.GridCoordinates == neighbor.GridCoordinates &&
+					record.Facing == stepDirection);
+
+				if (existing == null)
+				{
+					openList.Add(new FootprintNodeRecord
+					{
+						Cell = neighbor,
+						Facing = stepDirection,
+						Parent = current,
+						CostSoFar = cost,
+						EstimatedTotalCost = cost + Heuristic(neighbor, goal)
+					});
+				}
+				else if (cost < existing.CostSoFar)
+				{
+					existing.Parent = current;
+					existing.CostSoFar = cost;
+					existing.EstimatedTotalCost = cost + Heuristic(neighbor, goal);
+				}
+			}
+		}
+
+		if (targetRecord == null)
+			return new List<GridCell>();
+
+		var path = new List<GridCell>();
+		for (FootprintNodeRecord record = targetRecord;
+		     record != null;
+		     record = record.Parent)
+			path.Add(record.Cell);
+		path.Reverse();
+		return path;
+	}
+
+	/// <summary>
+	/// Finds every destination a shaped unit can afford in one bounded Dijkstra
+	/// search. This replaces running A* independently for every movement tile.
+	/// </summary>
+	public Dictionary<Vector3I, FootprintPathResult> FindReachablePathsForGridObject(
+		GridObject gridObject,
+		GridCell start,
+		int maximumTimeUnits,
+		int maximumStamina
+	)
+	{
+		var results = new Dictionary<Vector3I, FootprintPathResult>();
+		GridPositionData position = gridObject?.GridPositionData;
+		if (position == null || start == null || GridSystem.Instance == null ||
+		    maximumTimeUnits < 0 || maximumStamina < 0)
+			return results;
+
+		var frontier = new PriorityQueue<FootprintNodeRecord, float>();
+		var records = new Dictionary<(Vector3I Coordinates, Enums.Direction Facing), FootprintNodeRecord>();
+		var occupancyCache = new Dictionary<(Vector3I Coordinates, Enums.Direction Facing), bool>();
+
+		bool CanFit(GridCell anchor, Enums.Direction facing)
+		{
+			var key = (anchor.GridCoordinates, facing);
+			if (!occupancyCache.TryGetValue(key, out bool canFit))
+			{
+				canFit = position.CanOccupyAt(anchor, facing);
+				occupancyCache[key] = canFit;
+			}
+			return canFit;
+		}
+		var startRecord = new FootprintNodeRecord
+		{
+			Cell = start,
+			Facing = position.Direction,
+			CostSoFar = 0f,
+			StaminaCost = 0
+		};
+		var startKey = (start.GridCoordinates, position.Direction);
+		records[startKey] = startRecord;
+		frontier.Enqueue(startRecord, 0f);
+
+		while (frontier.Count > 0)
+		{
+			FootprintNodeRecord current = frontier.Dequeue();
+			var currentKey = (current.Cell.GridCoordinates, current.Facing);
+			if (!records.TryGetValue(currentKey, out FootprintNodeRecord best) ||
+			    !ReferenceEquals(best, current))
+				continue;
+
+			if (!GridSystem.Instance.TryGetGridCellNeighbors(
+				    current.Cell,
+				    true,
+				    false,
+				    out List<GridCell> neighbors))
+				continue;
+
+			foreach (GridCell neighbor in neighbors)
+			{
+				Enums.Direction stepDirection = RotationHelperFunctions
+					.GetDirectionBetweenCells(current.Cell, neighbor);
+				if (stepDirection == Enums.Direction.None ||
+				    !CanFit(current.Cell, stepDirection) ||
+				    !CanFit(neighbor, stepDirection))
+					continue;
+
+				int rotationSteps = Mathf.Abs(
+					RotationHelperFunctions.GetRotationStepsBetweenDirections(
+						current.Facing,
+						stepDirection
+					)
+				);
+				int movementTimeCost = Mathf.RoundToInt(
+					GetShapedMovementCost(current.Cell, neighbor)
+				);
+				int nextTimeCost = Mathf.RoundToInt(current.CostSoFar) +
+				                   rotationSteps + movementTimeCost;
+				int nextStaminaCost = current.StaminaCost + rotationSteps + 2;
+				if (nextTimeCost > maximumTimeUnits ||
+				    nextStaminaCost > maximumStamina)
+					continue;
+
+				var neighborKey = (neighbor.GridCoordinates, stepDirection);
+				if (records.TryGetValue(neighborKey, out FootprintNodeRecord existing) &&
+				    (existing.CostSoFar < nextTimeCost ||
+				     (Mathf.IsEqualApprox(existing.CostSoFar, nextTimeCost) &&
+				      existing.StaminaCost <= nextStaminaCost)))
+					continue;
+
+				var next = new FootprintNodeRecord
+				{
+					Cell = neighbor,
+					Facing = stepDirection,
+					Parent = current,
+					CostSoFar = nextTimeCost,
+					StaminaCost = nextStaminaCost
+				};
+				records[neighborKey] = next;
+				frontier.Enqueue(next, nextTimeCost);
+			}
+		}
+
+		var bestRecordsByCell = new Dictionary<Vector3I, FootprintNodeRecord>();
+		foreach (FootprintNodeRecord record in records.Values)
+		{
+			if (record.Cell == start) continue;
+
+			if (!bestRecordsByCell.TryGetValue(
+				    record.Cell.GridCoordinates,
+				    out FootprintNodeRecord existing) ||
+			    record.CostSoFar < existing.CostSoFar ||
+			    (Mathf.IsEqualApprox(record.CostSoFar, existing.CostSoFar) &&
+			     record.StaminaCost < existing.StaminaCost))
+				bestRecordsByCell[record.Cell.GridCoordinates] = record;
+		}
+
+		foreach (var pair in bestRecordsByCell)
+		{
+			FootprintNodeRecord record = pair.Value;
+			results[pair.Key] = new FootprintPathResult
+			{
+				Path = ReconstructFootprintPath(record),
+				TimeUnitCost = Mathf.RoundToInt(record.CostSoFar),
+				StaminaCost = record.StaminaCost,
+				ArrivalDirection = record.Facing
+			};
+		}
+
+		return results;
+	}
+
+	private static List<GridCell> ReconstructFootprintPath(FootprintNodeRecord record)
+	{
+		var path = new List<GridCell>();
+		for (FootprintNodeRecord current = record; current != null; current = current.Parent)
+			path.Add(current.Cell);
+		path.Reverse();
+		return path;
+	}
+
+	private static float GetShapedMovementCost(GridCell start, GridCell end)
+	{
+		Vector3I delta = end.GridCoordinates - start.GridCoordinates;
+		bool diagonal = Mathf.Abs(delta.X) == 1 && Mathf.Abs(delta.Z) == 1;
+		return diagonal ? 6f : 4f;
+	}
+
+	private sealed class FootprintNodeRecord
+	{
+		public GridCell Cell;
+		public Enums.Direction Facing;
+		public FootprintNodeRecord Parent;
+		public float CostSoFar;
+		public int StaminaCost;
+		public float EstimatedTotalCost;
+	}
+
+	public sealed class FootprintPathResult
+	{
+		public List<GridCell> Path { get; init; } = new();
+		public int TimeUnitCost { get; init; }
+		public int StaminaCost { get; init; }
+		public Enums.Direction ArrivalDirection { get; init; }
+	}
+
+	/// <summary>
 	/// Asynchronous version of FindPath that can be awaited
 	/// </summary>
 	public async Task<List<GridCell>> FindPathAsync(GridCell start, GridCell goal, bool adjacentIsValid = false,

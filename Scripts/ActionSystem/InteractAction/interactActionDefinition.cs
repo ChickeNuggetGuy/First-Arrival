@@ -9,6 +9,8 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public partial class interactActionDefinition : ActionDefinition
 {
+	protected override bool TargetsGridObjects => true;
+
 	public override ActionBase InstantiateAction(GridObject parent, GridCell startGridCell, GridCell targetGridCell,
 		Godot.Collections.Dictionary<Enums.Stat, int> costs)
 	{
@@ -33,14 +35,7 @@ public partial class interactActionDefinition : ActionDefinition
 			return false;
 		}
 		
-		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
-		{
-			if(gridObject == null) return false;
-			if(!gridObject.IsActive) return false;
-			if(gridObject == parentGridObject) return false;
-			if(gridObject is not IInteractableGridobject) return false;
-			return true;
-		});
+		GridObject targetGridObject = GetTargetGridObject(gridObject, targetGridCell);
 
 		if (targetGridObject == null)
 		{
@@ -56,91 +51,91 @@ public partial class interactActionDefinition : ActionDefinition
 			reason = "Target grid object is not interactable";
 			return false;
 		}
-		if (!GridSystem.Instance.TryGetGridCellsNeighbors(interactable.GetInteractableCells(),false,false, out var neighbors))
-		{
-			reason = "Could not find neighbors for target gridcell";
-			return false;
-		}
+			// Reach the selected interaction cell, not any other part of the object.
+			var targetCells = new List<GridCell> { targetGridCell };
 
-		
-
-		// Already adjacent?
-		if (neighbors.Any(gridCell => gridCell.GridCoordinates == startingGridCell.GridCoordinates))
-		{
-			// Face the target if needed
-			if (
-				!AddRotateCostsIfNeeded(
-					gridObject,
-					startingGridCell,
-					targetGridCell,
-					costs,
-					out var rotateReason
-				)
-			)
+			GridCell actionAnchor = gridObject.GridPositionData.AnchorCell
+			                        ?? startingGridCell;
+			if (GridFootprintUtility.TryGetAdjacentFacingTarget(
+				    gridObject,
+				    actionAnchor,
+				    targetCells,
+				    out GridCell facingTarget,
+				    out _))
 			{
-				reason = rotateReason;
-				return false;
+				if (!AddRotateCostsIfNeeded(
+					    gridObject,
+					    actionAnchor,
+					    facingTarget,
+					    costs,
+					    out string rotateReason,
+					    actionAnchor))
+				{
+					reason = rotateReason;
+					return false;
+				}
 			}
-		}
-		else
-		{
-			// Need to move to an adjacent tile first
-			var walkableNeighbors = neighbors.Where(n =>
-				n.IsWalkable &&
-				!n.HasMovementBlockingGridObject() &&
-				Pathfinder.Instance.IsPathPossible(startingGridCell.GridCoordinates, n.GridCoordinates)
-			).ToList();
-
-			if (walkableNeighbors.Count == 0)
+			else
 			{
-				reason = "No adjacent walkable cell near target";
-				return false;
-			}
-
-			var targetAdjacent = walkableNeighbors.OrderBy(n =>
-				startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)
-			).First();
-
-			var moveAction =
-				gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
+				var moveAction = gridObjectActions.ActionDefinitions
+					.FirstOrDefault(action => action is MoveActionDefinition)
 					as MoveActionDefinition;
+				if (moveAction == null)
+				{
+					reason = "Unit cannot move when movement is required";
+					return false;
+				}
 
-			if (moveAction == null)
-			{
-				reason = "unit cannot move when it is needed";
-				return false;
+				bool foundDestination = false;
+				string lastMoveReason = "No adjacent anchor fits the unit footprint";
+				foreach (GridCell candidate in GridFootprintUtility
+				         .GetAdjacentAnchorCandidates(gridObject, targetCells))
+				{
+					if (!moveAction.TryBuildCostsOnly(
+						    gridObject,
+						    startingGridCell,
+						    candidate,
+						    out var moveCosts,
+						    out lastMoveReason))
+						continue;
+
+					if (!GridFootprintUtility.TryGetAdjacentFacingTarget(
+						    gridObject,
+						    candidate,
+						    targetCells,
+						    out GridCell candidateFacingTarget,
+						    out _))
+						continue;
+
+					var combinedCosts = new Godot.Collections.Dictionary<Enums.Stat, int>();
+					AddCosts(combinedCosts, moveCosts);
+					Enums.Direction arrivalDirection = moveAction.path?.Count >= 2
+						? RotationHelperFunctions.GetDirectionBetweenCells(
+							moveAction.path[^2],
+							moveAction.path[^1]
+						)
+						: gridObject.GridPositionData.Direction;
+					if (!AddRotateCostsIfNeeded(
+						    gridObject,
+						    candidate,
+						    candidateFacingTarget,
+						    combinedCosts,
+						    out _,
+						    candidate,
+						    arrivalDirection))
+						continue;
+
+					AddCosts(costs, combinedCosts);
+					foundDestination = true;
+					break;
+				}
+
+				if (!foundDestination)
+				{
+					reason = $"Cannot reach interaction range: {lastMoveReason}";
+					return false;
+				}
 			}
-
-			if (
-				!moveAction.TryBuildCostsOnly(
-					gridObject,
-					startingGridCell,
-					targetAdjacent,
-					out var moveCosts,
-					out var moveReason
-				)
-			)
-			{
-				reason = $"move Action validation failed: {moveReason}";
-				return false;
-			}
-
-			AddCosts(costs, moveCosts);
-
-			if (
-				!AddRotateCostsIfNeeded(
-					gridObject,
-					targetAdjacent,
-					targetGridCell,
-					costs,
-					out var rotateReason2
-				)
-			)
-			{
-				reason = rotateReason2;
-				return false;
-			}
-		}
 
 		foreach (KeyValuePair<Enums.Stat, int> cost in interactable.costs)
 		{
@@ -151,40 +146,24 @@ public partial class interactActionDefinition : ActionDefinition
 		return true;
 	}
 
+	internal static GridObject GetTargetGridObject(GridObject actor, GridCell cell)
+	{
+		return cell?.gridObjects?.FirstOrDefault(target =>
+			target != null && target.IsActive && target != actor &&
+			target is IInteractableGridobject interactable &&
+			(interactable.GetInteractableCells()?.Contains(cell) ?? false));
+	}
+
 	protected override List<GridCell> GetValidGridCells(GridObject gridObject, GridCell startingGridCell)
 	{
-		List<GridCell> validCells = GridSystem.Instance.AllGridCells.Where(cell =>
-		{
-			if (!cell.HasGridObject()) return false;
-
-			if (!cell.gridObjects.Any(gridObject => gridObject is IInteractableGridobject interactableGridObject)) return false;
-			return true;
-		}).ToList();
-		return validCells;
+		return GridSystem.Instance?.AllGridCells?
+			.Where(cell => GetTargetGridObject(gridObject, cell) != null)
+			.ToList() ?? new List<GridCell>();
 	}
 
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
 	{
-		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
-		{
-			if(gridObject == null) return false;
-			if(gridObject is IInteractableGridobject) return false;
-			if(!gridObject.IsActive) return false;
-			if(gridObject == parentGridObject) return false;
-		
-			return true;
-		});
-
-		if (targetGridObject == null)
-		{
-			GD.Print("Target grid object is null, failed all conditions");
-			return (targetGridCell, 0);
-		}
-			
-		else
-		{
-			return (targetGridCell, 85);
-		}
+		return (targetGridCell, GetTargetGridObject(parentGridObject, targetGridCell) != null ? 85 : 0);
 	}
 
 	public override bool GetIsUIAction() => true;

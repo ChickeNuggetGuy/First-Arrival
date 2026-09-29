@@ -23,27 +23,33 @@ public partial class ProcessGridObjectsSegment: TurnSegment
 	protected override async Task _Execute()
 	{
 		GD.Print("Execute ProcessGridObjectsSegment");
-		List<GridObject> gridObjects = teamHolder.GridObjects[Enums.GridObjectState.Active];
+		List<GridObject> gridObjects = teamHolder.GridObjects.Values.SelectMany(units => units)
+			.Where(unit => unit.IsActive || unit.Condition?.State == Enums.UnitCondition.Unconscious)
+			.Distinct().ToList();
 		if (gridObjects.Count == 0) return;
 		
 		// Bleeding can kill and remove a unit while this segment is processing.
 		// Iterate over a snapshot so the team list may safely change.
 		foreach (var gridObject in gridObjects.ToArray())
 		{
-			if(!gridObject.TryGetGridObjectNode<GridObjectSight>( out GridObjectSight gridObjectSight )) continue;
-			
-			gridObjectSight.CalculateSightArea();
+			if (gridObject.CanAct && gridObject.TryGetGridObjectNode<GridObjectSight>(out var gridObjectSight))
+				gridObjectSight.CalculateSightArea();
 			
 			if(!gridObject.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) continue;
 
 			GridObjectStat health = null;
-			if (statHolder.TryGetStat(Enums.Stat.Health, out health))
+			statHolder.TryGetStat(Enums.Stat.Health, out health);
+			if (gridObject.Condition != null)
 			{
-				health.ApplyFatalWoundBleeding();
-				if (!gridObject.IsActive) continue;
+				bool wasUnconscious = gridObject.Condition.State == Enums.UnitCondition.Unconscious;
+				gridObject.Condition.ProcessTurn();
+				if (!gridObject.CanAct || wasUnconscious) continue;
 			}
+			else health?.ApplyFatalWoundBleeding();
+			if (!gridObject.CanAct) continue;
 
-			GridObjectStat[]stats = statHolder.Stats.Where(stat => stat.turnBehavior != Enums.StatTurnBehavior.None).ToArray();
+			GridObjectStat[]stats = statHolder.Stats.Where(stat => stat.Stat != Enums.Stat.Stun &&
+				stat.turnBehavior != Enums.StatTurnBehavior.None).ToArray();
 
 			foreach (GridObjectStat stat in stats)
 			{

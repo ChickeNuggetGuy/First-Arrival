@@ -529,12 +529,46 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 	}
 	
 	public bool TryBuildBase(Enums.UnitTeam team, HexCellData cell, int baseIndex , int cost)
+		=> TryBuildBaseInternal(
+			team,
+			cell,
+			baseIndex,
+			cost,
+			allowCityCell: false,
+			baseName: string.Empty);
+
+	/// <summary>
+	/// Story construction can supply a narrative name and cost while retaining
+	/// the normal land, city, and base-occupancy placement rules.
+	/// </summary>
+	public bool TryBuildStoryBase(HexCellData cell, string baseName, int cost = 0)
+	{
+		GlobeTeamHolder playerTeam = GetTeamData(Enums.UnitTeam.Player);
+		int baseIndex = (playerTeam?.Bases.Count ?? 0) + 1;
+		return TryBuildBaseInternal(
+			Enums.UnitTeam.Player,
+			cell,
+			baseIndex,
+			Math.Max(0, cost),
+			allowCityCell: false,
+			baseName: baseName);
+	}
+
+	private bool TryBuildBaseInternal(
+		Enums.UnitTeam team,
+		HexCellData cell,
+		int baseIndex,
+		int cost,
+		bool allowCityCell,
+		string baseName)
 	{
 		if (team ==  Enums.UnitTeam.None) return false;
 		if (cell.cellType == Enums.HexGridType.Water) return false;
 
 		GlobeCityManager cityManager = GlobeCityManager.Instance;
-		if (cityManager.TryGetCityDefinition(cell.Index, out var city)) return false;
+		if (!allowCityCell &&
+		    cityManager?.TryGetCityDefinition(cell.Index, out _) == true)
+			return false;
 
 		foreach (GlobeTeamHolder holder in teamData.Values)
 		{
@@ -563,6 +597,8 @@ public partial class GlobeTeamManager : Manager<GlobeTeamManager>
 		{
 			if (!teamData[team].TryGetBaseAtIndex(cell.Index, out var definition))
 				return false;
+			if (!string.IsNullOrWhiteSpace(baseName))
+				definition.definitionName = baseName;
 
 			RegisterCellDefinition(definition);
 			SpawnBase(definition);

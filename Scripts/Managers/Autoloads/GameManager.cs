@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Inventory_System;
@@ -158,6 +159,7 @@ public partial class GameManager : Manager<GameManager>
 		SavesManager.LoadFromAutosave = false;
 		SavesManager.PendingSaveData = null;
 		SavesManager.Instance.currentSavename = tempSaveName;
+		TutorialManager.Instance?.ResetProgress();
 		SetCurrentTeamResearchState(null, null);
 
 		return await ChangeSceneAsync(scene, false);
@@ -703,10 +705,10 @@ public partial class GameManager : Manager<GameManager>
 			.GetGridObjectTeamHolder(Enums.UnitTeam.Enemy);
 		GridObjectTeamHolder playerHolder = GridObjectManager.Instance?
 			.GetGridObjectTeamHolder(Enums.UnitTeam.Player);
-		int enemiesKilled = GetGridObjectCount(
-			enemyHolder,
-			Enums.GridObjectState.Inactive);
-		int unitsLost = isQuickBattle
+		int enemiesKilled = enemyHolder?.GridObjects?[Enums.GridObjectState.Inactive]
+			.Count(unit => unit.Condition == null || unit.Condition.State == Enums.UnitCondition.Dead) ?? 0;
+		bool hasRecoveryCraft = currentMission?.onRouteCraft != null;
+		int unitsLost = isQuickBattle || !hasRecoveryCraft
 			? GetGridObjectCount(playerHolder, Enums.GridObjectState.Inactive)
 			: Math.Max(
 				0,
@@ -1303,6 +1305,24 @@ public partial class GameManager : Manager<GameManager>
 				out Variant operationValue)
 				? operationValue.AsInt32()
 				: -1;
+			string storyEventId = missionDefinitionData.TryGetValue(
+				"storyEventId",
+				out Variant storyEventValue)
+				? storyEventValue.AsString()
+				: string.Empty;
+			bool allowsLocalResponse = missionDefinitionData.TryGetValue(
+				"allowsLocalResponse",
+				out Variant localResponseValue) &&
+				localResponseValue.AsBool();
+			bool isExclusiveStoryChoice = missionDefinitionData.TryGetValue(
+				"isExclusiveStoryChoice",
+				out Variant exclusiveChoiceValue) &&
+				exclusiveChoiceValue.AsBool();
+			int localResponderCount = missionDefinitionData.TryGetValue(
+				"localResponderCount",
+				out Variant responderCountValue)
+				? Math.Max(1, responderCountValue.AsInt32())
+				: 3;
 			int timeoutTime = missionDefinitionData.TryGetValue(
 				"timeoutTime",
 				out Variant timeoutValue)
@@ -1321,7 +1341,11 @@ public partial class GameManager : Manager<GameManager>
 				null,
 				status,
 				onRouteCraft,
-				alienOperationId);
+				alienOperationId,
+				storyEventId,
+				allowsLocalResponse,
+				isExclusiveStoryChoice,
+				localResponderCount);
 			definition.RestoreTimeoutState(timeoutTime, timeLeft);
 			definition.RestoreBattleResult(missionDefinitionData);
 			return definition;

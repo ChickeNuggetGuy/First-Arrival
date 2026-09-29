@@ -30,6 +30,21 @@ public partial class Rotate360ActionDefinition : ActionDefinition
 			reason = "RotateActionDefinition not found on GridObject";
 			return false;
 		}
+
+		for (int directionValue = (int)Enums.Direction.North;
+		     directionValue <= (int)Enums.Direction.NorthWest;
+		     directionValue++)
+		{
+			var direction = (Enums.Direction)directionValue;
+			if (!gridObject.GridPositionData.CanOccupyAt(
+				    gridObject.GridPositionData.AnchorCell,
+				    direction,
+				    out string footprintReason))
+			{
+				reason = $"Cannot rotate 360 here: {footprintReason}";
+				return false;
+			}
+		}
 		
 		// 8 steps for a 360 rotation (45 degrees each)
 		const int rotationSteps = 8;

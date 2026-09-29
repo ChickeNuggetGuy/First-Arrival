@@ -10,11 +10,14 @@ using FirstArrival.Scripts.Utility;
 public partial class RangedAttackActionDefinition
 	: ItemActionDefinition
 {
+	protected override bool TargetsGridObjects => true;
+
 	[Export] public Enums.RangedAttackType Type;
 	[Export] public int attackCount = 1;
 	[Export(PropertyHint.Range, "1,100,1")] public int ammoCost = 1;
 	[Export] public int range;
 	[Export] public bool canCauseFatalWounds = true;
+	[Export] public bool dealsStunDamage = false;
 
 	// Legacy per-action ammo links remain supported while weapon resources migrate
 	// to ItemData.AmmoItem. Damage still comes from the linked ammo ItemData.
@@ -88,13 +91,26 @@ public partial class RangedAttackActionDefinition
 			return false;
 		}
 
-		if (targetGridCell.gridObjects.Contains(parentGridObject))
+		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(candidate =>
+			candidate != null &&
+			candidate.IsActive &&
+			candidate != gridObject &&
+			candidate.Team != gridObject.Team);
+		if (targetGridObject == null)
 		{
-			reason = "Target grid object is equal to parent";
+			reason = "No active hostile target found";
 			return false;
 		}
 
-		float distance = startingGridCell.GridCoordinates.DistanceTo(targetGridCell.GridCoordinates);
+		List<GridCell> sourceCells = GridFootprintUtility.GetOccupiedCells(
+			gridObject,
+			startingGridCell
+		);
+		var targetCells = new List<GridCell> { targetGridCell };
+		float distance = GridFootprintUtility.GetClosestGridDistance(
+			sourceCells,
+			targetCells
+		);
 		if (distance > range)
 		{
 			reason = "Target is out of range";
@@ -103,7 +119,19 @@ public partial class RangedAttackActionDefinition
 
 		// TODO: Add Line of Sight Check
 
-		if (!AddRotateCostsIfNeeded(gridObject, startingGridCell, targetGridCell, costs, out var rotateReason))
+		GridCell actionAnchor = gridObject.GridPositionData.AnchorCell
+		                        ?? startingGridCell;
+		GridCell facingTarget = targetCells
+			.OrderBy(cell => actionAnchor.GridCoordinates.DistanceSquaredTo(
+				cell.GridCoordinates))
+			.First();
+		if (!AddRotateCostsIfNeeded(
+			    gridObject,
+			    actionAnchor,
+			    facingTarget,
+			    costs,
+			    out var rotateReason,
+			    actionAnchor))
 		{
 			reason = rotateReason;
 			return false;

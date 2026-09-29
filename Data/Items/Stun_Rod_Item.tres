@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://b4o5p5b3ve5nw"]
+
+[ext_resource type="Script" uid="uid://cqq7u24ovq2wo" path="res://Scripts/ActionSystem/ItemActions/MeleeAttackAction/MeleeAttackActionDefinition.cs" id="1_melee"]
+[ext_resource type="Script" uid="uid://cdhdv6w5jignj" path="res://Scripts/GridSystem/GridShape.cs" id="2_shape"]
+[ext_resource type="Script" uid="uid://da4j8smky5g6x" path="res://Scripts/Inventory System/ItemData.cs" id="3_item"]
+[ext_resource type="Texture2D" uid="uid://dndr0grauwkdg" path="res://Data/InventorySystem/stun_rod.svg" id="4_icon"]
+
+[sub_resource type="Resource" id="Stun"]
+script = ExtResource("1_melee")
+damage = 40
+canCauseFatalWounds = false
+dealsStunDamage = true
+
+[sub_resource type="CapsuleMesh" id="Mesh"]
+radius = 0.035
+height = 0.65
+
+[sub_resource type="Resource" id="Shape"]
+script = ExtResource("2_shape")
+SizeZ = 3
+OccupiedCells = Array[bool]([true, true, true])
+
+[resource]
+resource_name = "Stun Rod"
+script = ExtResource("3_item")
+ItemID = 113
+ItemName = "Stun Rod"
+ItemDescription = "Contact weapon that inflicts 40 stun without damaging health. A target falls unconscious when stun reaches its current health."
+ItemIcon = ExtResource("4_icon")
+Category = 1
+WeaponClass = 1
+ItemShape = SubResource("Shape")
+weight = 3
+ItemMesh = SubResource("Mesh")
+visualScale = Vector3(1, 1, 1)
+ActionDefinitions = Array[Object]([SubResource("Stun")])
+buyPrice = 600
+sellPrice = 400

@@ -31,6 +31,10 @@ public partial class MissionCellDefinition : HexCellDefinition
 
 	public Craft onRouteCraft; 
 	public int alienOperationId { get; private set; } = -1;
+	public string StoryEventId { get; private set; } = string.Empty;
+	public bool AllowsLocalResponse { get; private set; }
+	public bool IsExclusiveStoryChoice { get; private set; }
+	public int LocalResponderCount { get; private set; } = 3;
 
 	public MissionCellDefinition(
 		int cellIndex,
@@ -39,13 +43,21 @@ public partial class MissionCellDefinition : HexCellDefinition
 		Node3D missionVisual = null,
 		Enums.MissionStatus missionStatus = Enums.MissionStatus.None,
 		Craft craft = null,
-		int alienOperationId = -1) : base(cellIndex, name)
+		int alienOperationId = -1,
+		string storyEventId = "",
+		bool allowsLocalResponse = false,
+		bool isExclusiveStoryChoice = false,
+		int localResponderCount = 3) : base(cellIndex, name)
 	{
 		this.mission = mission;
 		if (missionVisual != null)
 			this.missionVisual = missionVisual;
 		this.missionStatus = missionStatus;
 		this.alienOperationId = alienOperationId;
+		StoryEventId = storyEventId ?? string.Empty;
+		AllowsLocalResponse = allowsLocalResponse;
+		IsExclusiveStoryChoice = isExclusiveStoryChoice;
+		LocalResponderCount = Math.Max(1, localResponderCount);
 		SetOnRouteCraft(craft);
 		timeLeft = timeoutTime;
 		StartTimeoutTracking();
@@ -165,6 +177,16 @@ public partial class MissionCellDefinition : HexCellDefinition
 		{
 			UIManager.Instance?.GetWindow<MissionDetailsUI>()?.ShowMission(targetMission);
 		}));
+		if (AllowsLocalResponse &&
+		    !missionStatus.HasFlag(Enums.MissionStatus.Visited))
+		{
+			actions.Add("Respond Locally", Callable.From(() =>
+			{
+				if (GlobeMissionManager.Instance != null)
+					_ = GlobeMissionManager.Instance.LoadLocalResponseMissionScene(
+						targetMission);
+			}));
+		}
 
 		return actions;
 	}
@@ -186,6 +208,10 @@ public partial class MissionCellDefinition : HexCellDefinition
 		data.Add("timeoutTime", timeoutTime);
 		data.Add("timeLeft", timeLeft);
 		data.Add("alienOperationId", alienOperationId);
+		data.Add("storyEventId", StoryEventId);
+		data.Add("allowsLocalResponse", AllowsLocalResponse);
+		data.Add("isExclusiveStoryChoice", IsExclusiveStoryChoice);
+		data.Add("localResponderCount", LocalResponderCount);
 		data.Add("battleResult", SaveBattleResult());
 		return data;
 	}

@@ -107,6 +107,27 @@ public partial class ItemData : Resource
 		retVal.Init((ItemData)itemData.Duplicate());
 		return retVal;
 	}
+
+	public static ItemData CreateBodyData(string unitName, bool dead)
+	{
+		var shape = new GridShape { SizeX = 2, SizeY = 1, SizeZ = 3 };
+		shape.FillAll(true);
+		return new ItemData
+		{
+			ItemID = -2,
+			ItemName = $"{unitName} ({(dead ? "dead" : "unconscious")})",
+			ItemDescription = "A body linked to the original unit.",
+			ItemShape = shape,
+			ItemIcon = GD.Load<Texture2D>("res://Data/InventorySystem/unit_body.svg"),
+			MaxStackSize = 1,
+			weight = 4,
+			ShowInBuySellWindow = false,
+			ActionDefinitions = new() { new ThrowActionDefinition() },
+			ItemMesh = new CapsuleMesh { Radius = 0.22f, Height = 1.5f },
+			visualScale = Vector3.One,
+			LeftHandItemRotation = new Vector3(Mathf.Pi / 2, 0, 0)
+		};
+	}
 	
 	public bool TryGetItemActionDefinition<T>(out T def) where T : ItemActionDefinition
 	{

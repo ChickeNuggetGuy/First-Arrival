@@ -32,6 +32,7 @@ public partial class OrbitalCamera : Node3D
     [Export] public float MinZoom = 2.0f;
     [Export] public float MaxZoom = 20.0f;
     
+    private float _mousePanDistance;
     private float _pitch = 0.0f;
     private float _yaw = 0.0f;
     
@@ -79,10 +80,9 @@ public partial class OrbitalCamera : Node3D
     public override void _UnhandledInput(InputEvent @event)
     {
 	    if(UIManager.Instance.BlockingInput) return;
-        // Mouse Rotation (Only when Right Click is held)
-        
         if (@event is InputEventMouseMotion mouseMotion && Input.IsMouseButtonPressed(MouseButton.Left))
         {
+            Vector2 previousOrbit = new(_yaw, _pitch);
             _yaw -= mouseMotion.Relative.X * MouseSensitivity;
             
             float pitchDelta = mouseMotion.Relative.Y * MouseSensitivity;
@@ -90,6 +90,8 @@ public partial class OrbitalCamera : Node3D
             else _pitch -= pitchDelta;
 
             ClampPitch();
+            float distance = previousOrbit.DistanceTo(new Vector2(_yaw, _pitch));
+            _mousePanDistance += distance;
         }
 
         // Mouse Zoom (Scroll Wheel)
@@ -111,12 +113,17 @@ public partial class OrbitalCamera : Node3D
     public override void _Process(double delta)
     {
         RecoverInvalidOrbitState();
+        if (_mousePanDistance > 0.0f)
+            TutorialManager.Instance?.ReportControlAction(
+                TutorialControlAction.MousePan, _mousePanDistance, (float)delta);
+        _mousePanDistance = 0.0f;
         HandleKeyboardInput((float)delta);
         UpdateTransform((float)delta);
     }
 
     private void HandleKeyboardInput(float delta)
     {
+        if (UIManager.Instance?.BlockingInput == true) return;
         // Use the project's physical-key actions instead of polling logical
         // key codes. This keeps WASD working regardless of keyboard layout or
         // which Control currently owns keyboard focus.
@@ -135,9 +142,12 @@ public partial class OrbitalCamera : Node3D
                 zoomT);
 
             Vector2 panInput = new Vector2(panHorizontal, panVertical).Normalized();
+            Vector2 previousOrbit = new(_yaw, _pitch);
             _yaw += panInput.X * zoomAdjustedPanSpeed * delta;
             _pitch += panInput.Y * zoomAdjustedPanSpeed * delta;
             ClampPitch();
+            float distance = previousOrbit.DistanceTo(new Vector2(_yaw, _pitch));
+            TutorialManager.Instance?.ReportControlAction(TutorialControlAction.KeyboardPan, distance, delta);
         }
 
         if (AutoOrbit)

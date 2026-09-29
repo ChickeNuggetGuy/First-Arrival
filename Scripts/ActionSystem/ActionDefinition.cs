@@ -8,6 +8,18 @@ using FirstArrival.Scripts.Utility;
 [GlobalClass]
 public abstract partial class ActionDefinition : Resource
 {
+  // Object actions select supported cells, then apply their own range,
+  // movement and cost checks. Cell/area actions keep their existing rules.
+  protected virtual bool TargetsGridObjects => false;
+
+  private bool IsSelectableTargetCell(GridCell cell)
+  {
+    return !TargetsGridObjects ||
+      (cell != null && cell != GridCell.Null &&
+       cell.state.HasFlag(Enums.GridCellState.Ground) &&
+       !cell.state.HasFlag(Enums.GridCellState.Disabled) && cell.HasGridObject());
+  }
+
   public GridObject parentGridObject { get; set; }
   [Export] public bool confirmClick = false;
   
@@ -45,9 +57,9 @@ public abstract partial class ActionDefinition : Resource
 	
     
     parentGridObject = gridObject;
-    if (gridObject == null)
+    if (gridObject == null || !gridObject.CanAct)
     {
-      reason = "GridObject is null";
+      reason = "Unit cannot act";
       costs = CreateFailCosts();
       return false;
     }
@@ -61,6 +73,13 @@ public abstract partial class ActionDefinition : Resource
     if (startingGridCell == null || targetGridCell == null)
     {
       reason = "Starting or target grid cell is null";
+      costs = CreateFailCosts();
+      return false;
+    }
+
+    if (!IsSelectableTargetCell(targetGridCell))
+    {
+      reason = "Target must be a ground-supported object cell";
       costs = CreateFailCosts();
       return false;
     }
@@ -102,15 +121,22 @@ public abstract partial class ActionDefinition : Resource
   {
     costs = CreateCostContainer();
 
-    if (gridObject == null)
+    if (gridObject == null || !gridObject.CanAct)
     {
-      reason = "GridObject is null";
+      reason = "Unit cannot act";
       return false;
     }
 
     if (startingGridCell == null || targetGridCell == null)
     {
       reason = "Starting or target grid cell is null";
+      return false;
+    }
+
+    parentGridObject = gridObject;
+    if (!IsSelectableTargetCell(targetGridCell))
+    {
+      reason = "Target must be a ground-supported object cell";
       return false;
     }
 
@@ -135,9 +161,24 @@ public abstract partial class ActionDefinition : Resource
   {
     parentGridObject = gridObject;
     ValidGridCells.Clear();
-    List<GridCell> validCells = GetValidGridCells(gridObject, startingGridCell);
+    List<GridCell> validCells = GetSelectableGridCells(gridObject, startingGridCell);
     if (validCells != null)
       ValidGridCells.AddRange(validCells);
+  }
+
+  private List<GridCell> GetSelectableGridCells(GridObject gridObject, GridCell startingGridCell)
+  {
+    if (gridObject == null || !gridObject.CanAct || startingGridCell == null)
+      return new List<GridCell>();
+
+    parentGridObject = gridObject;
+    var candidates = GetValidGridCells(gridObject, startingGridCell);
+    if (candidates == null) return new List<GridCell>();
+    if (!TargetsGridObjects) return candidates;
+
+    return candidates.Where(IsSelectableTargetCell).Distinct()
+      .Where(cell => CanTakeAction(gridObject, startingGridCell, cell, out _, out _))
+      .ToList();
   }
 
   protected abstract List<GridCell> GetValidGridCells(
@@ -147,7 +188,7 @@ public abstract partial class ActionDefinition : Resource
 
   public (GridCell gridCell, int score,  Godot.Collections.Dictionary<Enums.Stat, int> costs) DetermineBestAIAction()
   {
-	  List<GridCell> possibleGridCells = GetValidGridCells(parentGridObject, parentGridObject.GridPositionData.AnchorCell);
+	  List<GridCell> possibleGridCells = GetSelectableGridCells(parentGridObject, parentGridObject?.GridPositionData?.AnchorCell);
 	  GD.Print($"{GetActionName()}: Possible grid cells: {possibleGridCells.Count}");
 	  if (possibleGridCells.Count == 0)
 	  {
@@ -233,7 +274,9 @@ public abstract partial class ActionDefinition : Resource
     GridCell startingGridCell,
     GridCell targetGridCell,
     Godot.Collections.Dictionary<Enums.Stat, int> costs,
-    out string reason
+    out string reason,
+    GridCell occupancyAnchor = null,
+    Enums.Direction assumedCurrentDirection = Enums.Direction.None
   )
   {
     reason = "";
@@ -251,11 +294,29 @@ public abstract partial class ActionDefinition : Resource
       return false;
     }
 
-    var currentDir = gridObject.GridPositionData.Direction;
+    var currentDir = assumedCurrentDirection == Enums.Direction.None
+      ? gridObject.GridPositionData.Direction
+      : assumedCurrentDirection;
     var targetDir = RotationHelperFunctions.GetDirectionBetweenCells(
       startingGridCell,
       targetGridCell
     );
+
+    if (targetDir == Enums.Direction.None)
+      return true;
+
+    GridCell finalAnchor = occupancyAnchor
+      ?? gridObject.GridPositionData.AnchorCell
+      ?? startingGridCell;
+    if (!gridObject.GridPositionData.CanOccupyAt(
+          finalAnchor,
+          targetDir,
+          out string footprintReason
+        ))
+    {
+      reason = $"Cannot face target: {footprintReason}";
+      return false;
+    }
 
     if (currentDir == targetDir) return true;
 

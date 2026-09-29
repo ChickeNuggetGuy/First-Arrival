@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FirstArrival.Scripts.Inventory_System;
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
@@ -165,10 +166,11 @@ public static class MissionRecoveryResolver
 			    out List<GridObject> activeUnits))
 			return recovered;
 
-		foreach (GridObject unit in activeUnits)
+		foreach (GridObject unit in playerHolder.GridObjects.Values.SelectMany(units => units).Distinct())
 		{
 			if (unit == null || !GodotObject.IsInstanceValid(unit) ||
-			    !unit.IsActive ||
+			    !(unit.IsActive || unit.Condition?.State == Enums.UnitCondition.Unconscious) ||
+			    unit.Condition?.State == Enums.UnitCondition.Dead ||
 			    !fullField && !IsOnStartingCell(unit, startingCells))
 				continue;
 
@@ -177,6 +179,23 @@ public static class MissionRecoveryResolver
 			savedUnit["Team"] = (int)Enums.UnitTeam.Player;
 			savedUnit["IsActive"] = false;
 			savedUnit["HasPosition"] = false;
+			// Stun is a battle condition; evacuation ends it, while health and fatal
+			// wounds stay on the soldier's original component save data.
+			if (unit.Condition != null)
+			{
+				var nodes = savedUnit["Nodes"].AsGodotDictionary<string, Variant>();
+				var condition = nodes[unit.Condition.Name].AsGodotDictionary<string, Variant>();
+				condition["state"] = (int)Enums.UnitCondition.Conscious;
+				condition["stimulantRecovery"] = false;
+				foreach (var node in nodes.Values)
+				{
+					var values = node.AsGodotDictionary<string, Variant>();
+					if (values.TryGetValue("Stun", out var stun))
+						stun.AsGodotDictionary<string, Variant>()["current"] = 0;
+				}
+				if (nodes.TryGetValue("Stun", out var stunNode))
+					stunNode.AsGodotDictionary<string, Variant>()["current"] = 0;
+			}
 			result.RecoveredUnits.Add(savedUnit);
 			recovered.Add(unit);
 		}
@@ -253,6 +272,8 @@ public static class MissionRecoveryResolver
 		GridObject gridObject,
 		HashSet<GridCell> startingCells)
 	{
+		GridCell bodyCell = gridObject?.Condition?.Body?.GetWorldCell();
+		if (bodyCell != null) return startingCells.Contains(bodyCell);
 		GridPositionData position = gridObject?.GridPositionData;
 		if (position?.AnchorCell != null && startingCells.Contains(position.AnchorCell))
 			return true;

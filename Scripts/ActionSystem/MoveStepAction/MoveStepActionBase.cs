@@ -98,25 +98,11 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
       }
     }
     
-    //Setup animation
-    Enums.Stance stance = parentGridObject.CurrentStance;
-    blendSpaceValue = new Vector2(0,0);
-    if (targetDirection == Enums.Direction.North || targetDirection == Enums.Direction.South
-                                                 || targetDirection == Enums.Direction.East ||
-                                                 targetDirection == Enums.Direction.West)
-    {
-	    //Moving 
-	    blendSpaceValue.X = 0;
-    }
-    else if (targetDirection == Enums.Direction.NorthEast || targetDirection == Enums.Direction.SouthEast)
-    {
-	    blendSpaceValue.X = 1;
-    }
-    else if (targetDirection == Enums.Direction.NorthWest || targetDirection == Enums.Direction.SouthWest)
-    {
-	    blendSpaceValue.X = 0;
-    }
-    blendSpaceValue.Y = 0;
+    // Every step first turns the unit toward its destination, so its movement
+    // is always forward in model space. Selecting a strafe clip from the world
+    // direction made diagonal steps slide sideways while the root moved toward
+    // the correct cell.
+    blendSpaceValue = Vector2.Zero;
 
     await Task.CompletedTask;
   }
@@ -126,49 +112,55 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
 	  _playedMovementVisuals = ShouldAnimate();
 	  if (!_playedMovementVisuals)
 	  {
-		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
-		  parentGridObject.animationNode.TrySetParameter(
+		  parentGridObject.animationNode?.SetLocomotionType(Enums.LocomotionType.Idle);
+		  parentGridObject.animationNode?.TrySetParameter(
 			  "WalkBlendSpace/blend_position",
 			  Vector2.Zero
 		  );
-		  parentGridObject.Position = targetGridCell.WorldCenter;
+		  parentGridObject.GlobalPosition = targetGridCell.WorldCenter;
 		  return;
 	  }
 
-	  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
-	  parentGridObject.animationNode.TrySetParameter("WalkBlendSpace/blend_position", blendSpaceValue);
+	  parentGridObject.animationNode?.SetLocomotionType(Enums.LocomotionType.Moving);
+	  parentGridObject.animationNode?.TrySetParameter("WalkBlendSpace/blend_position", blendSpaceValue);
 
 	  _movementTween = ApplyAnimationSpeed(parentGridObject.CreateTween());
 	  var moveTw = _movementTween.TweenProperty(
 		  parentGridObject,
-		  "position",
+		  "global_position",
 		  targetGridCell.WorldCenter,
 		  0.5f // StepMoveDurationSec
 	  );
 	  moveTw.SetTrans(Tween.TransitionType.Linear);
 
-	  await WaitForTween(_movementTween);
+	  bool completed = await WaitForTween(_movementTween);
 	  _movementTween = null;
+	  if (completed)
+		  parentGridObject.GlobalPosition = targetGridCell.WorldCenter;
   }
 
   protected override Task ActionComplete()
   {
-	  parentGridObject.GridPositionData.SetGridCell(targetGridCell);
+	  if (!parentGridObject.GridPositionData.TrySetGridCell(targetGridCell))
+	  {
+		  parentGridObject.GlobalPosition = startingGridCell.WorldCenter;
+		  return CancelCall();
+	  }
 	  if (!_playedMovementVisuals)
 		  return Task.CompletedTask;
 
 	  if (NextActionBase is MoveStepActionBase nextStep)
 	  {
-		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Moving);
-		  parentGridObject.animationNode.TrySetParameter(
+		  parentGridObject.animationNode?.SetLocomotionType(Enums.LocomotionType.Moving);
+		  parentGridObject.animationNode?.TrySetParameter(
 			  "WalkBlendSpace/blend_position",
 			  nextStep.blendSpaceValue
 		  );
 	  }
 	  else
 	  {
-		  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
-		  parentGridObject.animationNode.TrySetParameter(
+		  parentGridObject.animationNode?.SetLocomotionType(Enums.LocomotionType.Idle);
+		  parentGridObject.animationNode?.TrySetParameter(
 			  "WalkBlendSpace/blend_position",
 			  Vector2.Zero
 		  );
@@ -190,12 +182,12 @@ public class MoveStepActionBase : ActionBase, ICompositeAction
 	  // the step began so world position and grid occupancy remain consistent.
 	  if (startingGridCell != null)
 	  {
-		  parentGridObject.Position = startingGridCell.WorldCenter;
+		  parentGridObject.GlobalPosition = startingGridCell.WorldCenter;
 		  parentGridObject.GridPositionData.SetGridCell(startingGridCell);
 	  }
 
-	  parentGridObject.animationNode.SetLocomotionType(Enums.LocomotionType.Idle);
-	  parentGridObject.animationNode.TrySetParameter(
+	  parentGridObject.animationNode?.SetLocomotionType(Enums.LocomotionType.Idle);
+	  parentGridObject.animationNode?.TrySetParameter(
 		  "WalkBlendSpace/blend_position",
 		  Vector2.Zero
 	  );

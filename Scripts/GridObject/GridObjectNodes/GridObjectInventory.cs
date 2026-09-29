@@ -39,6 +39,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 			}
         
 			InventoryGrids.Add(inventoryType, inventory);
+			inventory.OwningUnit = parentGridObject;
 			inventory.ItemAdded += InventoryOnItemAdded;
 			inventory.ItemRemoved += InventoryOnItemRemoved;
 		}
@@ -262,6 +263,7 @@ public partial class GridObjectInventory : GridObjectNode, IContextUser<GridObje
 				if (inventory != null)
 				{
 					InventoryGrids.Add(inventoryType, inventory);
+					inventory.OwningUnit = parentGridObject;
 					inventory.ItemAdded += InventoryOnItemAdded;
 					inventory.ItemRemoved += InventoryOnItemRemoved;
 				}

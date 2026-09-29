@@ -16,45 +16,33 @@ public partial class InteractActionBase : ActionBase, ICompositeAction
 		ActionDefinition parentAction, Godot.Collections.Dictionary<Enums.Stat, int> costs)
 		: base(parentGridObject, startingGridCell, targetGridCell ,parentAction, costs)
 	{
-		targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>  gridObject is IInteractableGridobject ) as IInteractableGridobject;
+		targetGridObject = interactActionDefinition.GetTargetGridObject(parentGridObject, targetGridCell) as IInteractableGridobject;
 	}
 
 	
 	protected override async Task Setup()
-	{
-		ParentActionBase = this;
-
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell,false, false, out var neighbors))
 		{
-			GD.PrintErr("InteractAction.Setup: Could not find neighbors for target gridcell");
-			return;
-		}
+			ParentActionBase = this;
 
-		if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
+			if(!parentGridObject.TryGetGridObjectNode<GridObjectActions>(out var gridObjectActions)) return;
+			if (targetGridObject == null) return;
+			var targetCells = new List<GridCell> { targetGridCell };
 
-		// Are we already adjacent?
-		bool isAdjacent = neighbors.Any(c => c.GridCoordinates == startingGridCell.GridCoordinates);
+			GridCell actionAnchor = parentGridObject.GridPositionData.AnchorCell
+			                        ?? startingGridCell;
+			if (GridFootprintUtility.TryGetAdjacentFacingTarget(
+				    parentGridObject,
+				    actionAnchor,
+				    targetCells,
+				    out GridCell facingTarget,
+				    out _))
+			{
+				AddRotateSubActionIfNeeded(actionAnchor, facingTarget);
+				return;
+			}
 
-		if (isAdjacent)
-		{
-			AddRotateSubActionIfNeeded(startingGridCell, targetGridCell);
-			return;
-		}
-		
-		// Not adjacent. We need to move.
-		var walkableNeighbors = neighbors
-			.Where(n => n.IsWalkable && !n.HasMovementBlockingGridObject())
-			.ToList();
-		if (!walkableNeighbors.Any())
-		{
-			GD.PrintErr("InteractAction.Setup: No walkable cell near target to move to.");
-			return;
-		}
-
-		var moveDestination = walkableNeighbors.OrderBy(n => startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)).First();
-
-		MoveActionDefinition moveActionDefinition =
-			gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
+			MoveActionDefinition moveActionDefinition =
+				gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition) as MoveActionDefinition;
 		
 		if (moveActionDefinition == null)
 		{
@@ -62,11 +50,46 @@ public partial class InteractActionBase : ActionBase, ICompositeAction
 			return;
 		}
 		
-		MoveActionBase moveActionBase = moveActionDefinition.InstantiateAction(parentGridObject,
-			startingGridCell, moveDestination, 
-			new Godot.Collections.Dictionary<Enums.Stat, int>()) as MoveActionBase;
-		AddSubAction(moveActionBase);
-		AddRotateSubActionIfNeeded(moveDestination, targetGridCell, force: true);
+			foreach (GridCell moveDestination in GridFootprintUtility
+			         .GetAdjacentAnchorCandidates(parentGridObject, targetCells))
+			{
+				if (!moveActionDefinition.TryBuildCostsOnly(
+					    parentGridObject,
+					    startingGridCell,
+					    moveDestination,
+					    out var executionMoveCosts,
+					    out _))
+					continue;
+
+				if (!GridFootprintUtility.TryGetAdjacentFacingTarget(
+					    parentGridObject,
+					    moveDestination,
+					    targetCells,
+					    out GridCell destinationFacingTarget,
+					    out _))
+					continue;
+
+				MoveActionBase moveActionBase = moveActionDefinition.InstantiateAction(
+					parentGridObject,
+					startingGridCell,
+					moveDestination,
+					new Godot.Collections.Dictionary<Enums.Stat, int>()
+				) as MoveActionBase;
+				AddSubAction(moveActionBase);
+				foreach (var moveCost in executionMoveCosts)
+				{
+					if (costs.ContainsKey(moveCost.Key))
+						costs[moveCost.Key] -= moveCost.Value;
+				}
+				AddRotateSubActionIfNeeded(
+					moveDestination,
+					destinationFacingTarget,
+					force: true
+				);
+				return;
+			}
+
+			GD.PrintErr("InteractAction.Setup: No reachable anchor fits the unit footprint.");
 	}
 
 	protected override async Task Execute()

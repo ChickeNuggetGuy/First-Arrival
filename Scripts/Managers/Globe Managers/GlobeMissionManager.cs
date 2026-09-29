@@ -68,6 +68,7 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
     {
         if (loadingData)
         {
+			PruneUnselectedStoryChoices();
             foreach (var missionDef in _activeMissions.Values.ToArray())
             {
                 if (missionDef.missionStatus.HasFlag(Enums.MissionStatus.Visited))
@@ -216,7 +217,29 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 		Enums.MissionType missionType,
 		int difficulty,
 		string missionName)
+		=> TryCreateStoryMission(
+			targetCellIndex,
+			missionType,
+			difficulty,
+			missionName,
+			storyEventId: string.Empty,
+			allowsLocalResponse: false,
+			isExclusiveStoryChoice: false,
+			localResponderCount: 3,
+			out _);
+
+	public bool TryCreateStoryMission(
+		int targetCellIndex,
+		Enums.MissionType missionType,
+		int difficulty,
+		string missionName,
+		string storyEventId,
+		bool allowsLocalResponse,
+		bool isExclusiveStoryChoice,
+		int localResponderCount,
+		out MissionCellDefinition missionDefinition)
 	{
+		missionDefinition = null;
 		HexCellData? cell = GlobeHexGridManager.Instance?.GetCellFromIndex(
 			targetCellIndex,
 			excludeWater: true);
@@ -225,7 +248,22 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			missionType,
 			difficulty,
 			alienOperationId: -1,
-			string.IsNullOrWhiteSpace(missionName) ? "Story Mission" : missionName);
+			string.IsNullOrWhiteSpace(missionName) ? "Story Mission" : missionName,
+			storyEventId,
+			allowsLocalResponse,
+			isExclusiveStoryChoice,
+			localResponderCount,
+			out missionDefinition);
+	}
+
+	public bool HasMissionAt(int cellIndex) => _activeMissions.ContainsKey(cellIndex);
+
+	public bool CanCreateStoryMissions(int count)
+	{
+		if (count <= 0) return false;
+		int unresolvedMissionCount = _activeMissions.Values.Count(mission =>
+			!mission.missionStatus.HasFlag(Enums.MissionStatus.Visited));
+		return unresolvedMissionCount + count <= maxActiveMissions;
 	}
 
 	/// <summary>
@@ -264,8 +302,36 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 		Enums.MissionType missionType,
 		int difficulty,
 		int alienOperationId,
-		string missionName)
+		string missionName,
+		string storyEventId = "",
+		bool allowsLocalResponse = false,
+		bool isExclusiveStoryChoice = false,
+		int localResponderCount = 3)
+		=> TryCreateMission(
+			cell,
+			missionType,
+			difficulty,
+			alienOperationId,
+			missionName,
+			storyEventId,
+			allowsLocalResponse,
+			isExclusiveStoryChoice,
+			localResponderCount,
+			out _);
+
+	private bool TryCreateMission(
+		HexCellData cell,
+		Enums.MissionType missionType,
+		int difficulty,
+		int alienOperationId,
+		string missionName,
+		string storyEventId,
+		bool allowsLocalResponse,
+		bool isExclusiveStoryChoice,
+		int localResponderCount,
+		out MissionCellDefinition createdMission)
     {
+		createdMission = null;
         if (cell.cellType == Enums.HexGridType.Water)
             return false;
 
@@ -277,7 +343,12 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 		if (unresolvedMissionCount >= maxActiveMissions)
 			return false;
 
-		MissionBase mission = GenerateRandomMission(cell.Index, missionType, "New Mission TEST","Alien Activity sighted", difficulty);
+		MissionBase mission = GenerateRandomMission(
+			cell.Index,
+			missionType,
+			missionName,
+			"Alien activity sighted",
+			difficulty);
         if (mission == null)
             return false;
 
@@ -286,13 +357,22 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			missionName,
 			mission,
 			null,
-			alienOperationId: alienOperationId
+			alienOperationId: alienOperationId,
+			storyEventId: storyEventId,
+			allowsLocalResponse: allowsLocalResponse,
+			isExclusiveStoryChoice: isExclusiveStoryChoice,
+			localResponderCount: localResponderCount
         );
         
         _activeMissions.Add(cell.Index, missionCellDefinition);
         SpawnMissionVisual(cell, $"Mission_{cell.Index}");
         
+		if (missionCellDefinition.IsVisibleTo(
+			    GlobeTeamManager.Instance?.ViewingTeam ?? Enums.UnitTeam.Player))
+			GlobeTimeManager.Instance?.SetTimeSpeed(0);
+
         EmitSignal(SignalName.MissionSpawned, mission);
+		createdMission = missionCellDefinition;
         return true;
     }
 
@@ -426,6 +506,127 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 	    return false;
     }
 
+	/// <summary>
+	/// Starts an opening story mission with local responders instead of requiring
+	/// an existing player base, transport craft, and deployed squad.
+	/// </summary>
+	public async Task<bool> LoadLocalResponseMissionScene(
+		MissionCellDefinition missionDefinition)
+	{
+		if (missionDefinition?.mission == null ||
+		    !missionDefinition.AllowsLocalResponse ||
+		    missionDefinition.missionStatus.HasFlag(Enums.MissionStatus.Visited) ||
+		    !_activeMissions.TryGetValue(
+			    missionDefinition.cellIndex,
+			    out MissionCellDefinition activeMission) ||
+		    activeMission != missionDefinition ||
+		    SavesManager.Instance == null ||
+		    GameManager.Instance == null)
+			return false;
+
+		Enums.MissionStatus previousStatus = missionDefinition.missionStatus;
+		CommitStoryMissionChoice(missionDefinition);
+		var globeState = SavesManager.Instance.GetSceneTransitionState()
+			.Duplicate(true);
+		// Local-response missions still belong to the campaign. Keep the globe
+		// snapshot in session memory so GameManager can distinguish this from a
+		// quick battle and return here after the battle report is confirmed.
+		SavesManager.Instance.SetSessionData("GlobeState", globeState);
+
+		GameManager.Instance.ClearPendingBattleLoadout();
+		GameManager.Instance.unitCounts = new Vector2I(
+			missionDefinition.LocalResponderCount,
+			missionDefinition.mission.EnemySpawnCount);
+		GameManager.Instance.mapSize = new Vector2I(
+			GD.RandRange(3, 4),
+			GD.RandRange(3, 4));
+		GameManager.Instance.currentMission = missionDefinition;
+		missionDefinition.missionStatus |= Enums.MissionStatus.Visited;
+
+		SavesManager.LoadFromAutosave = false;
+		SavesManager.PendingSaveData = null;
+		bool changed = false;
+		try
+		{
+			changed = await GameManager.Instance.TryChangeScene(
+				GameManager.GameScene.BattleScene,
+				saveManagerData: false);
+		}
+		catch (Exception exception)
+		{
+			GD.PrintErr(
+				$"The local-response battle could not finish loading: {exception.Message}");
+		}
+
+		if (changed) return true;
+		GameManager.Instance.ClearPendingBattleLoadout();
+		GameManager.Instance.currentMission = null;
+		StoryManager.Instance?.ClearSelectedStoryMission(
+			missionDefinition.StoryEventId,
+			missionDefinition.cellIndex);
+
+		if (GodotObject.IsInstanceValid(this) && IsInsideTree())
+		{
+			missionDefinition.missionStatus = previousStatus & ~(
+				Enums.MissionStatus.Visited |
+				Enums.MissionStatus.OnRoute);
+			return false;
+		}
+
+		ResetFailedMissionLaunch(globeState, missionDefinition.cellIndex);
+		SavesManager.PendingSaveData = globeState;
+		SavesManager.LoadFromAutosave = false;
+		try
+		{
+			await GameManager.Instance.ChangeSceneAsync(
+				GameManager.GameScene.GlobeScene,
+				true);
+		}
+		catch (Exception exception)
+		{
+			SavesManager.PendingSaveData = null;
+			GD.PrintErr(
+				$"The globe scene could not be restored: {exception.Message}");
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// Commits one mission in an exclusive story choice and removes its sibling
+	/// markers so only the selected location can become the campaign start.
+	/// </summary>
+	public void CommitStoryMissionChoice(MissionCellDefinition selectedMission)
+	{
+		if (selectedMission == null ||
+		    string.IsNullOrWhiteSpace(selectedMission.StoryEventId))
+			return;
+
+		StoryManager.Instance?.RecordSelectedStoryMission(
+			selectedMission.StoryEventId,
+			selectedMission.cellIndex);
+		if (!selectedMission.IsExclusiveStoryChoice) return;
+
+		foreach (MissionCellDefinition mission in _activeMissions.Values.ToArray())
+		{
+			if (mission == selectedMission ||
+			    mission.StoryEventId != selectedMission.StoryEventId)
+				continue;
+			RemoveMissionDefinition(mission);
+		}
+	}
+
+	private void PruneUnselectedStoryChoices()
+	{
+		MissionCellDefinition[] selectedChoices = _activeMissions.Values
+			.Where(mission =>
+				mission.IsExclusiveStoryChoice &&
+				!string.IsNullOrWhiteSpace(mission.StoryEventId) &&
+				mission.missionStatus.HasFlag(Enums.MissionStatus.Visited))
+			.ToArray();
+		foreach (MissionCellDefinition selectedChoice in selectedChoices)
+			CommitStoryMissionChoice(selectedChoice);
+	}
+
 	private static void ResetFailedMissionLaunch(
 		Godot.Collections.Dictionary<string, Variant> root,
 		int cellIndex)
@@ -524,6 +725,14 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
         GlobeTeamHolder playerTeam = teamManager?.GetTeamData(Enums.UnitTeam.Player);
 
 		Enums.MissionStatus outcome = GetMissionOutcome(missionDefinition);
+		if (!string.IsNullOrWhiteSpace(missionDefinition.StoryEventId) &&
+		    outcome != Enums.MissionStatus.None)
+		{
+			StoryManager.Instance?.RecordStoryMissionOutcome(
+				missionDefinition.StoryEventId,
+				missionDefinition.cellIndex,
+				outcome);
+		}
 		if (missionDefinition.alienOperationId >= 0 && outcome != Enums.MissionStatus.None)
 			GlobeAIManager.Instance?.ResolveOperation(
 				missionDefinition.alienOperationId,
@@ -784,6 +993,18 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 			int alienOperationId = mDefData.ContainsKey("alienOperationId")
 				? mDefData["alienOperationId"].AsInt32()
 				: -1;
+			string storyEventId = mDefData.ContainsKey("storyEventId")
+				? mDefData["storyEventId"].AsString()
+				: string.Empty;
+			bool allowsLocalResponse =
+				mDefData.ContainsKey("allowsLocalResponse") &&
+				mDefData["allowsLocalResponse"].AsBool();
+			bool isExclusiveStoryChoice =
+				mDefData.ContainsKey("isExclusiveStoryChoice") &&
+				mDefData["isExclusiveStoryChoice"].AsBool();
+			int localResponderCount = mDefData.ContainsKey("localResponderCount")
+				? Math.Max(1, mDefData["localResponderCount"].AsInt32())
+				: 3;
             Craft onRouteCraft = null;
             if (mDefData.ContainsKey("onRouteCraft"))
             {
@@ -818,7 +1039,11 @@ public partial class GlobeMissionManager : Manager<GlobeMissionManager>
 					null,
 					status,
 					onRouteCraft,
-					alienOperationId);
+					alienOperationId,
+					storyEventId,
+					allowsLocalResponse,
+					isExclusiveStoryChoice,
+					localResponderCount);
 				missionDefinition.RestoreTimeoutState(timeoutTime, timeLeft);
 				missionDefinition.RestoreBattleResult(mDefData);
 				_activeMissions.Add(cellIdx, missionDefinition);

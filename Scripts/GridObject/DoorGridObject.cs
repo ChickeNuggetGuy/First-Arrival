@@ -89,33 +89,34 @@ public partial class DoorGridObject : GridObject, IInteractableGridobject
     {
         if (!_initialized) return;
 
+        GridSystem gridSystem = GridSystem.Instance;
+        if (gridSystem == null) return;
+
         isOpen = !isOpen;
         UpdateVisuals();
-        
 
         foreach (var doorCell in _doorCells)
         {
-            var oldState = doorCell.state;
-            var oldConnections = GridSystem.Instance.GetConnections(doorCell.GridCoordinates);
-
-            Enums.GridCellState newState;
-            if (isOpen)
-                newState = oldState & ~Enums.GridCellState.Obstructed;
-            else
-                newState = oldState | Enums.GridCellState.Obstructed;
+            Enums.GridCellState newState = isOpen
+                ? doorCell.state & ~Enums.GridCellState.Obstructed
+                : doorCell.state | Enums.GridCellState.Obstructed;
 
             doorCell.ModifyOriginalState(newState);
-            doorCell.SetState(newState);
+            doorCell.SetStateWithoutConnectionUpdate(newState);
+        }
 
-            var newConnections = GridSystem.Instance.GetConnections(doorCell.GridCoordinates);
+        // A multi-cell door must transition atomically. Rebuilding after each
+        // individual cell exposes a partly open door to the symmetric graph
+        // updater and can leave an orientation-dependent seam behind.
+        gridSystem.UpdateConnectionsForCells(_doorCells);
 
-            if (!isOpen && newConnections.Count > 0)
+        if (!isOpen)
+        {
+            foreach (var doorCell in _doorCells)
             {
-                GD.PrintErr($"  ERROR: Closed door still has {newConnections.Count} connections!");
-                foreach (var conn in newConnections)
-                {
-                    GD.PrintErr($"    Connected to: {conn}");
-                }
+                var connections = gridSystem.GetConnections(doorCell.GridCoordinates);
+                if (connections.Count > 0)
+                    GD.PrintErr($"Closed door cell {doorCell.GridCoordinates} still has {connections.Count} connections.");
             }
         }
 

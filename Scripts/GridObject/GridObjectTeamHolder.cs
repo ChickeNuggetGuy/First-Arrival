@@ -15,7 +15,7 @@ public partial class GridObjectTeamHolder : Node
     [Export] private Node _activeUnitsHolder;
     [Export] private Node _inactiveUnitsHolder;
 
-    [Export] public PackedScene unitPrefab;
+    [Export] public Array<PackedScene> unitPrefabs;
     public int VisibilityMinX { get; private set; }
     public int VisibilityMinY { get; private set; }
     public int VisibilityMinZ { get; private set; }
@@ -29,6 +29,12 @@ public partial class GridObjectTeamHolder : Node
     // Stores 2D slices for debug
     [Export] public Godot.Collections.Dictionary<int, ImageTexture> VisibilityTextures = new();
     private readonly Godot.Collections.Dictionary<int, Image> _visibilityImages = new();
+    private readonly Godot.Collections.Array<Image> _visibilitySlices = new();
+    private readonly HashSet<int> _dirtyVisibilitySlices = new();
+    private readonly List<GridCell> _newlyVisibleCells = new();
+    private GridCell[][,] _visibilityGrid;
+    private bool _textureNeedsCreate;
+    private bool _textureUploadQueued;
     
     //used by visibility Shader
     public ImageTexture3D VisibilityTexture3D { get; private set; } = new ImageTexture3D();
@@ -48,6 +54,12 @@ public partial class GridObjectTeamHolder : Node
 
     public void Setup()
     {
+        foreach (var body in GetChildren().OfType<FirstArrival.Scripts.Inventory_System.UnitBodyItem>())
+            body.QueueFree();
+        _visibilityGrid = null;
+        TeamVisibleCells.Clear();
+        TeamNoLongerVisibleCells.Clear();
+        ExploredCells.Clear();
         GridObjects = new System.Collections.Generic.Dictionary<Enums.GridObjectState, List<GridObject>>()
         {
             { Enums.GridObjectState.Active, new List<GridObject>() },
@@ -90,11 +102,9 @@ public partial class GridObjectTeamHolder : Node
 
 		    if (!gridObject.TryGetGridObjectNode<GridObjectSight>(out var sight) || sight == null) continue;
 
-		    // Build the team texture from a fresh sight result for every active
-		    // viewer. A different unit may have moved or turned since its last
-		    // explicit refresh, and stale per-unit caches would otherwise let the
-		    // unit that just changed overwrite the team's combined visibility.
-		    sight.CalculateSightArea();
+		    // The sight cache checks grid revision, position and heading, including
+		    // changes made outside actions. Repeated completion callbacks can reuse it.
+		    sight.EnsureUpToDate();
 
 		    foreach (var cell in sight.VisibleCells)
 		    {
@@ -107,120 +117,144 @@ public partial class GridObjectTeamHolder : Node
 	    TeamNoLongerVisibleCells.UnionWith(TeamVisibleCells);
 	    TeamNoLongerVisibleCells.ExceptWith(newTeamVisible);
 
+        _newlyVisibleCells.Clear();
+        foreach (var cell in newTeamVisible)
+            if (!TeamVisibleCells.Contains(cell)) _newlyVisibleCells.Add(cell);
+
 	    TeamVisibleCells.Clear();
 	    TeamVisibleCells.UnionWith(newTeamVisible);
 	    ExploredCells.UnionWith(TeamVisibleCells);
         
-        // GD.Print($"UpdateVisibility: Team {Team}, ActiveUnits: {gridObjects.Count}, VisibleCells: {TeamVisibleCells.Count}");
-
-	    UpdateVisibilityTextures();
-
-        // Pass Team and Texture to the manager
-	    EmitSignal(SignalName.VisibilityChanged, (int)Team, VisibilityTexture3D);
-    }
-
-    /// <summary>
-    /// Generates Image slices and constructs the ImageTexture3D.
-    /// </summary>
-    private void UpdateVisibilityTextures()
-    {
-        var allCells = GridSystem.Instance.AllGridCells;
-        if (allCells == null || !allCells.Any())
+        // Gameplay fog must be current before the next action or enemy check.
+        // Only the GPU upload is deferred, combining instant steps in one frame.
+        bool initialized = EnsureVisibilityImages();
+        if (!initialized)
         {
-            GD.PrintErr("UpdateVisibilityTextures: No cells found!");
-            return;
+            foreach (var cell in TeamNoLongerVisibleCells)
+                SetCellVisibility(cell, false);
+            foreach (var cell in _newlyVisibleCells)
+                SetCellVisibility(cell, true);
         }
 
-        int minX = allCells.Min(c => c.GridCoordinates.X);
-        int maxX = allCells.Max(c => c.GridCoordinates.X);
-        int minZ = allCells.Min(c => c.GridCoordinates.Z);
-        int maxZ = allCells.Max(c => c.GridCoordinates.Z);
-        
-        // Calculate Y bounds dynamically to ensure we cover all grid layers
-        int minY = allCells.Min(c => c.GridCoordinates.Y);
-        int maxY = allCells.Max(c => c.GridCoordinates.Y);
+        if (initialized || _dirtyVisibilitySlices.Count > 0)
+            QueueVisibilityTextureUpload();
+    }
 
+    private bool EnsureVisibilityImages()
+    {
+        var grid = GridSystem.Instance?.GridCells;
+        if (grid == null || ReferenceEquals(_visibilityGrid, grid)) return false;
+        var allCells = GridSystem.Instance.AllGridCells;
+        if (allCells == null || allCells.Length == 0) return false;
+
+        int minX = int.MaxValue, minY = int.MaxValue, minZ = int.MaxValue;
+        int maxX = int.MinValue, maxY = int.MinValue, maxZ = int.MinValue;
+        foreach (var cell in allCells)
+        {
+            if (cell == null) continue;
+            var coords = cell.GridCoordinates;
+            minX = System.Math.Min(minX, coords.X);
+            minY = System.Math.Min(minY, coords.Y);
+            minZ = System.Math.Min(minZ, coords.Z);
+            maxX = System.Math.Max(maxX, coords.X);
+            maxY = System.Math.Max(maxY, coords.Y);
+            maxZ = System.Math.Max(maxZ, coords.Z);
+        }
+        if (minX == int.MaxValue) return false;
+
+        _visibilityGrid = grid;
         VisibilityMinX = minX;
         VisibilityMinY = minY;
         VisibilityMinZ = minZ;
         VisibilityWidth = maxX - minX + 1;
-        VisibilityHeight = maxZ - minZ + 1; 
+        VisibilityHeight = maxZ - minZ + 1;
         VisibilityDepth = maxY - minY + 1;
-        
-        //  data for 3D Texture
-        Godot.Collections.Array<Image> allSlices = new Godot.Collections.Array<Image>();
-
-        VisibilityTexturesForDebug ??= new Godot.Collections.Array<ImageTexture>();
+        _visibilityImages.Clear();
+        _visibilitySlices.Clear();
+        VisibilityTextures.Clear();
         VisibilityTexturesForDebug.Clear();
+        _dirtyVisibilitySlices.Clear();
 
-        // Iterate through all Y levels defined by the map
-        for (int i = 0; i < VisibilityDepth; i++)
+        for (int y = 0; y < VisibilityDepth; y++)
         {
-            int y = minY + i;
-            Image image;
-            
-            // Check cache (using relative index i for cache key to keep 0-based index for texture array)
-            if (!_visibilityImages.TryGetValue(i, out image) ||
-                image.GetWidth() != VisibilityWidth || image.GetHeight() != VisibilityHeight)
-            {
-                image = Image.Create(VisibilityWidth, VisibilityHeight, false, Image.Format.Rgba8);
-                _visibilityImages[i] = image;
-                VisibilityTextures[i] = ImageTexture.CreateFromImage(image);
-            }
-
-            // Fill black 
+            var image = Image.Create(VisibilityWidth, VisibilityHeight, false, Image.Format.Rgba8);
             image.Fill(Colors.Black);
-
-            // Paint pixels on this slice
-            for (int x = 0; x < VisibilityWidth; x++)
-            {
-                for (int z = 0; z < VisibilityHeight; z++)
-                {
-                    var gridCoords = new Vector3I(x + minX, y, z + minZ);
-                    GridCell cell = GridSystem.Instance.GetGridCell(gridCoords);
-
-                    Color pixelColor = Colors.Black;
-                    
-                    if (cell != GridCell.Null)
-                    {
-                        bool isVisible = TeamVisibleCells.Contains(cell);
-                        bool isExplored = ExploredCells.Contains(cell);
-
-                        if (isVisible)
-                            pixelColor = Colors.White;
-                        else if (isExplored)
-                            pixelColor = new Color(0.5f, 0.5f, 0.5f);
-
-                        // Logic to update Cell state for gameplay logic
-                        if (Team == Enums.UnitTeam.Player)
-                        {
-                            Enums.FogState newState = isVisible ? Enums.FogState.Visible :
-                                                      isExplored ? Enums.FogState.PreviouslySeen :
-                                                      Enums.FogState.Unseen;
-                            
-                            if(cell.fogState != newState)
-                            {
-                                cell.SetFogState(newState);
-                            }
-                        }
-                    }
-
-                    if (pixelColor != Colors.Black)
-                        image.SetPixel(x, z, pixelColor);
-                }
-            }
-
-            // Update debug texture
-            var tex = VisibilityTextures[i];
-            tex.Update(image);
-            VisibilityTexturesForDebug.Add(tex);
-            
-            // Add to stack for 3D Texture
-            allSlices.Add(image);
+            _visibilityImages[y] = image;
+            _visibilitySlices.Add(image);
+            var texture = ImageTexture.CreateFromImage(image);
+            VisibilityTextures[y] = texture;
+            VisibilityTexturesForDebug.Add(texture);
+            _dirtyVisibilitySlices.Add(y);
         }
 
-        //Create or Update ImageTexture3D
-        VisibilityTexture3D.Create(Image.Format.Rgba8, VisibilityWidth, VisibilityHeight, VisibilityDepth, false, allSlices);
+        // Initialize all cells once per grid; subsequent updates touch only the
+        // visible area and cells that have just left it, never the map volume.
+        foreach (var cell in allCells)
+        {
+            if (cell == null) continue;
+            bool visible = TeamVisibleCells.Contains(cell);
+            bool explored = ExploredCells.Contains(cell);
+            if (visible || explored)
+                SetVisibilityPixel(cell, visible ? Colors.White : new Color(0.5f, 0.5f, 0.5f));
+            SetGameplayFog(cell, visible, explored);
+        }
+        _textureNeedsCreate = true;
+        return true;
+    }
+
+    private void SetCellVisibility(GridCell cell, bool visible)
+    {
+        SetVisibilityPixel(cell, visible ? Colors.White : new Color(0.5f, 0.5f, 0.5f));
+        SetGameplayFog(cell, visible, true);
+    }
+
+    private void SetGameplayFog(GridCell cell, bool visible, bool explored)
+    {
+        if (Team != Enums.UnitTeam.Player) return;
+        var state = visible ? Enums.FogState.Visible :
+            explored ? Enums.FogState.PreviouslySeen : Enums.FogState.Unseen;
+        if (cell.fogState != state) cell.SetFogState(state);
+    }
+
+    private void SetVisibilityPixel(GridCell cell, Color color)
+    {
+        var coords = cell.GridCoordinates;
+        int y = coords.Y - VisibilityMinY;
+        int x = coords.X - VisibilityMinX;
+        int z = coords.Z - VisibilityMinZ;
+        if (!_visibilityImages.TryGetValue(y, out var image) ||
+            x < 0 || z < 0 || x >= VisibilityWidth || z >= VisibilityHeight) return;
+        if (image.GetPixel(x, z) == color) return;
+        image.SetPixel(x, z, color);
+        _dirtyVisibilitySlices.Add(y);
+    }
+
+    private void QueueVisibilityTextureUpload()
+    {
+        if (_textureUploadQueued) return;
+        _textureUploadQueued = true;
+        Callable.From(FlushVisibilityTexture).CallDeferred();
+    }
+
+    private void FlushVisibilityTexture()
+    {
+        _textureUploadQueued = false;
+        if (_dirtyVisibilitySlices.Count == 0) return;
+        foreach (int y in _dirtyVisibilitySlices)
+            VisibilityTextures[y].Update(_visibilityImages[y]);
+
+        if (_textureNeedsCreate)
+        {
+            VisibilityTexture3D.Create(Image.Format.Rgba8, VisibilityWidth,
+                VisibilityHeight, VisibilityDepth, false, _visibilitySlices);
+            _textureNeedsCreate = false;
+        }
+        else
+        {
+            VisibilityTexture3D.Update(_visibilitySlices);
+        }
+        _dirtyVisibilitySlices.Clear();
+        EmitSignal(SignalName.VisibilityChanged, (int)Team, VisibilityTexture3D);
     }
 
     public List<GridCell> GetVisibleGridCells() => TeamVisibleCells.ToList();
@@ -232,8 +266,9 @@ public partial class GridObjectTeamHolder : Node
         {
             if (sightSource.TryGetGridObjectNode<GridObjectSight>(out var sight))
             {
-                sight.MarkDirty();
-                sight.EnsureUpToDate();
+                // A manual refresh may follow an external physics change. Action
+                // refreshes use the revision-aware cache checked for every viewer.
+                if (actionCompleted == null) sight.MarkDirty();
             }
         }
         UpdateVisibility();
@@ -254,6 +289,7 @@ public partial class GridObjectTeamHolder : Node
 
     public void SetSelectedGridObject(GridObject gridObject)
     {
+        if (gridObject != null && !gridObject.CanAct) return;
         CurrentGridObject = gridObject;
         EmitSignal(SignalName.SelectedGridObjectChanged, CurrentGridObject);
     }
@@ -289,6 +325,11 @@ public partial class GridObjectTeamHolder : Node
 
     private void HealthOnCurrentValueMin(int value, GridObject gridObject)
     {
+        if (gridObject.Condition != null)
+        {
+            gridObject.Condition.Evaluate();
+            return;
+        }
         if (gridObject == CurrentGridObject) GetNextGridObject();
         
         GridObjects[Enums.GridObjectState.Active].Remove(gridObject);
@@ -370,6 +411,7 @@ public partial class GridObjectTeamHolder : Node
                     await newUnit.LoadAsync(unitData);
                     GridObjects[Enums.GridObjectState.Inactive].Add(newUnit);
                     newUnit.SetIsActive(false); 
+                    newUnit.Hide();
                 }
             }
         }

@@ -14,6 +14,7 @@ public partial class GridStatBarUI : UIElement
 
 	private GridObjectStat _stat;
 	private GridObjectStat _healthStat;
+	private GridObjectStat _stunStat;
 	private GridObjectStatHolder _statHolder;
 	private StatProgressBarOverlay _overlay;
 	private int _previewCost;
@@ -45,6 +46,8 @@ public partial class GridStatBarUI : UIElement
 		_stat = gridObjectStat;
 		_statHolder.TryGetStat(Enums.Stat.Health, out _healthStat);
 		_stat.CurrentValueChanged += StatOnCurrentValueChanged;
+		if (_stat.Stat == Enums.Stat.Health && _statHolder.TryGetStat(Enums.Stat.Stun, out _stunStat))
+			_stunStat.CurrentValueChanged += StatOnCurrentValueChanged;
 		if (_healthStat != null)
 		{
 			_healthStat.FatalWoundsChanged += HealthOnFatalWoundsChanged;
@@ -94,6 +97,8 @@ public partial class GridStatBarUI : UIElement
 		{
 			_healthStat.FatalWoundsChanged -= HealthOnFatalWoundsChanged;
 		}
+		if (_stunStat != null) _stunStat.CurrentValueChanged -= StatOnCurrentValueChanged;
+		_stunStat = null;
 		_stat = null;
 		_healthStat = null;
 		_statHolder = null;

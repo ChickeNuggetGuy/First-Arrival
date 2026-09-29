@@ -29,6 +29,17 @@ public partial class GridSystem : Manager<GridSystem>
 	public GridCell[][,] GridCells { get; private set; }
 	private HashSet<CellConnection> _cellConnections;
 
+	/// <summary>
+	/// Changes whenever cell occupancy or navigation state changes. Path queries
+	/// use this to safely reuse a reachability search while the grid is unchanged.
+	/// </summary>
+	public ulong NavigationRevision { get; private set; }
+
+	public void MarkNavigationChanged()
+	{
+		NavigationRevision++;
+	}
+
 	public GridCell[] AllGridCells
 	{
 		get
@@ -102,7 +113,7 @@ public partial class GridSystem : Manager<GridSystem>
 	#region Functions
 	public Vector3I GetGridSize()
 	{
-		int chunkSize = MeshTerrainGenerator.Instance.chunkSize;
+		int chunkSize = MeshTerrainGenerator.Instance.ActiveChunkSize;
 		return new Vector3I(
 			GameManager.Instance.mapSize.X * chunkSize,
 			Mathf.RoundToInt(20 * _cellSize.Y),
@@ -859,6 +870,40 @@ public partial class GridSystem : Manager<GridSystem>
 		}
 	}
 
+	/// <summary>
+	/// Rebuilds a group of changed cells and their shared neighborhood from one
+	/// final state snapshot. This is used by multi-cell obstacles such as doors,
+	/// where rebuilding between individual state changes can leave stale seams.
+	/// </summary>
+	public void UpdateConnectionsForCells(IEnumerable<GridCell> changedCells)
+	{
+		if (changedCells == null || GridCells == null)
+			return;
+
+		var cellsToUpdate = new HashSet<Vector3I>();
+		foreach (GridCell changedCell in changedCells)
+		{
+			if (changedCell == null) continue;
+
+			Vector3I center = changedCell.GridCoordinates;
+			for (int yOffset = -1; yOffset <= 1; yOffset++)
+			{
+				for (int xOffset = -1; xOffset <= 1; xOffset++)
+				{
+					for (int zOffset = -1; zOffset <= 1; zOffset++)
+					{
+						Vector3I coords = center + new Vector3I(xOffset, yOffset, zOffset);
+						if (GetGridCell(coords) != null)
+							cellsToUpdate.Add(coords);
+					}
+				}
+			}
+		}
+
+		foreach (Vector3I coords in cellsToUpdate)
+			UpdateGridCell(coords);
+	}
+
 	private async Task SetupCellConnections()
 	{
 		BuildAllConnections();
@@ -1532,7 +1577,10 @@ public partial class GridSystem : Manager<GridSystem>
 		if (rootCell == null)
 			return occupiedCells;
 
-		var worldCoords = positionData.Shape.GetWorldCoordinates(rootCell.GridCoordinates);
+		var worldCoords = positionData.GetWorldCoordinatesAt(
+			rootCell.GridCoordinates,
+			positionData.Direction
+		);
 
 		foreach (var coord in worldCoords)
 		{

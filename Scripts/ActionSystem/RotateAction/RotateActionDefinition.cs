@@ -36,6 +36,20 @@ public partial class RotateActionDefinition : ActionDefinition
 			startingGridCell,
 			targetGridCell
 		);
+		if (targetDirection == Enums.Direction.None)
+		{
+			reason = "Target does not define a facing direction";
+			return false;
+		}
+
+		if (!gridObject.GridPositionData.CanOccupyAt(
+			    gridObject.GridPositionData.AnchorCell,
+			    targetDirection,
+			    out string footprintReason))
+		{
+			reason = $"Cannot rotate here: {footprintReason}";
+			return false;
+		}
 
 		// GridPositionData is the authoritative gameplay facing. The visual mesh
 		// is animated separately and may be a child of the GridObject.

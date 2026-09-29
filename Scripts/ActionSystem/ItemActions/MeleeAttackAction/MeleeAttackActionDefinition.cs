@@ -1,7 +1,6 @@
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
-
 using FirstArrival.Scripts.Managers;
 using FirstArrival.Scripts.Utility;
 
@@ -9,13 +8,18 @@ using FirstArrival.Scripts.Utility;
 public partial class MeleeAttackActionDefinition
 	: ItemActionDefinition
 {
+	protected override bool TargetsGridObjects => true;
+
 	[Export] public int damage;
 	[Export] public bool canCauseFatalWounds = true;
+	[Export] public bool dealsStunDamage = false;
 
-	[ExportGroup("Action Cost")]
-	[Export(PropertyHint.Range, "1,100,1")] public int timeUnitCost = 24;
-	[Export(PropertyHint.Range, "0,100,1")] public int staminaCost = 16;
-	
+	[ExportGroup("Action Cost")] [Export(PropertyHint.Range, "1,100,1")]
+	public int timeUnitCost = 24;
+
+	[Export(PropertyHint.Range, "0,100,1")]
+	public int staminaCost = 16;
+
 	public override ActionBase InstantiateAction(
 		GridObject parent,
 		GridCell startGridCell,
@@ -52,49 +56,40 @@ public partial class MeleeAttackActionDefinition
 
 		if (!targetGridCell.HasGridObject())
 		{
-
 			reason = "No grid object found";
 			return false;
 		}
 
-		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
-		{
-			if(gridObject == null) return false;
-			if(!gridObject.IsActive) return false;
-			if(gridObject == parentGridObject) return false;
-			if(gridObject.Team == parentGridObject.Team) return false;
-			return true;
-		});
+		GridObject targetGridObject = GetTarget(gridObject, targetGridCell);
 
 		if (targetGridObject == null)
 		{
 			reason = "Target grid object is null, failed all conditions";
 			return false;
 		}
-		
 
-		// Use every geometric neighbor for the adjacency check. An occupied cell
-		// is not walkable, so asking only for walkable neighbors makes an attacker
-		// that is already beside the target appear non-adjacent on its next hit.
-		if (!GridSystem.Instance.TryGetGridCellNeighbors(targetGridCell, false, false, out var neighbors))
-		{
-			reason = "Could not find neighbors for target gridcell";
-			return false;
-		}
 
-		// Already adjacent
-		if (neighbors.Any(gridCell => gridCell.GridCoordinates == startingGridCell.GridCoordinates))
+		var targetCells = new List<GridCell> { targetGridCell };
+		GridCell actionAnchor = gridObject.GridPositionData.AnchorCell
+		                        ?? startingGridCell;
+		bool canAttackFromCurrentAnchor = GridFootprintUtility
+			.TryGetAdjacentFacingTarget(
+				gridObject,
+				actionAnchor,
+				targetCells,
+				out GridCell facingTarget,
+				out _
+			);
+
+		if (canAttackFromCurrentAnchor)
 		{
-			// Face the target if needed
-			if (
-				!AddRotateCostsIfNeeded(
-					gridObject,
-					startingGridCell,
-					targetGridCell,
-					costs,
-					out var rotateReason
-				)
-			)
+			if (!AddRotateCostsIfNeeded(
+				    gridObject,
+				    actionAnchor,
+				    facingTarget,
+				    costs,
+				    out string rotateReason,
+				    actionAnchor))
 			{
 				reason = rotateReason;
 				return false;
@@ -102,58 +97,62 @@ public partial class MeleeAttackActionDefinition
 		}
 		else
 		{
-			// Need to move to an adjacent tile first
-			var walkableNeighbors = neighbors.Where(n =>
-				n.IsWalkable
-			).ToList();
-
-			if (walkableNeighbors.Count == 0)
-			{
-				reason = "No adjacent walkable cell near target";
-				return false;
-			}
-
-			var targetAdjacent = walkableNeighbors.OrderBy(n =>
-				startingGridCell.GridCoordinates.DistanceSquaredTo(n.GridCoordinates)
-			).First();
-
-			var moveAction =
-				gridObjectActions.ActionDefinitions.FirstOrDefault(a => a is MoveActionDefinition)
-					as MoveActionDefinition;
-
+			var moveAction = gridObjectActions.ActionDefinitions
+					.FirstOrDefault(action => action is MoveActionDefinition)
+				as MoveActionDefinition;
 			if (moveAction == null)
 			{
-				reason = "unit cannot move when it is needed";
+				reason = "Unit cannot move when movement is required";
 				return false;
 			}
 
-			if (
-				!moveAction.TryBuildCostsOnly(
-					gridObject,
-					startingGridCell,
-					targetAdjacent,
-					out var moveCosts,
-					out var moveReason
-				)
-			)
+			bool foundDestination = false;
+			string lastMoveReason = "No adjacent anchor fits the unit footprint";
+			foreach (GridCell candidate in GridFootprintUtility
+				         .GetAdjacentAnchorCandidates(gridObject, targetCells))
 			{
-				reason = $"move Action validation failed: {moveReason}";
-				return false;
+				if (!moveAction.TryBuildCostsOnly(
+					    gridObject,
+					    startingGridCell,
+					    candidate,
+					    out var moveCosts,
+					    out lastMoveReason))
+					continue;
+
+				if (!GridFootprintUtility.TryGetAdjacentFacingTarget(
+					    gridObject,
+					    candidate,
+					    targetCells,
+					    out GridCell candidateFacingTarget,
+					    out _))
+					continue;
+
+				var combinedCosts = new Godot.Collections.Dictionary<Enums.Stat, int>();
+				AddCosts(combinedCosts, moveCosts);
+				Enums.Direction arrivalDirection = moveAction.path?.Count >= 2
+					? RotationHelperFunctions.GetDirectionBetweenCells(
+						moveAction.path[^2],
+						moveAction.path[^1]
+					)
+					: gridObject.GridPositionData.Direction;
+				if (!AddRotateCostsIfNeeded(
+					    gridObject,
+					    candidate,
+					    candidateFacingTarget,
+					    combinedCosts,
+					    out _,
+					    candidate,
+					    arrivalDirection))
+					continue;
+
+				AddCosts(costs, combinedCosts);
+				foundDestination = true;
+				break;
 			}
 
-			AddCosts(costs, moveCosts);
-
-			if (
-				!AddRotateCostsIfNeeded(
-					gridObject,
-					targetAdjacent,
-					targetGridCell,
-					costs,
-					out var rotateReason2
-				)
-			)
+			if (!foundDestination)
 			{
-				reason = rotateReason2;
+				reason = $"Cannot reach melee range: {lastMoveReason}";
 				return false;
 			}
 		}
@@ -172,58 +171,34 @@ public partial class MeleeAttackActionDefinition
 	{
 		return parentGridObject.TeamHolder.GetVisibleGridCells().Where(cell =>
 		{
-			if(!cell.HasGridObject())return false;
+			if (!cell.HasGridObject()) return false;
 			return true;
 		}).ToList();
 	}
 
+	// Grid cells also contain terrain metadata. Validation, setup and execution
+	// must resolve the same damageable occupant rather than the first object.
+	public GridObject GetTarget(GridObject actor, GridCell cell)
+	{
+		if (actor == null || cell?.gridObjects == null) return null;
+		return cell.gridObjects.Where(candidate =>
+				candidate != null && candidate is not GridCellStateOverride &&
+				candidate.IsActive && candidate != actor && candidate.Team != actor.Team &&
+				candidate.TryGetGridObjectNode<GridObjectStatHolder>(out var stats) &&
+				stats.TryGetStat(Enums.Stat.Health, out var health) && health.CurrentValue > 0 &&
+				(!dealsStunDamage || candidate.Condition?.Stun != null))
+			.OrderBy(candidate => candidate.scenery)
+			.FirstOrDefault();
+	}
+
 	public override (GridCell gridCell, int score) GetAIActionScore(GridCell targetGridCell)
 	{
-		GD.Print("Valid:" + ValidGridCells.Count.ToString());
-		if(!targetGridCell.HasGridObject())
-		{
-			
-			return (targetGridCell, 0);
-		}
-		GridObject targetGridObject = targetGridCell.gridObjects.FirstOrDefault(gridObject =>
-		{
-			if(gridObject == null)
-			{
-				GD.Print("GetValidGridCells: Target grid object is null");
-				return false;
-			}
-			if(!gridObject.IsActive)
-			{
-				GD.Print("GetValidGridCells: Target grid object is not active ");
-				return false;
-			}
-			if(gridObject == parentGridObject)
-			{
-				GD.Print("GetValidGridCells: Target grid object is the same as parent");
-				return false;
-			}
-			if(gridObject.Team.HasFlag(parentGridObject.Team))
-			{
-				GD.Print("GetValidGridCells: Target grid object is on same team");
-				return false;
-			}
-			return true;
-		});
-
-		if (targetGridObject == null)
-		{
-			GD.Print("GetValidGridCells: Target grid object is null, failed all conditions");
-			return (targetGridCell, 0);
-		}
-		else
-		{
-			return (targetGridCell, 100);
-		}
+		return (targetGridCell, GetTarget(parentGridObject, targetGridCell) == null ? 0 : 100);
 	}
-	
-	
+
+
 	public override bool GetIsUIAction() => true;
-	public override string GetActionName() => "Melee";
+	public override string GetActionName() => dealsStunDamage ? "Stun" : "Melee";
 	public override MouseButton GetActionInput() => MouseButton.Left;
 	public override bool GetIsAlwaysActive() => false;
 	public override bool GetRemainSelected() => true;

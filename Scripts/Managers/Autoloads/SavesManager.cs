@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using FirstArrival.Scripts.Utility;
 using Godot.Collections;
@@ -37,6 +38,12 @@ public partial class SavesManager : Manager<SavesManager>
     /// </summary>
     public Godot.Collections.Dictionary<string, Variant> PackageFullState()
     {
+        // Cursor inventories are transient UI state. Return a carried body to
+        // its source before serializing the world and unit inventories.
+        var held = UIManager.Instance?.mouseHeldInventoryUI;
+        if (held?.InventoryGrid?.UniqueItems.Any(entry => entry.item is
+                FirstArrival.Scripts.Inventory_System.UnitBodyItem) == true && !held.TryReturnHeldItem())
+            throw new System.InvalidOperationException("Place the held body before saving.");
         var gm = GameManager.Instance;
         if (gm == null) return new Godot.Collections.Dictionary<string, Variant>();
 

@@ -15,7 +15,16 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	#region Variables
 
 	[Export] private bool generateTerrainMesh = true;
-	[Export] public int chunkSize { get; set; }
+	// Chunk dimensions are measured in grid cells; cellSize.X supplies world spacing.
+	[Export(PropertyHint.Range, "1,256,1,or_greater")]
+	public int chunkSize { get; set; } = 20;
+
+	[Export(PropertyHint.Range, "1,256,1,or_greater")]
+	public int urbanChunkSize { get; set; } = 40;
+
+	// mapSize remains a count of chunks, using the selected map type's dimensions.
+	public int ActiveChunkSize => Mathf.Max(1,
+		mapType == Enums.ChunkType.Urban ? urbanChunkSize : chunkSize);
 
 	[Export] public Vector2 cellSize { get; set; }
 
@@ -100,6 +109,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		new();
 
 	private Array<ChunkData> chunkTypes;
+	private string[] loadedUrbanChunkPaths;
 	private bool[,] lockedVertices;
 	private readonly RandomNumberGenerator rng = new();
 	private readonly List<StructurePlacement> structurePlacements = new();
@@ -124,6 +134,13 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	protected override async Task _Setup(bool loadingData)
 	{
+		// Campaign missions are selected in the globe scene and carried across the
+		// scene transition by GameManager. Resolve the battle map before any chunk
+		// prefabs or terrain data are prepared.
+		MissionBase currentMission = GameManager.Instance?.currentMission?.mission;
+		if (currentMission != null)
+			mapType = GetMapTypeForMission(currentMission.MissionType, mapType);
+
 		switch (mapType)
 		{
 			case Enums.ChunkType.Grassland:
@@ -154,6 +171,18 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		await Task.CompletedTask;
 	}
 
+	/// <summary>
+	/// Maps strategic mission types to their battle terrain. Mission types without
+	/// a special battlefield keep the map type configured on the battle scene.
+	/// </summary>
+	public static Enums.ChunkType GetMapTypeForMission(
+		Enums.MissionType missionType,
+		Enums.ChunkType fallbackMapType) => missionType switch
+	{
+		Enums.MissionType.CityDefense => Enums.ChunkType.Urban,
+		_ => fallbackMapType
+	};
+
 	protected override async Task _Execute(bool loadingData)
 	{
 		GameManager gameManager = GameManager.Instance;
@@ -178,7 +207,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				var node = cData?.GetChunkNode();
 				if (node != null)
 				{
-					float chunkWorldSize = chunkSize * cellSize.X;
+					float chunkWorldSize = ActiveChunkSize * cellSize.X;
 					float chunkBaseHeight = cData.chunkType == ChunkData.ChunkType.ManMade
 						? GetManmadeBaseHeight()
 						: 0f;
@@ -273,7 +302,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 					cData.chunk.Initialize(
 						chunkX,
 						chunkZ,
-						chunkSize,
+						ActiveChunkSize,
 						terrainHeights,
 						cellSize.X,
 						cData
@@ -291,10 +320,21 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				}
 			}
 
-			SpawnGeneratedStructures();
 			GD.Print($"MeshTerrainGenerator: chunks built. {GetMapSize()}");
 		}
+		else
+		{
+			// Handmade chunks must be registered with physics before sampling a landing site.
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			if (!HasLoadedData)
+				GenerateStructurePlacements();
+			else
+				RebuildStructureMasksFromPlacements();
+		}
 
+		// Ships provide the player spawn overrides on every map type.
+		SpawnGeneratedStructures();
 		await Task.CompletedTask;
 	}
 
@@ -418,7 +458,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		if (chunkTypes.Count != count)
 			chunkTypes.Resize(count);
 
-		if (!TryGetPrefabListForMapType(mapType, out Array prefabs))
+		bool restoreUrbanChunks = loadedUrbanChunkPaths?.Length == count;
+		if (!TryGetPrefabListForMapType(mapType, out Array prefabs) && !restoreUrbanChunks)
 		{
 			GD.PrintErr(
 				$"MeshTerrainGenerator: No prefabs registered for {mapType}. "
@@ -449,8 +490,9 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			{
 				int idx = x + z * chunksX;
 
-				int pick = rng.RandiRange(0, prefabs.Count - 1);
-				string path = ResolvePrefabVariantToPath(prefabs[pick]);
+				string path = restoreUrbanChunks
+					? loadedUrbanChunkPaths[idx]
+					: ResolvePrefabVariantToPath(prefabs[rng.RandiRange(0, prefabs.Count - 1)]);
 
 				chunkTypes[idx] = new ChunkData
 				{
@@ -517,8 +559,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	{
 		GameManager gameManager = GameManager.Instance;
 
-		int vertsX = (gameManager.mapSize.X * chunkSize) + 1;
-		int vertsZ = (gameManager.mapSize.Y * chunkSize) + 1;
+		int vertsX = (gameManager.mapSize.X * ActiveChunkSize) + 1;
+		int vertsZ = (gameManager.mapSize.Y * ActiveChunkSize) + 1;
 
 		terrainHeights = new Vector3[vertsX, vertsZ];
 		lockedVertices = new bool[vertsX, vertsZ];
@@ -539,7 +581,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		
 
 
-		float chunkWorldSize = chunkSize * cellSize.X;
+		float chunkWorldSize = ActiveChunkSize * cellSize.X;
 
 		for (int x = 0; x < vertsX; x++)
 		{
@@ -889,7 +931,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		grassExcludedCells.Clear();
 
 		if (
-			terrainHeights == null
+			(generateTerrainMesh && terrainHeights == null)
 			|| structureDefinitions == null
 			|| structureDefinitions.Length == 0
 		)
@@ -902,8 +944,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 				: rng.Randi();
 		var structureRng = new RandomNumberGenerator { Seed = resolvedSeed };
 
-		int mapCellsX = terrainHeights.GetLength(0) - 1;
-		int mapCellsZ = terrainHeights.GetLength(1) - 1;
+		int mapCellsX = GameManager.Instance.mapSize.X * ActiveChunkSize;
+		int mapCellsZ = GameManager.Instance.mapSize.Y * ActiveChunkSize;
 
 		for (int definitionIndex = 0; definitionIndex < structureDefinitions.Length; definitionIndex++)
 		{
@@ -943,9 +985,17 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 					? 1
 					: Mathf.Max(1, definition.AttemptsPerInstance);
 
+				int randomAttempts = attempts;
+				// A required landing site must not depend on luck when an open site exists.
+				if (!generateTerrainMesh && !usesFixedAnchor)
+					attempts += mapCellsX * mapCellsZ * (definition.AllowQuarterTurns ? 4 : 1);
+
 				for (int attempt = 0; attempt < attempts; attempt++)
 				{
-					int quarterTurns = definition.AllowQuarterTurns
+					int fallbackIndex = attempt - randomAttempts;
+					int quarterTurns = fallbackIndex >= 0
+						? fallbackIndex / (mapCellsX * mapCellsZ)
+						: definition.AllowQuarterTurns
 						? structureRng.RandiRange(0, 3)
 						: 0;
 					List<Vector2I> offsets =
@@ -966,6 +1016,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 					Vector2I anchor = usesFixedAnchor
 						? definition.FixedAnchorCell
+						: fallbackIndex >= 0
+							? new Vector2I(fallbackIndex % mapCellsX, (fallbackIndex / mapCellsX) % mapCellsZ)
 						: new Vector2I(
 							structureRng.RandiRange(minAnchorX, maxAnchorX),
 							structureRng.RandiRange(minAnchorZ, maxAnchorZ)
@@ -991,7 +1043,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 						continue;
 
 					if (
-						definition.Interaction
+						generateTerrainMesh && definition.Interaction
 						== TerrainStructureDefinition.TerrainInteraction.FlattenAndBlend
 					)
 					{
@@ -1001,7 +1053,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 							targetHeight
 						);
 					}
-					else
+					else if (generateTerrainMesh)
 					{
 						foreach (Vector2I vertex in footprintVertices)
 							lockedVertices[vertex.X, vertex.Y] = true;
@@ -1039,7 +1091,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			}
 		}
 
-		if (structurePlacements.Count == 0)
+		if (structurePlacements.Count == 0 || !generateTerrainMesh)
 			return;
 
 		ClampHeightsToMin(minHeightY, includeManMade: false);
@@ -1068,8 +1120,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		footprintVertices = new HashSet<Vector2I>();
 		targetHeight = 0f;
 
-		int mapCellsX = terrainHeights.GetLength(0) - 1;
-		int mapCellsZ = terrainHeights.GetLength(1) - 1;
+		int mapCellsX = GameManager.Instance.mapSize.X * ActiveChunkSize;
+		int mapCellsZ = GameManager.Instance.mapSize.Y * ActiveChunkSize;
 		int separation = Mathf.Max(0, definition.SeparationCells);
 
 		foreach (Vector2I offset in offsets)
@@ -1102,6 +1154,9 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			footprintVertices.Add(cell + Vector2I.One);
 		}
 
+		if (!generateTerrainMesh)
+			return TryEvaluateManmadeStructureSurface(definition, footprintCells, out targetHeight);
+
 		var sampledHeights = new List<float>(footprintVertices.Count);
 		float minHeight = float.PositiveInfinity;
 		float maxHeight = float.NegativeInfinity;
@@ -1130,6 +1185,49 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			: sampledHeights[middle];
 		targetHeight = QuantizeHeight(Mathf.Max(minHeightY, median));
 		return true;
+	}
+
+	private bool TryEvaluateManmadeStructureSurface(
+		TerrainStructureDefinition definition,
+		List<Vector2I> cells,
+		out float targetHeight)
+	{
+		targetHeight = 0f;
+		float minHeight = float.PositiveInfinity;
+		float maxHeight = float.NegativeInfinity;
+		var space = GetTree().Root.GetWorld3D().DirectSpaceState;
+		var query = new PhysicsRayQueryParameters3D
+		{
+			CollideWithBodies = true,
+			CollideWithAreas = false,
+			CollisionMask = manmadeRaycastMask == 0 ? uint.MaxValue : manmadeRaycastMask
+		};
+		// Inset corners catch holes and obstructions without sampling a neighbour's edge.
+		Vector2[] samples = { new(0.5f, 0.5f), new(0.05f, 0.05f), new(0.95f, 0.05f),
+			new(0.05f, 0.95f), new(0.95f, 0.95f) };
+		foreach (Vector2I cell in cells)
+		foreach (Vector2 sample in samples)
+		{
+			query.From = new Vector3((cell.X + sample.X) * cellSize.X,
+				manmadeRaycastHeight, (cell.Y + sample.Y) * cellSize.X);
+			query.To = query.From + Vector3.Down * manmadeRaycastLength;
+			var hit = space.IntersectRay(query);
+			if (hit.Count == 0 || hit["collider"].AsGodotObject() is not CollisionObject3D collider
+				|| (collider.CollisionLayer & PhysicsLayer.TERRAIN) == 0
+				|| hit["normal"].AsVector3().Y < 0.9f)
+				return false;
+
+			float height = hit["position"].AsVector3().Y;
+			minHeight = Mathf.Min(minHeight, height);
+			maxHeight = Mathf.Max(maxHeight, height);
+			// FlattenAndBlend cannot alter handmade meshes, so all city sites must fit.
+			if (maxHeight - minHeight > Mathf.Max(0f, definition.MaxHeightDifference))
+				return false;
+		}
+
+		// Use the real highest surface rather than quantizing into roads or sidewalks.
+		targetHeight = maxHeight;
+		return cells.Count > 0;
 	}
 
 	private void FlattenAndBlendStructureSite(
@@ -1196,8 +1294,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		IEnumerable<Vector2I> footprintCells
 	)
 	{
-		int mapCellsX = terrainHeights.GetLength(0) - 1;
-		int mapCellsZ = terrainHeights.GetLength(1) - 1;
+		int mapCellsX = GameManager.Instance.mapSize.X * ActiveChunkSize;
+		int mapCellsZ = GameManager.Instance.mapSize.Y * ActiveChunkSize;
 		int grassClearance = Mathf.Max(0, definition.GrassClearanceCells);
 
 		foreach (Vector2I cell in footprintCells)
@@ -1222,8 +1320,8 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	private bool IsManMadeCell(Vector2I cell)
 	{
-		int chunkX = cell.X / chunkSize;
-		int chunkZ = cell.Y / chunkSize;
+		int chunkX = cell.X / ActiveChunkSize;
+		int chunkZ = cell.Y / ActiveChunkSize;
 		if (
 			chunkX < 0
 			|| chunkZ < 0
@@ -1631,10 +1729,10 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			int cx = c.chunkCoordinates.X;
 			int cz = c.chunkCoordinates.Y;
 
-			int vx0 = cx * chunkSize;
-			int vz0 = cz * chunkSize;
-			int vx1 = vx0 + chunkSize;
-			int vz1 = vz0 + chunkSize;
+			int vx0 = cx * ActiveChunkSize;
+			int vz0 = cz * ActiveChunkSize;
+			int vx1 = vx0 + ActiveChunkSize;
+			int vz1 = vz0 + ActiveChunkSize;
 
 			manmadeChunks.Add((vx0, vz0, vx1, vz1));
 		}
@@ -1762,7 +1860,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		if (chunkTypes == null)
 			return false;
 
-		float chunkWorldSize = chunkSize * cellSize.X;
+		float chunkWorldSize = ActiveChunkSize * cellSize.X;
 		int chunkX = Mathf.FloorToInt(worldX / chunkWorldSize);
 		int chunkZ = Mathf.FloorToInt(worldZ / chunkWorldSize);
 
@@ -1860,7 +1958,13 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 	public override Godot.Collections.Dictionary<string, Variant> Save()
 	{
 		if (!generateTerrainMesh)
-			return new Godot.Collections.Dictionary<string, Variant>();
+		{
+			var cityData = SaveStructurePlacements();
+			cityData["MapType"] = (int)mapType;
+			cityData["UrbanChunkSize"] = urbanChunkSize;
+			cityData["UrbanChunkPaths"] = chunkTypes.Select(chunk => chunk.chunkGOIndex).ToArray();
+			return cityData;
+		}
 
 		if (terrainHeights == null || lockedVertices == null)
 		{
@@ -1884,6 +1988,16 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			}
 		}
 
+		var data = SaveStructurePlacements();
+		data["GridWidth"] = width;
+		data["GridDepth"] = depth;
+		data["Heights"] = flatHeights;
+		data["LockedVertices"] = flatLocked;
+		return data;
+	}
+
+	private Godot.Collections.Dictionary<string, Variant> SaveStructurePlacements()
+	{
 		int placementCount = structurePlacements.Count;
 		int[] definitionIndices = new int[placementCount];
 		int[] anchorCellsX = new int[placementCount];
@@ -1902,10 +2016,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 		return new Godot.Collections.Dictionary<string, Variant>
 		{
-			{ "GridWidth", width },
-			{ "GridDepth", depth },
-			{ "Heights", flatHeights },
-			{ "LockedVertices", flatLocked },
 			{ "StructureDefinitionIndices", definitionIndices },
 			{ "StructureAnchorCellsX", anchorCellsX },
 			{ "StructureAnchorCellsZ", anchorCellsZ },
@@ -1919,8 +2029,23 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 		if (!HasLoadedData)
 			return Task.CompletedTask;
 
-		if (!generateTerrainMesh)
+		loadedUrbanChunkPaths = null;
+		if (data != null && data.ContainsKey("UrbanChunkPaths"))
+		{
+			mapType = Enums.ChunkType.Urban;
+			generateTerrainMesh = false;
+			urbanChunkSize = data["UrbanChunkSize"].AsInt32();
+			loadedUrbanChunkPaths = data["UrbanChunkPaths"].AsStringArray();
+			LoadStructurePlacements(data);
 			return Task.CompletedTask;
+		}
+
+		if (!generateTerrainMesh)
+		{
+			// Older city saves have no terrain/structure data; create a fresh landing site.
+			HasLoadedData = false;
+			return Task.CompletedTask;
+		}
 
 		if (data == null || !data.ContainsKey("Heights"))
 		{
@@ -1957,6 +2082,14 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			}
 		}
 
+		LoadStructurePlacements(data);
+
+		GD.Print("MeshTerrainGenerator: Terrain heightmap loaded successfully.");
+		return Task.CompletedTask;
+	}
+
+	private void LoadStructurePlacements(Godot.Collections.Dictionary<string, Variant> data)
+	{
 		structurePlacements.Clear();
 		if (
 			data.ContainsKey("StructureDefinitionIndices")
@@ -1996,8 +2129,6 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 			}
 		}
 
-		GD.Print("MeshTerrainGenerator: Terrain heightmap loaded successfully.");
-		return Task.CompletedTask;
 	}
 
 	#endregion
@@ -2009,7 +2140,7 @@ public partial class MeshTerrainGenerator : Manager<MeshTerrainGenerator>
 
 	public Vector3I GetMapCellSize()
 	{
-		return new Vector3I(Mathf.RoundToInt(cellSize.X) * chunkSize, Mathf.RoundToInt(cellSize.Y) * chunkSize,
-			Mathf.RoundToInt(cellSize.X) * chunkSize);
+		return new Vector3I(Mathf.RoundToInt(cellSize.X) * ActiveChunkSize, Mathf.RoundToInt(cellSize.Y) * ActiveChunkSize,
+			Mathf.RoundToInt(cellSize.X) * ActiveChunkSize);
 	}
 }

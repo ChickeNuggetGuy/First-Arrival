@@ -97,12 +97,20 @@ public partial class PathVisualizer : Node3D
         
         if (startCell == targetCell) return;
 
-        // Calculate the path
-        List<GridCell> path = Pathfinder.Instance.FindPath(startCell, targetCell);
-        if (path == null || path.Count <= 1) return;
-        
-        var moveAction = ActionManager.Instance.SelectedAction
-            as MoveActionDefinition;
+		var moveAction = ActionManager.Instance.SelectedAction
+		    as MoveActionDefinition;
+		if (moveAction == null || !moveAction.TryBuildCostsOnly(
+			    selectedUnit,
+			    startCell,
+			    targetCell,
+			    out _,
+			    out _))
+			return;
+
+		// Movement selection already computed every affordable shaped path in one
+		// pass. Reuse it while hovering instead of launching another A* search.
+		List<GridCell> path = moveAction.path;
+		if (path == null || path.Count <= 1) return;
 
 
         int currentTU = GetCurrentTimeUnits(selectedUnit);
@@ -166,7 +174,7 @@ public partial class PathVisualizer : Node3D
     {
 	    if(!unit.TryGetGridObjectNode<GridObjectStatHolder>(out GridObjectStatHolder statHolder)) return -1;
 	    
-	    if(!statHolder.TryGetStat(Enums.Stat.TimeUnits, out GridObjectStat stamina)) return -1;
+		if(!statHolder.TryGetStat(Enums.Stat.Stamina, out GridObjectStat stamina)) return -1;
 
 	    return (int)stamina.CurrentValue;
     }
